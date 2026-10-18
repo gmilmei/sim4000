@@ -1,0 +1,88 @@
+\chapter{Everyday operation}\label{everyday-operation}
+\index{Shutdown}
+\index{Command contexts}
+\index{File retention}
+
+Use this section as a route through the detailed, checked examples. Choose one fresh-session example at a time: do not create another process with a name already in use or enter FP commands while a demonstration program is waiting for an answer.
+
+\section{Find the right procedure}\label{find-the-right-procedure}
+
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+Task
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Procedure
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+Start, enter the date and reach \passthrough{\lstinline!s!} & \manualref{first-monitor-session}{First monitor session} \\
+Create a user FP, stop or remove a process & \manualref{processes-and-command-contexts}{Processes and command contexts} \\
+Import, display, copy, rename or export text & \manualref{files-catalog-entries-and-algol-programs}{Files and Algol examples} \\
+Edit an imported text file & \manualref{edit-a-text-file-inside-the-guest}{Guest editor} \\
+Compile Algol or assemble SLANG & \manualref{compile-and-run-a-small-algol-program}{Algol example}, \manualref{assemble-a-slang-source}{SLANG example} \\
+Find programs or inspect file metadata & \manualref{inspect-catalog-information}{Catalog information}, \manualref{software-and-files-in-the-supplied-disk-image}{installed software} \\
+Preserve guest files for another session & \manualref{keep-guest-files-across-sessions}{Keep guest files} \\
+Connect another terminal & \manualref{telnet-consoles}{Telnet consoles} \\
+Choose text or binary host transfer & \manualref{choose-text-or-binary-transfer}{Transfer modes} \\
+Run a reviewed FP command file & \manualref{call-one-command-file-from-another}{Command-file input}, \manualref{execute-commands-conditionally}{conditional execution} \\
+Recover from accidental pasted input & \manualref{inspect-or-discard-pasted-input}{Inspect or discard input} \\
+Select disk persistence or another controller & \manualref{choose-how-rc433x-disk-writes-survive}{RC433X persistence}, \manualref{select-the-optional-historical-disk-interface}{historical disk profile} \\
+Limit host CPU use & \manualref{execution-throttle}{Execution throttle} \\
+Inspect guest memory and execution & \manualref{debugging-and-core-files}{Debugging and core files} \\
+\end{longtable}
+
+\section{Decide what to keep before starting}\label{decide-what-to-keep-before-starting}
+
+The default disk mode is disposable. Exporting a result with \passthrough{\lstinline!tohost!} creates a host file that survives emulator exit, but a guest file written only to the volatile disk overlay does not survive. For ordinary experiments, use that default and export wanted results before quitting.
+
+For work that must remain on the guest disk, make both decisions explicitly:
+
+\begin{itemize}
+\tightlist
+\item
+  Select a persistent overlay or a writable working copy before booting.
+\item
+  Give the guest file a retained catalog scope using the checked \manualref{allocate-resources-and-promote-a-file}{resource allocation and promotion example}.
+\end{itemize}
+
+Persistent disk writes alone do not prevent the monitor from deleting a process's temporary files. Retained guest scope alone does not make a volatile disk overlay persistent. Follow the complete retention example rather than changing just one of these settings.
+
+\section{Suspend, finish or exit}\label{suspend-finish-or-exit}
+
+These are different actions, not interchangeable shutdown commands:
+
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+Action
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Where
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+What remains
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+Control-E, then \passthrough{\lstinline!continue!} & Simulator & Guest execution resumes without reset. \\
+\passthrough{\lstinline!finis!} & Idle ordinary FP command input & Ends that FP; the system removes its process and temporary entries. \\
+\passthrough{\lstinline!quit!} & \passthrough{\lstinline!sim4000>!} & Exits the emulator; volatile disk changes and running guest state are lost. \\
+\end{longtable}
+
+For a finished ordinary FP session, export wanted files first, enter \passthrough{\lstinline!finis!} and wait for the system's pause notice. If you need to verify removal, use a completed system \passthrough{\lstinline!list!}; the pause notice can precede cleanup. Then press Control-E and enter \passthrough{\lstinline!quit!} at the simulator prompt. This is not a rule for exiting an editor, an interactive diagnostic or another running program; use its own documented exit procedure to get back to FP first.
+
+To take a break without ending the guest session, use Control-E and leave the emulator running at \passthrough{\lstinline!sim4000>!}, then \passthrough{\lstinline!continue!} later. The session is still only in that host process; quitting does not create a resumable snapshot. A saved core file is not a complete guest-session checkpoint.
+
+\section{When the terminal context is unclear}\label{when-the-terminal-context-is-unclear}
+
+At \passthrough{\lstinline!sim4000>!}, enter only simulator commands. At guest \passthrough{\lstinline!att!}, select a process name. In \passthrough{\lstinline!s!}, use system commands such as \passthrough{\lstinline!list!} or \passthrough{\lstinline!new!}. In an idle user FP, use utility names and file commands. A program-specific question is another context again: answer that program, not the host shell or FP.
+
+If an expected system reply is delayed by \passthrough{\lstinline!to <process>!}, do not send another system command into that process's pending read. See the bounded \manualref{a-queued-fp-read-can-delay-a-system-reply}{queued FP read example}; its empty-line procedure applies only to the checked idle-FP situation. For other failures, use \manualref{startup-and-terminal-recovery}{startup recovery} or the \manualref{recover-from-fp-and-assembly-errors}{specific FP and assembly error examples}.

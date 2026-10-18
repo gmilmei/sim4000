@@ -1,0 +1,4463 @@
+m.                mons1 - operating system s, part 1
+
+
+c.-880504
+
+
+
+
+b.i30 w.
+i0=82 02 24, i1=12 00 00
+
+; if newtime (i0,i1) > oldtime (a133,a134) then oldtime:=newtime;
+c.i0-a133
+c.i0-a133-1, a133=i0, a134=i1, z.
+c.i1-a134-1,          a134=i1, z.
+z.
+
+i10=i0, i20=i1
+
+i15=i10/100000 , i10=i10-i15*100000 , i25=i20/100000 , i20=i20-i25*100000 
+i14=i10/10000  , i10=i10-i14*10000  , i24=i20/10000  , i20=i20-i24*10000 
+i13=i10/1000   , i10=i10-i13*1000   , i23=i20/1000   , i20=i20-i23*1000
+i12=i10/100    , i10=i10-i12*100    , i22=i20/100    , i20=i20-i22*100
+i11=i10/10     , i10=i10-i11*10     , i21=i20/10     , i20=i20-i21*10
+
+i2:<:                              date  :>
+(:i15+48:)<16+(:i14+48:)<8+46
+(:i13+48:)<16+(:i12+48:)<8+46
+(:i11+48:)<16+(:i10+48:)<8+32
+
+(:i25+48:)<16+(:i24+48:)<8+46
+(:i23+48:)<16+(:i22+48:)<8+46
+(:i21+48:)<16+(:i20+48:)<8+ 0
+
+i3:  al. w0      i2.     ; write date:
+     rs  w0  x2  +0      ;   first free:=start(text);
+     al  w2       0      ;
+     jl      x3          ;   return to slang(status ok);
+
+     jl.         i3.     ;
+e.
+j.
+
+
+z. ; 880504
+
+
+
+
+; rc date
+
+; segment 8: operating system s
+
+s. k=k, h50,g110,f29,e90,d90,c100,v100
+w.b127=k, c70, k = k-2
+
+; segment structure:
+;     definitions         (c names)
+;     utility procedures  (d names)
+;     variables           (e names)
+;     command actions     (g names)
+;     tables              (h names)
+;
+;     (i and j names are used locally)
+
+
+; some definitions originally placed elsewhere in the monitor / onn880508
+
+  a127=q7     ;  max device  (fetched from option1, monitor text 0)
+  a133=101177 ;  monitor date
+  a134=120000 ;     -    time
+  a135=3      ;  release (3.0)
+  a136=0      ;     -
+  a180=14     ;  register dump area length (hw)
+  a199=2      ;  devno of s mainconsole
+
+; end of additional definitions
+
+
+; size options:
+c0=k        ; first addr of s
+; c1=def below; size of console description
+; c2=def below; size of work area
+c3=4       ; no of own work areas
+c16= 2       ; stack depth ( of nested 'reads' )
+c4=c3+1     ; no of own buffers
+c5=2        ; no of own area processes
+c7=7        ;     -    buf
+c8=6        ;     -    area
+c9=0        ;     -    internal
+c10=8.7440   ;     -    function
+;c11=def below; size of core table entry
+c12=12800    ; standard size
+c13=20       ;     -    entries,perm,work device
+c14=800      ;     -    segments,perm,work device
+c81=a117/2    ; number of console desriptions (arbitrary choosen value)
+c82=8.0760    ; standard mask
+c89=8+12*a112       ; standard length of susercatentry
+c100=1     ; number of privileged conseles
+c15=k, <:disc:>,0,0   ; standard work device name
+; definition of chain head. chain heads may be
+; placed any where in the elements, but the location
+; must be the same in all sorts of chains
+;c69     ; susercatname
+
+c20=0        ; next chain element
+c21=c20+2    ; last chain element
+c23= 8.77700000       ; systemoptions: all commands except job/get, 
+                      ; terminals unblocked after start up.
+
+t.
+m.
+m.                s size options included
+
+
+c4=c3+1; no of own buffers
+c5=2   ; no of own area processes
+
+; systemoptions:
+; systemoptions determine whether code is included for certain
+; commands. they are defined by bits in the identifier c23
+; as follows:
+;
+;    break:             c23=c23 o. 1<22
+;    include/exclude:   c23=c23 o. 1<21
+;    call:              c23=c23 o. 1<20
+;    list:              c23=c23 o. 1<19
+;    max:               c23=c23 o. 1<18
+;    replace:           c23=c23 o. 1<17
+;    all:               c23=c23 o. 1<16
+;    print:             c23=c23 o. 1<15
+; job:          c23=c23o.1<14
+;      terminals blocked after start up   c23=c23 o. 1<13
+
+; testoptions:
+; testoptions are used during debugging of the system. they
+; are defined by bits in the identifier c24 as follows:
+;
+;    internal interrupt:     c24=c24 o. 1<23
+;    character testoutput:   c24=c24 o. 1<22
+;    parameter testoutput:   c24=c24 o. 1<21
+;    event testoutput:       c24=c24 o. 1<20
+;    work testoutput:        c24=c24 o. 1<19
+;    console testoutput:     c24=c24 o. 1<18
+c24 = a93         
+
+; definition of core table entry format:
+
+;c20=def above; next entry
+;c21=def above; last entry
+c17=c21+2    ; child
+c18=c17+2    ; child console
+c22=c18+2    ; segment no in susercat or -1
+c19=c22+2    ; kind , name of alternative primary input
+c93=c19+10   ; kind , name of alternative primary output
+c11=c93+10+2 ; size of coretable entry
+
+; definition of a console description format
+;c20=def above; next console
+;c21=def above; last console
+c28=c21+2    ; access count        word
+c25=c28+2    ; process description word
+c26=c25+2    ; priority            halfword
+c27=c26+1    ; command mask        halfword
+c29=c27+1    ; process name        quadrouple
+c30=c29+8       ; first address      word
+c31=c30+2        ; top address       word
+c32=c31+2    ; buf claim           halfword
+c33=c32+1    ; area claim;         halfword
+c34=c33+1    ; internal claim;     halfword
+c35=c34+1    ; function mask;      halfword
+c37=c35+1    ; protection register;halfword
+c38=c37+1    ; protection key;     halfword
+c41=c38+1    ; max interval;       double
+c42=c41+4    ; standard interval;  double
+c39=c42+4    ; size;               word
+c40=c39+2    ; program name;       quadrouble
+c43=c40+8   ; user interval;      double
+c95=c43+4    ; primin : kind , name
+c96=c95+10   ; primout: kind , name
+c97=c96+10   ; first logic address
+c98=c97+2    ; cpa limit
+c44=c98+2     ; entries temp oth device
+c45=c44+2    ; segments temp oth device
+c46=c45+2    ; entries perm oth device
+c47=c46+2; segments perm on 0th device
+; ---
+;c44+n<3      ; entries temp nth device
+;c45+n<3      ; segments temp nth device
+;c46+n<3      ; entries perm nth device
+;c47+n<3      ; segments perm mth device
+c48=c44+a112<3-2; last of console description
+c1=c48+2       ; size of console description
+
+;last part of console buffer will be cleared at each call of 
+; new , all , get or job.
+c49=c95      ; first parameter to be cleared
+
+; meaning of command mask:
+; bit  0:(not used)
+; bit  1:all bs resources
+; bit  2:mode,modify,print,date
+; bit  3:job,start,stop,break,dump,list,max,remove,proc,prog,load,read,unstack,i,o
+; bit  4:include,exclude
+; bit  5:size,pr,pk,login,user,project,,prio,base
+; bit  6:addr,function,buf,area,internal,key,bs,temp,perm,all,call
+; bit  7:new,create,run,init,
+; bit  8:privileged
+; bit  9:absolute protection
+; bit 10:absolute address
+; bit 11:not used
+
+; definition of work area format:
+
+c50=0        ; state (=0=> available: <> 0 => buff addr)
+c51=c50+2    ; restart addr
+; *** start of part to be saved-restored
+c90=c51+2      ; name area
+c78=c90+10
+c80=c78+2
+c91=c80+2    ; remove indicator
+c52=c91+2    ; console
+c53=c52+2    ; last addr
+c54=c53+2    ; char shift
+c55=c54+2    ; char addr
+c56=c55+2    ; chilel
+c57=c56+2    ; core table entry
+; *** end of part to be saved-restored
+c58=c57+2    ; input stack pointer
+c59=c58+2    ; first stack element
+  ; subformat of stack entry:
+  ; name + nta of area
+  c60=10       ; segment no
+  c61=c60+2    ; saved last addr
+  c62=c61+2    ; saved char shift
+  c63=c62+2    ; saved char addr
+  c64=c63+2    ; (size of entry)
+c71=c16*c64+c59; (top of stack)
+c72=c71-c64  ; last stack entry start
+c73=c59-c64  ; base of stack
+c65=c71+2    ; output buffer start
+c66=c65+36   ; input buffer start; often output buffer top
+c67=c66+52   ; last addr of buffer
+c2=c67+2     ; size of a work area
+; the input buffer may be overwritten by output in certain cases
+
+; meaning of work area state:
+; state=0           available
+; state=buf addr    waiting for answer
+
+; procedure type internal
+; comment: internal interrupt procedure used during debugging
+; of s.
+d0:
+c.(:c24>23a.1:)-1       ; if internal interrupt then
+w.    0,r.a180>1        ; begin
+b.i24 w.
+    am        (b4)    ;
+    rl  w0     a199<1 ;
+     jl. w3     d24.     ;   find console(mainconsole);
+     jl.          0      ;+2: not found: wait forever;
+     rs. w1     (i2.)     ;   console:=main console;
+     jl. w3     d19.     ;   init write;
+     al. w1      i0.     ;
+     jl. w3     d21.     ;   write text(<:s-break:>);
+     al. w2      d0.     ;
+
+i1:  al  w0      32      ; next:
+     jl. w3     d20.     ;   write char(sp);
+     rl  w1  x2          ;
+     jl. w3     d22.     ;   write integer(param);
+     al  w2  x2  +2      ;
+     se. w2      d0.+a180;   if not all printed then
+     jl.         i1.     ;     goto next;
+
+     al  w0      10      ;
+     jl. w3     d20.     ;   writechar(nl);
+     jl. w3     d23.     ;   type line(buf);
+     al. w1     (i3.)     ;
+     jd     1<11+18      ;   wait answer(buf);
+     jl.       (i4.)   ;   goto end line;
+
+i0:<:<10>s-break:<0>:>  ;
+ i2: e25
+ i3: e32
+i4:  g30               ;
+e.
+z.                      ; end
+
+b. i20, j20 w.
+
+i0:  0                 ; saved link
+i1:  0                 ; saved w3
+i2:  0                 ; saved w1
+
+i5:  h20               ; first of buffer
+
+j0:  g3                ; end line: not allowed
+j1:  g12               ; end line: area unknown
+j2:  g15               ; end line: area error
+
+j5:  e24               ; pointer to: work
+j6:  e26               ; pointer to: last addr
+j7:  e28               ; pointer to: char addr
+ j8: e27               ; pointer to: char shift
+
+j10: e47               ; pointer to: area input mess
+j11: e49               ; pointer to: last of buffer
+j12: e50               ; pointer to: segment number
+j13: e32               ; pointer to: answer
+; procedure stack input
+;   stacks the input pointers and selects the given area for input
+;
+; call: w2=name, w3=link
+; exit: all regs undef
+
+d79:                   ; stack input:
+     rs. w3     i0.    ;   save return;
+     rl. w1    (j5.)   ;   w1 := work;
+     rl  w3  x1+c58    ;   w3 := stack pointer;
+     sn  w3  x1+c72    ;   if stack pointer = last stack entry then
+     jl.       (j0.)   ;     goto not allowed; (* i.e. stack overflow *)
+
+     al  w3  x3+c64    ;   increase (stack pointer);
+     rs  w3  x1+c58    ;
+
+     rl. w1    (j6.)   ;
+     rs  w1  x3+c61    ;   save last addr in stack entry;
+     dl. w1    (j7.)   ;
+     ds  w1  x3+c63    ;   save char shift and char addr in stack entry;
+
+     dl  w1  x2+2      ;   move name to stack entry;
+     ds  w1  x3+2      ;
+     dl  w1  x2+6      ;
+     ds  w1  x3+6      ;
+
+; prepare variables for immediately buffer change
+     al  w0    -1      ;
+     rs  w0  x3+c60    ;   segment.stack entry := -1;
+
+     rl. w2     i0.    ;   w2 := return;
+     jl.        d82.   ;   goto next segment;
+
+
+
+; procedure unstack input
+;   restores the char pointers from the stack, and maybe also the buffer
+;
+; call: w2=link
+; exit: all regs undef
+
+d80:                   ; unstack input:
+     rl. w1    (j5.)   ;   w1 := work;
+     rl  w3  x1+c58    ;   w3 := stack pointer;
+     sn  w3  x1+c73    ;   if stack pointer = stack base then
+     jl      x2        ;     return;
+
+     al  w0  x3-c64    ;
+     rs  w0  x1+c58    ;   decrease (stack pointer);
+
+     dl  w1  x3+c63    ;
+     ds. w1    (j7.)   ;   restore char shift and char addr from stack entry;
+     rl  w1  x3+c61    ;
+     rs. w1    (j6.)   ;   restore last addr from stack entry;
+
+     jl.        d81.   ;   goto get segment;
+
+
+
+; procedure get segment
+; 
+; call: w2 = link
+; exit: w1,w2,w3=unch, w0=undef
+
+d81:                   ; get segment:
+     am         0-1    ;   increment := 0;
+
+; procedure get next segment
+;
+; call: w2 = link
+; exit: w1,w2,w3=unch, w0=undef
+
+d82:                   ; next segment:
+     al  w0     1      ;   increment := 1;
+
+; procedure read segment
+;
+; call: w0 = increment, w2 = link
+; exit: w1,w2,w3=unch, w0=undef
+
+d83:                   ; read segment:
+     ds. w3     i1.    ;   save return, w3;
+     rs. w1     i2.    ;   save w1;
+
+     rl. w1    (j5.)   ;   w1 := work;
+     rl  w3  x1+c58    ;   w3 := stack pointer;
+     sn  w3  x1+c73    ;   if stack pointer = stack base then
+     jl.        i10.   ;     goto return;
+
+     rl. w1     i5.    ;   w1 := first of buffer;
+     al  w2  x1+510    ;   w2 := last of buffer;
+     ds. w2    (j11.)  ;
+
+     sn  w0     0      ;   if increment <> 0 then
+     jl.        i8.    ;     begin
+     rs. w2    (j6.)   ;     last addr := last of buffer;
+     rs. w1    (j7.)   ;     char addr := first of buffer;
+     al  w1    -16     ;
+     rs. w1    (j8.)   ;     char shift := -16;
+i8:                    ;     end;
+
+     wa  w0  x3+c60    ;   segment := segment + increment;
+     rs  w0  x3+c60    ;
+     rs. w0    (j12.)  ;
+     jd         1<11+92;   create entry lock process(area name);
+     se  w0     0      ;   if result <> ok then
+     jl.       (j1.)   ;     goto area unknown;
+
+     al. w1    (j10.)  ;
+     jd         1<11+16;   send message (area input, area name);
+     al. w1    (j13.)  ;
+     jd         1<11+18;   wait answer(answer area);
+     rl  w1  x1        ;
+     lo  w1     0      ;   w1 := status 'or' result;
+     jd         1<11+64;   remove process (area name);
+     se  w1     1      ;   if any arror then
+     jl.       (j2.)   ;     goto area error;
+
+i10:                   ; return:
+     rl. w1     i2.    ;   restore regs;
+     dl. w3     i1.    ;
+     jl      x2        ;   return;
+
+e.                     ;
+
+; procedure next char(char,type)
+; comment: unpacks and classifies the next character from
+; the console buffer:
+;     character type:
+;     0   <small letter>
+;     1   <digit>
+;     2   <radix point or minus sign>
+;     3   <space>
+;     4   <separator>
+;     5   <end line>
+;     6   <other graphic>
+;     7   <blind>
+;     call:     return:
+; w0            char
+; w1            type
+; w2            destroyed
+; w3  link      link
+
+b.i24                   ; begin
+w.d1: dl. w2  e28.      ;
+     sh  w1       0      ;   if charshift>0 then
+     jl.         i0.     ;   begin
+     al  w1    -16     ;   char shift := -16;
+     al  w2  x2+2      ;   char addr := char addr + 2;
+     sh. w2    (e26.)  ;   if char addr > last addr then
+     jl.        i0.    ;     begin
+     al  w0     10     ;     char := newline;
+     rl. w1     e24.   ;
+     rl  w2  x1+c58    ;
+     sn  w2  x1+c73    ;     if stack pointer = stack base then
+     jl.        i1.    ;       goto classify char;  (* i.e. not end of area-read-buffer *)
+     jl. w2     d82.   ;     get next segm;
+     jl.        d1.    ;     goto next char;
+                       ;     end;
+i0:  rl  w0  x2  +0      ;
+     ls  w0  x1  +0      ;   char:=word(charaddr) shift charshift;
+     la. w0      i3.     ;   char:=char(17:23);
+     al  w1  x1  +8      ;   charshift:=charshift+8;
+     ds. w2     e28.   ;
+i1:                    ; classify char:
+     rl  w1       0      ;
+     ls  w1      -2      ;
+     wa. w1      e5.     ;
+     bz  w1  x1  +0      ;   entry:=byte(chartable+char/4);
+     so  w0       2.10   ;   type:=
+     ls  w1      -6      ;   if char mod 4=0 then entry(0:2) else
+     so  w0       2.01   ;   if char mod 4=1 then entry(3:5) else
+     ls  w1      -3      ;   if char mod 4=2 then entry(6:8) else
+     la. w1      i4.     ;                        entry(9:11);
+     jl      x3        ;   end;
+i3:8.177             ;
+i4:8.7               ;
+e.                      ; end
+
+; procedure next param(type)
+; comment: converts and classifies the next parameter from
+; the console buffer.
+;      parameter type:
+;      0   <empty>
+;      1   <name>
+;      2   <integer>
+;      3   <unknown>
+;      call:     return:
+; w0             type
+; w1             unchanged
+; w2             unchanged
+; w3   link      link
+
+b.i24                   ; begin
+w.d2: rs. w3  e60.      ;
+     ds. w2     e59.     ;
+     al  w1     0      ;
+     se. w1    (e87.)  ;   if areabuf undef then
+     jl. w2     d81.   ;     get segment;
+     rs. w1     e87.   ;   areabuf := defined;
+
+     al  w0     0      ;   param type := 0;
+     ds. w1     e19.     ;   integer:=0;
+     ds. w1     e21.     ;
+     ds. w1     e23.     ; name:=0
+     al  w0      10      ;
+     rl. w1      e6.     ;   radix:=10;
+     ds. w1     e57.     ;   state:=param table;
+
+d3:  jl. w3      d1.     ; continue:
+     wa. w1     e57.     ;   next char(char,type);
+     bz  w1  x1  +0      ;   entry:=byte(state+type);
+     al  w2     0      ;
+     ld  w2      -2      ;   action:=entry(0:9);
+     ls  w2     -19      ;
+     wa. w2      e6.     ;   state:=
+     rs. w2     e57.     ;   param table+8*entry(10:11);
+     jl.     x1 +d2.     ;   goto action;
+
+d4:  rl. w3     e19.     ; letter:
+     sl  w3      11      ;   if integer>=10
+     jl.         d7.     ;   then goto unknown;
+     al  w2       0      ;
+     wd. w3      i0.     ;
+     ls  w2       3      ;   char:=char shift
+     ac  w2  x2 -16      ;   (16-integer mod 3 * 8);
+     ls  w0  x2  +0      ;
+     ls  w3       1      ;   addr:=name+integer/3*2;
+     lo. w0  x3+e20.     ;
+     rs. w0  x3+e20.     ;   word(addr):=word(addr) or char;
+     rl. w3     e19.     ;
+     al  w3  x3  +1      ;
+     al  w2       1      ;   integer:=integer+1;
+     ds. w3     e19.     ;   param type:=1;
+     jl.         d3.     ;   goto continue;
+d5:  se  w0      45      ; radix or minus
+     jl.         i1.     ; if minus thrn
+     al  w3      -1      ;
+     rs. w3      i4.     ;
+     jl.         d3.     ;
+
+i1:  al  w3       0      ; 
+     rx. w3     e19.     ;   radix:=integer;
+     rs. w3     e56.     ;   integer:=0;
+     jl.         d3.     ;   goto continue;   
+
+d6:  rl. w3     e19.     ; digit:
+     wm. w3     e56.     ;
+     al  w3  x3 -48      ;   integer:=
+     wa  w3       0      ;   integer*radix-48+char;
+     al  w2       2      ;   param type:=2;
+     ds. w3     e19.     ;
+     jl.         d3.     ;   goto continue;
+
+d11:                   ; newline or semicolon:
+     sn  w0     10     ;
+     jl.        d8.    ;   while char <> newline do
+     jl. w3     d1.    ;     next char;
+     jl.        d11.   ;   goto delimiter;
+
+d7:                    ; unknown:
+     sn  w0     25     ;   if char = em then
+     jl. w2     d80.   ;     unstack input;
+     al  w2     3      ;
+     rs. w2     e18.     ;   param type:=3;
+d8:  rl. w0     e18.     ; delimiter:
+     rl. w2     e18.     ;
+     se  w2       2      ;
+     jl.         i2.     ;
+     rl. w3      i4.     ;
+     sh  w3      -1      ;
+     ac. w3    (e19.)    ;
+     sh  w3      -1      ;
+     rs. w3     e19.     ;
+     rs. w2      i4.     ;
+i2:  dl. w2     e59.     ;
+c.(:c24>21a.1:)-1       ;   if param testoutput then
+     jd     1<11+28      ;   type w0(param type);
+z.    jl.    (e60.)     ;
+i0:3                 ;
+i4:0     ;sign
+e.                      ; end
+
+; procedure next name
+; comment: checks that the next parameter from the console
+; buffer is a name:
+;      call:     return:
+; w0             type
+; w1             unchanged
+; w2             unchanged
+; w3   link      link
+
+b.i24                   ; begin
+w.d15:rs. w3  i0.       ;
+     jl. w3      d2.     ;   next param(type);
+     se  w0       1      ;   if type<>1
+     jl.         g2.     ;   then goto end line;
+     jl.        (i0.)    ;
+i0:0                 ; end
+
+
+; procedure next integer(integer)
+; comment: checks that the next parameter from the console
+; buffer is an integer.
+;      call:     return:
+; w0             integer
+; w1             unchanged
+; w2             unchanged
+; w3   link      link
+
+w.d16:rs. w3  i0.       ; begin
+     jl. w3      d2.     ;   next param(type);
+     se  w0       2      ;   if type<>2
+     jl.         g2.     ;   then goto end line;
+     rl. w0     e19.     ;
+     jl.        (i0.)    ;
+e.                      ; end
+
+; procedure increase access(console)
+; comment: increases the access counter of a given console,
+; and if the console was in the free pool, it is hooked
+; onto the used chain.
+;      call:     return:
+; w0             destroyed
+; w1   console   console
+; w2             unchanged
+; w3   link      unchanged
+
+b. i24 w.
+d9:  ds. w3      i1.     ;
+     al  w0       1      ; begin
+     wa  w0  x1+c28      ;
+     sh  w0       1      ;
+     al  w0       2      ;
+     rx  w0  x1+c28      ;   access count:= access count + 1;
+i4:;   if access count was <> 0
+     sl. w1    (e31.)    ;   or console belongs to the predefined
+     jl.          4      ;   then return;
+     jl. w3     d17.     ;   remove element(console);
+     dl. w3      i1.     ;   return
+     jl      x3          ; end;
+
+; procedure decrease access(console);
+; comment: decreases the access counter of a given console,
+; and if the access counter becomes null, and the console
+; description belongs to the potentially free consoles, it
+; is removed from the used chain and hooked onto the
+; rear of the free chain.
+;      call:     return:
+; w0             unchanged
+; w1   console   console
+; w2             unchanged
+; w3   link      destroyed
+
+d10: ds. w3      i1.     ; begin
+     rl  w3  x1+c28      ;
+     se  w3       2      ;
+     jl.         +8      ;
+     rl. w2     e81.     ;
+     sn  w2       0      ;
+     al  w3  x3  -1      ;
+     al  w3  x3  -1      ;   access count:= access - 1;
+sh w3 0
+al w3 0
+     rs  w3  x1+c28      ;
+     sn  w3       0      ;   if access count <> 0
+     sl. w1    (e31.)    ;   or console is predefined
+     jl.         i10.    ;   then return;
+     al. w2     e35.     ;
+     jl. w3     d18.     ;   link element(console,free chain);
+i10: dl. w3      i1.     ;   return
+     jl      x3          ;
+; end;
+
+i0:0            ; common room for register save
+i1:0            ; in increase and decrease access.
+i3:c82         ; standard console mask
+
+; procedure remove element(element)
+; comment: removes an element from its chain and makes
+; it point at itself.
+;      call:     return:
+; w0             unchanged
+; w1   element   element
+; w2             old next
+; w3   link      old last
+
+d17: rs. w3      i2.     ; begin
+     dl  w3  x1+c21      ;   next(last):= next(element)
+     rs  w2  x3+c20      ;   last(next):= last(element)
+     rs  w3  x2+c21      ;   next(element):= element;
+     rs  w1  x1+c21      ;   last(element):= element;
+     rs  w1  x1+c20      ;   return;
+     jl.        (i2.)    ; end;
+
+; procedure link element(element,head);
+; comment: links a console to the rear of the chain
+; defined by head. this is equivalent to linking
+; into a chain immediately before the element named
+; head.
+;      call:     return:
+; w0             unchanged
+; w1   element   element
+; w2   head      head
+; w3   link      old last
+
+d18: rs. w3      i2.     ; begin
+     rl  w3  x2+c21      ;   rear:= last(head);
+     rs  w1  x2+c21      ;   last(element):= last(head)
+     rs  w1  x3+c20      ;   next(rear):= element;
+     rs  w2  x1+c20      ;   next(element):= head;
+     rs  w3  x1+c21      ;   last(element):= rear;
+     jl.        (i2.)    ;   return;
+; end;
+i2:0            ; general return for remove and link;
+e.                      ; end
+
+; procedure init write
+; comment: prepares the writing of characters in the line buffer
+; within the current work area.
+;     call:     return:
+; w0            unchanged
+; w1            unchanged
+; w2            unchanged
+; w3  link      link
+
+b.i24                   ; begin
+w.d19:rs. w3  e55.      ;
+     rl. w3     e24.     ;
+     al  w3  x3+c65      ;
+     rs. w3     e45.     ;   line addr:=work+linebuf;
+     rs. w3     e46.     ;   writeaddr:=lineaddr;
+     al  w3      16      ;   writeshift:=16;
+     rx. w3     e55.     ;
+     jl      x3  +0      ;
+e.                      ; end
+
+
+; procedure writechar(char)
+; comment: packs the next character in the storage address
+; initialized by initwrite.
+;     call:     return:
+; w0  char      destroyed
+; w1            unchanged
+; w2            unchanged
+; w3  link      link
+
+b.i24                   ; begin
+w.d20:rx. w1  e55.      ;   if writeshift<0
+     rx. w2     e46.     ;   then
+     sl  w1       0      ;   begin
+     jl.         i0.     ;   writeshift:=16;
+     al  w1      16      ;   writeaddr:=writeaddr+2;
+     al  w2  x2  +2      ;   end;
+i0:  ls  w0  x1  +0      ;   char:=char shift writeshift;
+     se  w1      16      ;   if writeshift<>16 then
+     lo  w0  x2  +0      ;   char:=char or word(writeaddr);
+     rs  w0  x2  +0      ;   word(writeaddr):=char;
+     al  w1  x1  -8      ;   writeshift:=writeshift-8;
+     rx. w1     e55.     ;
+     rx. w2     e46.     ;
+     jl      x3  +0      ;
+e.                      ; end
+
+; procedure writetext(addr)
+; comment: moves a textstring terminated by a null to the
+; storage address initialized by initwrite.
+;     call:     return:
+; w0            no of chars
+; w1  addr      destroyed
+; w2            unchanged
+; w3  link      link
+
+b.i24                   ; begin
+w.d21:ds. w3  e60.      ;
+     al  w3       0      ;
+
+     al  w2  x1          ;
+i0:  rl  w1  x2          ; next word: portion:= word(addr);
+     al  w2  x2  +2      ;   addr:= addr + 2;
+i1:  al  w3  x3  +1      ;
+     al  w0       0      ;   repeat
+     ld  w1       8      ;     ch:= portion shift (-16);
+     sn  w0       0      ;     if ch = 0 then
+     jl.         i2.     ;     goto endtext;
+     rs. w3     e58.     ;
+     jl. w3     d20.     ;     write char(ch);
+     rl. w3     e58.     ;
+     al  w1  x1  +8.377  ;     portion:= portion shift 8 + 255;
+     sn  w1      -1      ;   until portion = 1;
+     am       i0-i1      ;
+     jl.         i1.     ;   goto next word;
+i2:  al  w0      32      ; end text:
+     al  w1  x3          ;
+     jl. w3     d20.     ;   writechar(32);
+i6:  rl. w1     e58.     ;
+i7:  dl. w3     e60.     ;
+     jl      x3  +0      ; end
+
+; procedure writeinteger(integer)
+; comment converts a positive integer to a textstring which
+; is moved to the storage address initialized by initwrite.
+;     call:     return:
+; w0            destroyed
+; w1  integer   number of digits
+; w2            unchanged
+; w3  link      link
+i4:1 000 000         ; powers of ten:
+100 000         ;
+10 000         ;
+1 000         ;
+100         ;
+10         ; 
+1         ;
+
+d22: ds. w3     e60.     ; begin
+     sl  w1       0      ;   if number < 0 then
+     jl.        i10.     ;    begin
+     ac  w1  x1          ;     number:= -number;
+     am       45-32      ;     sign:= <minus>;
+i10: al  w0      32      ;   end
+     al  w3       7      ;
+     rs. w3     i15.     ;
+     sl  w1       0      ;   else sign:= <sp>;
+     sl. w1     (i4.)    ;   if number = 1 < 23
+     jl.        i12.     ;   or number > 10 ** 6 then
+     al  w2      12      ;   divisor:= 10 ** 6;
+     al  w3       1      ;
+i11: sl. w1 (x2 +i4.-2)  ;   else
+  jl.  +4     ;
+     jl.        i13.     ;    begin
+     al  w2  x2  -2      ;     divisor:= 1;
+     al  w3  x3  +1      ;
+     jl.        i11.     ;     while number > divisor * 10 do
+i12: al  w2       0      ;      divisor:= divisor * 10;
+i13: rs. w3     i15.     ;
+     jl. w3     d20.     ;    end;
+i14: al  w0       0      ;   writechar(sign);
+     wd. w1  x2 +i4.     ;  repeat
+     al  w1  x1 +48      ;   digit:= 48 + number // divisor;
+     rx  w1       0      ;   number:= number mod divisor;
+     jl. w3     d20.     ;   writechar(digit);
+     al  w2  x2  +2      ;   divisor:= divisor // 10;
+     sh  w2      12      ;  until divisor = 0;
+     jl.        i14.     ;   comment return via
+     rl. w1     i15.     ;
+     jl.         i7.     ; end in writetext
+i15: 0             ; number of digits
+e.                      ; end
+
+; procedure typeline(buf)
+; comment: starts the output on the current console of the line buffer
+; within the current work area.
+;     call:     return:
+; w0            destroyed
+; w1            destroyed
+; w2            buf
+; w3  link      destroyed
+
+; procedure send buf (mess, buf)
+; (as typeline, but at call: w1=mess)
+
+b.i24                   ; begin
+w.
+d23:                   ; type line:
+     al. w1     e44.   ;   mess := output message;
+d26:                   ; send buf:
+     rs. w3     e60.   ;
+     rl. w2     e25.     ;
+     rl  w2  x2+c25      ;
+     dl  w0  x2+a11+2    ;
+     ds. w0     e41.     ;
+     dl  w0  x2+a11+6    ;
+     ds. w0     e43.     ;   receiver:=name(proc);
+     al. w3     e40.     ;
+     jd     1<11+16      ;   send mess(receiver,typemess,buf);
+     jl.       (e60.)    ;
+e.                      ; end
+
+; procedure find console(device no, console, sorry)
+; comment: searches a console with a given process descr. addr.
+;     call:     return:
+; w0  cons addr cons addr
+; w1            console
+; w2            unchanged
+; w3  link      link
+
+b.i24                   ; begin
+w.d24:rl. w1  e9.       ;   for console:=first console
+i0:  sn  w0 (x1+c25)     ;   step console size
+     jl      x3  +2      ;   until last console do
+     sn. w1    (e10.)    ;   if device(console)=device no
+     jl.         +6      ;   then goto found;
+     al  w1  x1 +c1      ;   goto sorry;
+     jl.         i0.     ; found:
+     al. w1     e35.     ; if not found then get
+     rl  w1  x1+c20      ; free consolebuffer
+     sn. w1     e35.     ;
+     jl      x3  +0      ;
+     rs  w0  x1+c25      ;
+     jl      x3  +2      ;
+e.                      ; end
+
+; common block for the procedures find parent, find size,
+; find addr, and max size. the procedures use the
+; variable core table element (e30) as work variable, and
+; the three first mentioned procedures leave it pointing
+; at a suitable element. i.e. for find parent, e30 points
+; at the core table element for the chilet, and for
+; find size and find addr, e30 points at an element
+; before which a suitable hole may be found.
+
+b. i24, j24
+w.
+
+; local sub procedures first hole and next hole(addr, size, sorry);
+; comment: this set of procedures perform the actual up
+; dating of the variable core table element.
+;      call:     return
+; w0:            hole addr
+; w1:            hole size
+; w2:            unchanged
+; w3:  link      link
+
+j0:  rs. w3     e30.     ; entry first hole:
+     rl. w0     e16.     ;   hole addr:= first core;
+     al. w3     e15.     ;   element:= core table head;
+     jl.         j2.     ;   goto advance;
+
+j1:  rx. w3     e30.     ; entry next hole:
+     sn. w3     e15.     ;   element:= core table element
+     jl.       (e30.)    ;   if element = core table head then
+     am     (x3+c17)     ;   return sorry;
+     rl  w0     a18      ;   hole addr:= top addr(child(element));
+c.-880504
+     am     (x3+c17)
+     wa  w0    a182      ; add base
+z. ; 880504
+j2:  rl  w3  x3+c20      ; advance:
+     rl  w1  x3+c17      ;   element:= next(element);
+     sn. w3     e15.     ;   if element = core table head
+     al. w1      e1.     ; el then tophole=topcore
+     rs. w2      i5.
+c.-880504
+     rl  w2  x1+a182
+z. ; 880504
+     rl  w1  x1+a17      ;   else tophole:= first addr(child(element));
+c.-880504
+     se. w3     e15.     ;
+     wa  w1       4      ; add base
+z. ; 880504
+     ws  w1       0      ;   hole size:= top hole - hole addr;
+     rx. w3     e30.     ;   core table element:= element;
+     rl. w2      i5.     ;
+     jl      x3  +2      ;   return happy;
+
+ i5: 0
+
+; procedure find parent(child,console,coretableelement,sorry);
+; comment: searches the parent console of a given child and
+; sets the variable core table element.
+;      call:     return:
+; w0:            destroyed
+; w1:            console
+; w2:  child     child
+; w3:  link      core table element
+
+d25: rs. w3     e60.     ; begin
+     am       j0-j1      ;   for i:= first hole,
+i0:  jl. w3      j1.     ;       next hole while happy do
+     jl.       (e60.)    ;    begin
+     rl. w3     e30.     ;     if child = child(element) then
+     se  w2 (x3+c17)     ;      begin console:= console(element);
+     jl.         i0.     ;       return happy
+     rl  w1  x3+c18      ;      end;
+     am.       (e60.)    ;    end;
+     jl          +2      ;   return sorry;
+; end;
+
+; procedure find size(start,size,sorry);
+; comment: the core table is searched for the first
+; hole not less than the size given. the start address
+; is returned and the variable core table entry is set
+; to point at the element before which a hole is
+; found.
+;      call:     return:
+; w0:            first addr
+; w1:  size      size (i.e. unchanged)
+; w2:            destroyed
+; w3:  link      destroyed
+
+d27: rs. w1     e37.     ; begin
+     rs. w3     e38.     ;   wanted size:= size;
+     am       j0-j1      ;   for size:= first hole, next hole while happy do
+i1:  jl. w3      j1.     ;   if size >= wanted size then
+     jl.       (e38.)    ;   goto found;
+     sl. w1    (e37.)    ;   return sorry;
+     jl.          4      ; found: size:= wanted size;
+     jl.         i1.     ;   first addr:= hole addr;
+     dl. w2     e38.     ;   return happy;
+     jl      x2  +2      ; end;
+
+; procedure find addr (start,size,sorry);
+; comment: the core table is searched for a hole with
+; a given start address and a size not less than given.
+;      call:     return:
+; w0:  start     start (i.e. unchanged)
+; w1:  size      size (i.e. unchanged)
+; w2:            destroyed
+; w3:  link      destroyed
+
+d28: rs. w1     e57.     ; begin
+     rs. w3     e58.     ;
+     rl  w2       0      ;
+     am       j0-j1      ;   for size:= first hole, next hole while happy do
+i2:  jl. w3      j1.     ;    begin
+     jl.       (e58.)    ;     if holeaddr > start addr then
+     sl  w0  x2  +2      ;     return sorry;
+     jl.       (e58.)    ;     add := hole addr + hole size
+     wa  w1       0      ;            - wanted size;
+     ws. w1     e57.     ;     if add >= start then goto found;
+     sh  w1  x2  -2      ;    end;
+     jl.         i2.     ;   return sorry;
+     al  w0  x2          ; found:
+     dl. w2     e58.     ;   return happy;
+     jl      x2  +2      ; end;
+
+; procedure find max(size)
+; comment: the core table is searched for the size of the largest
+; hole, and the size is delivered;
+;      call:     return:
+; w0:            destroyed
+; w1:            size
+; w2:            destroyed
+;w3:  link      destroyed
+
+d29: rs. w3     e58.     ; begin
+     al  w2       0      ;
+     am       j0-j1      ;   max:= 0;
+i3:  jl. w3      j1.     ;   for size:= firsthole,nexthole while happy do
+     jl.         i4.     ;    if size >= max then
+     sl  w1  x2          ;    max:= size;
+     al  w2  x1          ;
+     jl.         i3.     ;   size:= max;
+i4:  al  w1  x2          ;   return
+     jl.       (e58.)    ; end;
+
+e.
+
+; procedure reserve core(child)
+; comment: inserts a child in the core table just before
+; the element pointed at by core table entry. the variable
+; core table entry is updated to point at the new element;
+;     call:     return:
+; w0     child       child
+; w1            console
+; w2  console     core table element
+; w3  link      destroyed
+
+b.i24 w.                ; begin
+d30: rs. w3     e60.     ;   i:= base core table;
+     rl. w1     e33.     ; repeat
+i0:  al  w1  x1+c11      ;    i:= i + core table entry size;
+     se  w1 (x1+c21)     ; until
+     jl.         i0.     ;    core table entry(i) is free;
+     rx. w2     e30.     ;   link element(core table entry(i),
+     jl. w3     d18.     ;      core table element);
+     al  w2  x1          ;   core table element:= core table entry(i);
+     rx. w1     e30.     ;   core table element. child:= child;
+     ds  w1  x2+c18      ;   core table element. console:= console;
+     rl. w3     e79.     ;
+     rs  w3  x2+c22      ; coretable element. segm:=segmentno
+     al  w3      -1      ;
+     rs. w3     e79.     ;
+     rl  w0  x2+c17      ;
+     jl.       (e60.)    ;   return;
+e.                      ; end;
+
+; procedure release core(child)
+; comment: removes a child from the core table; 
+;     call:     return:
+; w0            destroyed
+; w1            destroyed
+; w2            destroyed
+; w3  link      destroyed
+
+b.i24 w.                ; begin
+d31: rs. w3      i1.     ;
+     rl. w1     e30.     ;
+     al  w2      -1      ;
+     rs  w2  x1   c22   ;
+     rl  w1  x1+c18      ;   console:= core table element.console;
+     jl. w3     d10.     ;   decrease access(console);
+     rl. w1     e30.     ;
+     jl. w3     d17.     ;   release element (core table element);
+     jl.        (i1.)    ;   return
+i1:0
+e.                      ; end
+c.4000               ; only in rc4000
+
+; procedure find keys(keys,pr,pk,sorry)
+; comment: examines all children and creates a possible
+; protection register with zeroes in all available protection
+; bits. from this possible register, a protection register pr
+; with a given number of keys is selected from left to right.
+; the protection key pk is set equal to the right-most assigned
+; key. upon return, keys is diminished by the number of assigned
+; keys.
+;     call:     return:
+; w0            pr
+; w1            pk
+; w2  keys      keys
+; w3  link      link
+
+b.i24                   ; begin
+w.d32:ds. w3  e60.      ;
+     rl  w1      b1      ;
+     bz  w0  x1+a24      ;   possible:=pr(s);
+     al. w2     e15.     ;   addr:=core table;
+i0:  rl  w2  x2+c20      ;   while word(addr)<>0 do
+     sn. w2     e15.     ;   begin
+     jl.         i2.     ;   child:=word(addr);
+     rl  w3  x2+c17      ;
+     bz  w3  x3+a24      ;   possible:=possible or
+     lx. w3      i1.     ;   (pr(child) exor last 7);
+     lo  w0       6      ;   addr:=addr+2;
+     jl.         i0.     ;
+i1:8.177             ;end;
+i2:  rl. w2     e59.     ;   pr:=possible;
+     al  w3       0      ;
+i3:  ls  w0       1      ;   bit:=16;
+     al  w3  x3  -1      ;   repeat
+     sz  w0     1<7      ;   bit:=bit+1;
+     jl.         i4.     ;   if pr(bit)=0 then
+     al  w2  x2  -1      ;   begin
+     sn  w2       0      ;   keys:=keys-1;
+     jl.         i5.     ;   if keys=0 then goto found;
+i4:  se  w3      -7      ;   end;
+     jl.         i3.     ;   until bit=24;
+     jl.       (e60.)    ;   goto sorry;
+i5:  lo. w0      i1.     ; found: pk:=bit;
+     ls  w0  x3  +0      ;   while bit<>24 do
+     ac  w1  x3  +0      ;   begin
+     rl. w3     e60.     ;   pr(bit):=1; bit:=bit+1;
+     jl      x3  +2      ;   end;
+e.                      ; end
+z.
+
+; procedure child name
+; comment: moves child name to receiver name.
+;     call:     return:
+; w0            destroyed
+; w1            destroyed
+; w2            child
+; w3  link      link
+
+b.i24                   ; begin
+w.d33:rl. w2  e29.      ;
+     dl  w1  x2+a11+2    ;
+     ds. w1     e41.     ;
+     dl  w1  x2+a11+6    ;   receiver:=name(child);
+     ds. w1     e43.     ;
+     jl      x3  +0      ;
+e.                      ; end
+
+; procedure check child
+; comment: checks that the process name in the console
+; description refers to a child of s. the console must
+; either be a privileged console or the parent of the 
+; child.
+;     call:     return:
+; w0            destroyed
+; w1            console
+; w2            child
+; w3  link      destroyed
+
+b.i24                   ; begin
+w.d34:rs. w3  i0.       ;
+     rl. w1     e25.     ;
+     al  w3  x1+c29      ;   process description(
+     jd      1<11+4      ;     process name(console),result);
+     rs. w0     e29.     ;   child:=result;
+     rl  w2       0      ;
+     rl  w1  x2  +0      ;
+     se  w2       0      ;   if child=0
+     se  w1       0      ;   or kind(child)<>0
+     jl.         g9.     ;   then goto end line;
+     jl. w3     d25.     ;
+     jl.         g3.     ;   find parent(child,parent,end line);
+     sn. w1    (e25.)    ;
+     jl.        (i0.)    ;   if console<>parent
+     rl. w1     e25.     ;
+     bz  w0  x1+c27      ;   and not privileged(console)
+     so  w0     1<3      ;
+     jl.         g3.     ;   then goto end line;
+     jl.        (i0.)    ;
+i0:0                 ;
+e.                      ; end
+
+; stepping stone
+
+jl. d79., d79=k-2
+
+
+; procedure create child
+; comment: allocates resources and creates a child process in
+; accordance with the console parameters. the child is included as
+; user of all devices in the device table. finally, the identification
+; bit of the child is set in the description of the console.
+;     call:     return:
+; w0            destroyed
+; w1            destroyed
+; w2            destroyed
+; w3  link      destroyed
+
+b.i25, j10 w.                   ; begin
+
+d35:rs. w3  i2.          ; find core:
+     el. w2     e81.     ;
+     se  w2       1      ;
+     jl. w3      d9.     ;
+     rl. w2     e25.     ;
+     rl  w0  x2+c30      ;   start:=first addr(console);
+     rl  w1  x2+c39      ;   size:=size(console);
+     bz  w3  x2+c27      ;
+     sz  w3     1<1      ;   if abs addr(console)
+     am     d28-d27      ;   then find addr(start,size,end line)
+     jl. w3     d27.     ;   else find size(start,size,end line);
+     jl.         g4.     ;
+     rl. w2     e25.     ;
+     rs  w0  x2+c30      ;   first addr(console):=start;
+     wa  w0  x2+c39      ;   top addr(console):=
+     rs  w0  x2+c31      ;   start+size(console);
+     bz  w3  x2+c27      ; find protection:
+c.4000                  ; in rc4000:
+     sz  w3     1<2      ;   if not abs protection(console) then
+     jl.         i0.     ;   begin
+     bz  w2  x2+c26      ;
+
+     jl. w3     d32.     ;   find keys(keys(console),
+     jl.         g8.     ;      new pr,new pk, end line);
+     rl. w2     e25.     ;   pr(console):=new pr;
+     hs  w0  x2+c37      ;   pk(console):=new pk;
+     hs  w1  x2+c38      ;   end;
+i0:  bl  w0  x2+c37      ;
+     sz  w0    -1<8      ;   if pr(console)(0:3)<>0 then
+     jl.         g8.     ;   goto end line;
+z.  
+
+c.-8000                   ; in rc8000:
+     rl. w0  i21.        ;
+     so  w3  1<2         ; if abs protection
+     jl.         j1.     ; 
+     so  w3  1<9         ; and allowed(console)
+     jl.         g3.     ; 
+     al  w1      -1      ; then no relocation and
+     rs  w1  x2+c97      ;
+     al  w0       0      ;  pr,pk=0,0 else
+ j1: rs  w0  x2+c37      ; pr,pk=240<12+7 , usermode
+z.
+     rl  w3      b1      ; check claims:
+     bz  w0  x2+c32      ;
+     bz  w1  x3+a19      ;
+     ws. w1      e2.     ;   if buf claim(console)>
+     sl  w0  x1  +1      ;   buf claim(s)-own buf
+     jl.         g5.     ;   then goto end line;
+     bz  w0  x2+c33      ;
+     bz  w1  x3+a20      ;   if area claim(console)>
+     ws. w1      e3.     ;
+     sl  w0  x1  +1      ;   area claim(s)-own area
+     jl.         g6.     ;   then goto end line;
+     bz  w0  x2+c34      ;
+     bz  w1  x3+a21      ;   if internal claim(console)>
+     sl  w0  x1  +0      ;   internal claim(s)-1
+     jl.         g7.     ;   then goto end line;
+; test intervals:
+; comment: the testing that the interval limits are contained
+; in each other is performed as schetched below
+; standard:          !2!
+;                   4   1
+     dl  w1  x2+c42+2    ;   the numbers refer to the numbers about
+     sh  w1 (x2+c43+2)   ; 1; if cons.std.hi >= cons.user.hi
+     sl  w0  x1  +1      ;
+     jl.        g19.     ;    then goto base alarm;
+     rl  w1  x2+c43      ;
+     sl  w1 (x2+c41)     ; 3; if cons.user.lo < cons.max.lo
+     jl.          4      ;
+     jl.        g19.     ;
+     ws  w1       0      ;
+     sl  w1       1      ;
+     jl.        g19.     ;    then goto base alarm;
+     dl  w1  x2+c41+2    ;
+     al  w1  x1  +1      ;
+     sl  w0 (x3+a45-2)   ; 6; or cons.max.hi < cons.user.hi
+     sh  w1 (x2+c43+2)   ;    then goto base alarm;
+     jl.        g19.     ;
+     al  w1  x1  -2      ;
+     sl  w1 (x3+a45-0)   ; 7; if cons.max.hi > s.std.hi
+     jl.        g19.     ;    then goto base alarm
+i25: al  w1  x2+c30      ;   create internal process(
+     al  w3  x2+c29      ;    process name(console),
+     jd     1<11+56      ;    first addr(console),result);
+     sn  w0       1      ;
+     jl.         g4.     ;
+     sn  w0       2      ;
+     jl.        g11.     ;
+     se  w0       0      ;   if result<>0 
+     jl.        g10.     ;   then goto end line;
+     jd      1<11+4      ;   process description(
+     rs. w0     e29.     ;     process name(console),result);
+     jl. w3     d30.     ; reserve core
+     al  w3  x1+c95     ; move kind,name of primin
+     al  w2  x2+c19     ; and primout to coretable
+j0 : rl  w0  x3         ; (set by i and o commands )
+     rs  w0  x2         ;
+     al  w3  x3+2       ;
+     al  w2  x2+2       ;
+     se  w3  x1+c97     ;
+     jl.     j0.        ;
+     al  w3  x1+c29      ; 
+
+c.-880504
+
+     al  w2  x1          ;
+     rl  w1  x1+c97      ; if first logic address defined then
+     sn  w1      -1      ;
+     jl.         j2.     ; begin
+     rl  w1  x2+c30      ; displacement := first address ( "physical")
+     ws  w1  x2+c97      ; - first logic address
+     jd      1<11+98     ; change address base
+     sn  w0  0           ; if not ok
+     jl.         j2.     ; then begin
+     jl. w3     d40.     ; remove process
+     jl.       g101.     ; write illegal relocation ; end
+
+
+; set the cpa register(child)
+
+j2 : rl  w1  x2+c98      ; if cpa < > initial cpa then
+     sn  w1       1      ; begin
+     jl.         j3.     ;
+     sn  w1      -1      ; if cpa(console) = -1 (default)
+     rl  w1  x2+c31      ; then cpa(child):= top core(child)
+     jd      1<11+126    ; set cpa 
+     sn  w0       0      ; if not ok then
+     jl.         j3.     ; begin
+     jl. w3     d40.     ; remove process
+     jl.         g8.     ; write illegal cpa
+; set the priority of the process
+; if the priority differs from default. (0)
+j3:  zl  w1  x2+c26      ; prio=prio.console
+     sn  w1       0      ; if prio<> 0 then 
+     jl.       i19.      ; 
+     jd    1<11+94       ; set priority
+     sn  w0      0       ; if result <> 0 then
+     jl.       i19.      ;
+     jl. w3    d40.      ; remove process
+     jl.       g27.      ; goto end line
+
+z. ; 880504
+
+; include process as user of all peripheral devices except those listed
+; in the s device exception tablr.
+i19: rl. w2     e11.     ;   addr:=start(exception table);
+     al  w1     0        ;   devno:=0;
+i1:  bz  w0  x2          ; include:
+     se  w0  x1          ;   if devno:=devno(addr) then
+     jl.        i3.      ;     addr:=addr+1;
+     al  w2  x2+1        ;   else
+     jl.        i4.      ;
+i3:  jd      1<11+12     ;     include user(name addr, devno);
+i4:  al  w1  x1+1        ;   devno:=devno+1;
+     se  w1     a127     ;   if devno<>number of peripheral processes then
+     jl.        i1.      ;     goto include;
+
+; give the child the required backing storage claims
+; if claims cannot be granted, the process is
+; removed and an alarm message is issued
+     rl. w2     e25.     ;
+     al  w3      -1      ;
+     rs. w3     e79.     ;
+     bz  w0  x2+c27      ;
+     so  w0    1<10      ;   if all bs (console)
+     jl.         i8.     ;   then begin
+c.(:c23>16 a.1:)-1
+     rl  w3     b22      ;  
+i5:  rs. w3     i11.     ;   next device:
+     rl  w3  x3          ;   w3:= chaintable
+     rl  w0  x3-a88+16   ;  
+     sn  w0       0      ;   if chaintable <> free
+     jl.         i7.     ;   then begin
+     dl  w1  x3-a88+18   ;
+     ds. w1     e21.     ;
+
+     dl  w1  x3-a88+22   ;
+     ds. w1     e23.     ;   work device:= docname(chaintab)
+     rl  w1  x3-a88+26   ;   slicelength(chaintab)
+     rs. w1     i12.     ;   =: slicelength
+     rl  w3  x3-a88-2    ;   claims rel(chaintab)
+     wa  w3      b1      ;   + cur proc
+     rs. w3      i9.     ;   =: claims
+     al. w2     e51.     ;  
+i6:  bz  w1  x3          ;   move claims
+     rs  w1  x2          ;
+     bz  w1  x3  +1      ;
+     wm. w1     i12.     ;
+     rs  w1  x2  +2      ;
+     al  w2  x2  +4      ;
+     al  w3  x3  +2      ;
+     am.        (i9.)    ;
+     sh  w3  a110*2      ;
+     jl.         i6.     ;
+     rl. w2     e25.     ;
+     al  w3  x2+c29      ;
+     al. w2     e20.     ;
+     al. w1     e51.     ;
+     jd     1<11+78      ;
+     se  w0       0      ; if result<>0
+     jl.        g20.     ;
+
+i7:  rl. w3     i11.     ;  
+     al  w3  x3  +2      ;   chaintab:= chaintab + 2
+     se  w3    (b24)     ;   if chain <> chain end
+     jl.         i5.     ;   then goto next device
+     jl.        (i2.)    ;   return
+i9:0
+i12:0                 ;  
+i11:0                 ;   end
+z.                      ;
+     jl.        g18.     ;
+i21: 240<12 + 7       ; pr,pk usermode
+
+; transfer claims to child,
+; the claimlist in the console-description
+
+i8:                    ; not 'all' bs (console):
+     rl. w3     e25.   ;   w3 := claimbase := console;
+i13:                   ; next chaintable:
+     rs. w3     i22.   ;   save claimbase;
+
+     dl  w1  x3+c44+6  ;   perm claim := claimlist(claimbase);
+     ds. w1     i24.   ;
+     wa  w0  x3+c44+0  ;   temp entries := temp+perm entry claim;
+     wa  w1  x3+c44+2  ;   temp segms   := temp+perm segm  claim;
+     rs. w0     i23.   ;   main entries := temp entries;
+     al  w0     0      ;   temp entries := 0;
+
+     ws. w3     e25.   ;   w3 := index in claimlist;
+     ls  w3    -2      ;
+     wa  w3     b22    ;   w3 := chain table number;
+     sl  w3    (b24)   ;   if all chains handled then
+     jl.       (i2.)   ;     return;
+     rl  w3  x3        ;   w3 := chain table addr;
+
+     al. w2     g20.   ;   error addr := claims exceeded;
+
+i14:                   ; transfer claim:
+; w0=temp entries, w1=temp segments
+; w2=error address
+; w3=chaintable address
+     rs. w2     i20.   ;   save(error addr);
+     al  w2     0      ;   key := 0;
+i15:                   ; next key:
+     ds. w1  x2+e52.   ;   claim(key) := entries,segments;
+     al  w2  x2+4      ;   increase(key);
+     sn  w2     a109*4 ;   if key = min aux key then
+     dl. w1     i24.   ;     entries,segments := perm claim;
+     sh  w2     a110*4 ;   if key <= max cat key then
+     jl.        i15.   ;     goto next key;
+
+     dl  w1  x3-a88+18 ;   name := docname.chaintable;
+     ds. w1     e21.   ;
+     dl  w1  x3-a88+22 ;
+     ds. w1     e23.   ;
+
+     rl. w3     e25.   ;   w3 := proc name;
+     al  w3  x3+c29    ;
+     al. w2     e20.   ;   w2 := docname;
+     al. w1     e51.   ;   w1 := claim;
+     jd         1<11+78;   set bs claim;
+     sn  w0     0      ;   if result = ok then
+     jl.        i16.   ;     goto maincat entries;
+     se  w0     1      ;   if result <> claims exceeded then
+     jl.        i17.   ;     goto next entry;
+     al  w0     1      ;
+     hs. w0     e81.   ;   fiddle with remove indicator...
+     jl. w3     d40.   ;   remove child;
+     jl.       (i20.)  ;   goto error;
+
+i16:                   ; maincat entries:
+     ld  w1    -100    ;   perm claim := 0,0;
+     ds. w1     i24.   ;
+     rx. w0     i23.   ;   w0 := main entries; main entries := 0;
+     rl  w3     b25    ;   w3 := main catalog chain table;
+     al. w2     g25.   ;   w2 := error addr := no maincat entries;
+     se  w0     0      ;   if main entries <> 0 then
+     jl.        i14.   ;     goto transfer claim;
+
+i17:                   ; next entry:
+     rl. w3     i22.   ;   increase (claimbase);
+     al  w3  x3+8      ;
+     jl.        i13.   ;   goto next chaintable;
+
+i20: 0                 ; error addr
+i22: 0                 ; claimbase
+i23: 0                 ; main entries;
+i24=k+2, 0,0           ; perm claim (entries, segments)
+
+i2:0                 ;   end
+e.                      ; end
+
+; procedure modify child(addr)
+; comment: modifies the registers of the current child as follows:
+;     child w0 = 0 or process description of parent console
+;     child w1 = process description of s
+;     child w2 = process description of parent console
+;     child w3 = process description of child
+;     child ex = 0
+;     child ic = addr
+;     call:     return:
+; w0  addr      destroyed
+; w1            destroyed
+; w2            destroyed
+; w3  link      destroyed
+
+b.i24                   ; begin
+w.d36:rs. w3  i0.       ;
+     rs. w0     e66.     ;   child ic:=addr;
+     rl  w0      b1      ;
+     rs. w0     e62.     ;   child w1:=s;
+     jl. w3     d33.     ;   child name;
+     jl. w3     d25.     ;   find parent(child,console,coretableelement,
+     am           0      ;               irrelevant);
+     rl  w1  x1+c25      ;
+     rs. w1     e61.     ;   child w0:= child w2;
+     ds. w2     e64.     ;   child w3:=child;
+; override these default w0 and w2 assignments,
+; in case of user-defined primary input (or -output) names
+     al  w1  x3+c19    ;   w1 := addr of primary input descr;
+     rl  w0  x1+2      ;
+     se  w0     0      ;   if name defined then
+     rs. w1     e61.   ;     child w0 := primary input descr;
+     al  w1  x3+c93    ;   w1 := addr of primary output descr;
+     rl  w0  x1+2      ;
+     se  w0     0      ;   if name defined then
+     rs. w1     e63.   ;     child w2 := primary output descr;
+
+     al. w1     e61.     ;
+     al. w3     e40.     ;   modify internal process(
+     jd     1<11+62      ;       receiver, child w0);
+     jl.        (i0.)    ;
+i0:0                 ;
+e.                      ; end
+
+; procedure load child
+; comment: loads a program from backing store into
+; a child process in accordance with the console parameters.
+; the program must be described as follows in the catalog:
+;            <size of area>
+;            <6 irrelevant words>
+;            <first segment to load>
+;            <content=3><instruction counter>
+;            <bytes to load>
+;     call:     return:
+; w0            destroyed
+; w1            destroyed
+; w2            destroyed
+; w3  link      destroyed
+
+b.i24                   ; begin
+w.d37:                  ; create and look up:
+     rl. w1      e29.    ; if state.process <> wait start 
+     zl  w1  x1+a13      ; then goto error
+     so  w1  2.100000    ; 
+     jl.         g3.     ;
+     rl. w2     e25.     ;
+     dl  w1  x2+c40+2    ;
+     ds. w1     e41.     ;
+     dl  w1  x2+c40+6    ;
+     ds. w1     e43.     ;   receiver:=prog(console);
+     rs. w3     i20.     ;
+     dl  w1  x2+c43+2    ; get catbase of console.(child)
+     al. w3      i1.     ; name=0
+     jd     1<11+72      ; catbase(s)=catbase(child)
+     se  w0       0      ; if not ok then
+     jl.        g19.     ; goto end line base illegal
+     al. w3     e40.     ;
+     jd     1<11+52      ; create area process(prog)
+     al. w3      i1.     ; prevent remove of process
+     sn  w0       2      ; if result=2 or
+     jl.        i10.     ;
+     sn  w0       3      ; result=3 or
+     jl.         i9.
+     se  w0       0      ; result<>0 then
+     jl.        i11.     ; goto give up
+     al. w3      e40.    ; 
+     al. w1     e51.     ;   look up entry(
+     jd     1<11+42      ;     receiver,tail,result);
+     sn  w0       2      ;   if result=2
+     jl.         i10.     ;   then goto give up 0;
+     rl. w2     e29.     ; check description:
+     bz. w0     e59.     ;
+     se  w0       3      ;   if content(tail)<>3
+     sn  w0       8      ;   and content(tail)<>8
+     sz                  ;
+     jl.         i11.     ;   then goto give up 0;
+     rl  w0  x2+a17      ;   first addr(area mess):=
+c.-880504
+     wa  w0  x2+a182
+Z. ; 880504
+     zl. w1     e67.     ; child ic:= first addr(child) (logical) +
+     wa  w1  x2+a17      ; ic(tail)
+     rs. w1     e66.     ;
+     sl  w1  (x2+a18)    ; if ic > top addr(child) then
+     jl.        i13.     ; give up
+     rl  w1  x2+a18      ; save physical top(child)
+c.-880504
+     wa  w1  x2+a182     ;
+z. ; 880504
+     al  w2  x1          ;
+     rl. w1     e60.     ;   first addr(child);
+     al  w1  x1+511      ;
+     as  w1      -9      ;   load size:=
+     as  w1       9      ;   (bytes(tail)+511)/512*512;
+     wa  w1       0      ;   last addr(area mess):=
+     al  w1  x1  -2      ;   first addr(child)+load size-2;
+     sl  w1  x2          ;   if last addr(area mess)>=
+     jl.         i13.     ;     top addr(child)
+     ds. w1     e49.     ;     then goto give up 0;
+     rl. w1     e58.     ;   segment(area mess):=
+     rs. w1     e50.     ;   segment(tail);
+     al. w1     e47.     ; load program:
+     jd     1<11+16      ;   send mess(receiver,area mess,buf);
+     al  w1       0      ;   (prepare for clearing last of command table)
+     sh. w0     (e8.)    ;   if first addr of child <= last of initcat code then
+     rs. w1    (e12.)    ;     terminate command-table with a zero;
+;     (i.e. prohibit further use of initcat-commands)
+     al. w1     e51.     ;
+     jd     1<11+18      ;   wait answer(buf,answer,result);
+
+     rl. w1     e51.     ;
+     sn  w0       1      ;   if result<>1 
+     se  w1       0      ;   or status(answer)<>0
+     jl.         i14.     ;   then goto give up 0;
+     al. w3     e40.     ;
+     jd     1<11+64      ;   remove process(receiver,result);
+     rl. w0     e66.     ;
+     jl. w3     d36.     ;   modify child(child ic);
+     rl. w2     e25.     ;
+     dl  w1  x2+c43+2    ; set catalog base
+     al. w3     e40.     ; set catalog base(version,result)
+     jd     1<11+72      ;
+     al. w3     i1.      ; (prevent remove process(proc)
+     sn  w0      0       ; if not ok then
+     jl.        i15.     ; goto restore base(s)
+     am          2       ; base illegal
+ i9:  am      2          ; 
+i10:  am      2          ;
+i11:  am      2          ;
+i12: am           2      ; area reserved
+i13: am           2      ; program too big
+i14: rl. w2     i16.     ; area error
+     rs. w2     i20.     ; store exit
+     jd     1<11+64      ; remove process(prog)
+i15: dl. w1      i2.     ; restore base(s)
+     al. w3      i1.     ;
+     jd     1<11+72      ;
+     jl.       (i20.)    ; exit
+i1: 0
+    a107
+i2: a108-1
+ i3 : 2.100000            ; state bit : wait for stop or start
+i20: 0
+i16: g15                 ; 0
+     g14                 ; +2
+     g13                 ; +4
+     g12                 ; +6
+     g11                 ; +8
+     g29                 ; +10
+     g19                 ; +12
+e.
+
+; procedure start child
+; comment: starts a child process.
+;     call:     return:
+; w0            destroyed
+; w1            destroyed
+; w2            destroyed
+; w3  link      destroyed
+
+b.i24                   ; begin
+w.d38:rs. w3  i0.       ;
+     jl. w3     d33.     ;   child name;
+     al. w3     e40.     ;
+     jd     1<11+58      ;   start internal process(receiver,result);
+     jl.        (i0.)    ;
+i0:0                 ;
+e.                      ; end
+
+
+; procedure stop child
+; comment: stops a child process.
+;     call:     return:
+; w0            destroyed
+; w1            destroyed
+; w2            destroyed
+; w3  link      destroyed
+
+b.i24                   ; begin
+w.d39:rs. w3  i0.       ;
+     jl. w3     d33.     ;   child name;
+     al. w3     e40.     ;
+     jd     1<11+60      ;   stop internal process(receiver,buf,result);
+     al. w1     e51.     ;
+     jd     1<11+18      ;   wait answer(buf,answer,result);
+     jl.        (i0.)    ;
+i0:0                 ;
+e.                      ; end
+
+; procedure remove child
+; comment: excludes a child as a user of all devices and
+; removes it.
+;     call:     return:
+; w0            destroyed
+; w1            destroyed
+; w2            destroyed
+; w3  link      destroyed
+
+b.i24                   ; begin
+w.d40:rs. w3  i1.       ;
+     jl. w3     d33.     ;   child name;
+     jl. w3     d25.     ;   find parent(child,console,
+     am           0      ;               irrelevant);
+     al. w3     e40.     ;
+     jd     1<11+64      ;
+     se  w0        0     ; if result not ok then
+     jl.         g11.    ; write out catalog error
+     jl. w3      d31.    ; release core
+     jl.        (i1.)    ;
+i1:0                 ;
+e.                      ; end
+
+; procedure find work(state,work)
+; comment: searches a work area in a given state.
+;     call:     return:
+; w0            unchanged
+; w1            work
+; w2  state     state
+; w3  link      link
+
+b.i24                   ; begin
+w.
+d41:                   ; find work:
+     rl. w1     e13.   ;   work := first work;
+i0:                    ; loop:
+     rs. w1     e24.   ;
+     sn  w2 (x1+c50)   ;   if state(work) = state then
+     jl      x3        ;     return;
+     al  w1  x1+c2     ;   increase(work);
+     sh. w1    (e14.)  ;   if work <= last work then
+     jl.        i0.    ;     goto loop;
+     jl.        g31.   ;   goto exam next; <* not expecting this answer *>
+e.                      ; found:
+; end;
+
+
+; procedure save work(state)
+; comment: saves a state and a number of variables in the
+; current work area and proceeds to examine the event queue.
+;     call:     return:
+; w0            destroyed
+; w1            work
+; w2  state     destroyed
+; w3  link      link
+
+b.i24                   ; begin
+w.d42:rl. w1  e24.      ;   state(work):=state;
+     ds  w3  x1+c51      ;   interrupt addr(work):=link;
+     rs. w2     e88.   ;   expected answer := state;
+c.(:c24>19a.1:)-1       ;   if work testoutput
+     jd     1<11+32      ;   then type w2(state);
+z.    al. w2  e20.      ;
+i0:  rl  w0  x2  +0      ;
+     rs  w0  x1+c90      ;   save(console)
+     al  w1  x1  +2      ;   to(core addr)
+     al  w2  x2  +2      ;   in(work);
+     sh. w2     e30.     ;
+     jl.         i0.     ;
+     rl. w3      e2.     ;
+     al  w3  x3  -1      ;   own buf:= own buf-1
+     rs. w3      e2.     ;
+     jl.        g30.     ;   goto exam first;
+e.                      ; end
+
+; procedure restore work(work, state)
+; comment: restores a number of variables from a work area
+; and jumps to the interrupt address.
+;     call:     return:
+; w0            logical status
+; w1            work
+; w2            state
+; w3  link
+;
+; return address: link + 0 :  status <> 0
+;                 link + 2 :  status =  0
+
+b.i24                   ; begin
+w.d43:rl. w1  e24.      ;
+     al. w2     e20.     ;
+     rs. w2     e87.   ;   areabuf := undef;
+i0:  rl  w0  x1+c90      ;
+     rs  w0  x2  +0      ;   restore(console)
+     al  w1  x1  +2      ;   to(core addr)
+     al  w2  x2  +2      ;   from(work);
+     sh. w2     e30.     ;
+     jl.         i0.     ;
+     rl. w1     e24.     ;   state:=state(work);
+     al  w2       0      ;   state(work):=0;
+     rx  w2  x1+c50      ;
+     rl. w3      e2.     ;
+     al  w3  x3  +1      ;   own buf:= own buf+1
+     rs. w3      e2.     ;
+     rl. w0     e59.     ;   w0 := logical status;
+     se  w0     1<1      ;   if status <> 0 then
+     jl     (x1+c51)     ;     goto interrupt addr(work);
+     am     (x1+c51)     ;   goto 2 + interrupt addr(work);
+     jl          +2      ;
+e.                      ; end
+
+; procedure type description
+; comment: testoutput of a console description
+;     call:     return:
+; w0            unchanged
+; w1            destroyed
+; w2            destroyed
+; w3  link      destroyed
+
+c.(:c24>18a.1:)-1       ; if console testoutput then
+b.i24                   ; begin
+w.d44:rs. w3  i1.       ;
+     rl. w1     e25.     ;
+     al  w2  x1  +0      ;   addr:=console;
+i0:  bz  w3  x2  +0      ;   repeat
+     jd     1<11+34      ;   type w3(byte(addr));
+     al  w2  x2  +1      ;   addr:=addr+1
+     se  w2  x1 +c1      ;   until addr=console+console size;
+     jl.         i0.     ;
+     jl.        (i1.)    ;
+i1:0                 ;
+e.                      ;
+z.                      ; end
+
+; procedure next bitnumbers(bits, type)
+; comment: converts a sequence of integers from the console buffer
+; and sets the corresponding bits in a word equal to one.
+;     call:     return:
+; w0            type
+; w1            unchanged
+; w2            bits
+; w3  link      link
+
+b.i24                   ; begin
+w.d45:rs. w3  i1.       ;
+     al  w2       0      ;   bits:=0;
+i0:  jl. w3      d2.     ; next bit:
+     se  w0       2      ;   next param(type);
+     jl.        (i1.)    ;   if type=2 then
+     ac. w3    (e19.)    ;   begin
+     al  w0       1      ;
+     ls  w0  x3 +23      ;   bits(23-integer):=1;
+     lo  w2       0      ;   goto next bit;
+     jl.         i0.     ;   end;
+i1:0                 ;
+e.                      ; end
+
+; procedure  reset last part of console
+; comment sets zeroes in whole claimlist of console descr
+; and in primin and primout.
+; initialize first logic address to standart value.
+;
+; call: w3 = link
+; exit: all regs undef
+
+b. i10 w.
+d46:                   ; clear claimlist:
+     rl. w1     e25.   ;   w1 := console;
+     al  w2  x1+c48-c49+2;   w2 := rel top of area to be cleared;
+     al  w0     0      ;
+i0:                    ; rep:
+     sl  w1  x2        ;   if pointer <= start of console then
+     jl.       i1.
+     al  w2  x2-2      ; decrease pointer
+     rs  w0  x2+c49    ;   claimlist(pointer) := 0;
+     jl.        i0.    ;   goto rep;
+i1:  rl. w0     e72.   ; set first logic address
+     rs  w0  x1+c97    ; and cpa
+     al  w0     -1     ; return
+     rs  w0  x1+c98    ;
+     jl      x3        ;
+
+e.
+; procedure devno(name adr. , devno*8, sorry)
+; comment: search the chaintable for a given name and
+; returns deviceno.*8 (relative adr. for claim list in console table )
+; and chaintable address ,
+; or returns sorry if name not found.
+;     call:       return:
+; w0              destroyed
+; w1              destroyed
+; w2 name adr.    deviceno.*8
+; w3 link         chaintable adr.
+;
+b. i10, j10
+w. 
+d61: rs. w3      i0.     ;
+     al  w1      -2      ;
+     rs. w1      i1.     ;
+ j1: rl. w3      i1.     ; next chaintable
+     al  w3  x3+2        ;
+     rs. w3      i1.     ;
+     wa  w3     b22      ; get adr of next chaintable
+                         ; if adr. of next chaintable
+     sl  w3    (b24)     ; >= top of chaintable then
+     jl.        (i0.)    ; return sorry
+     rl  w3  x3          ; begin compare  names
+     dl  w1  x3-a88+18   ; if name(chaintable)
+     sn  w0    (x2)      ; = name(adr.)
+     se  w1    (x2+2)    ; then return happy
+     jl.         j1.     ; else  get next chaintable
+     dl  w1  x3-a88+22   ;
+     sn  w0    (x2+4)    ;
+     se  w1    (x2+6)    ;
+     jl.         j1.     ;
+     rl. w2      i1.     ;
+     ls  w2       2      ;
+     rl. w1      i0. 
+     jl      x1+2
+ i0: 0
+ i1: 0
+e.
+c.(: c23>19 a.1:) -1                ; if list option then
+b.i24                               ; begin
+; block for the list option
+;
+; procedure writespace(no of spaces)
+; comment this procedure writes out a number of spaces <32>
+;             call             return
+; w0                           destroyed
+; w1 c        no of spaces 
+; w2                           unchanged
+; w3         link              link
+;
+w. d70:   rs. w3  i1.         ;
+i10: al  w0      32      ; while no of spaces>=0
+     jl. w3     d20.     ; do
+     al  w1  x1  -1      ;
+     se  w1       0      ; writechar space
+     jl.        i10.     ;
+     jl.        (i1.)    ;
+;
+;
+; procedure writeint(integer,type)
+; comment this procedure left justify an integer in
+; a 8 or 4 chars space filled field, according to type
+;             call               return
+;w0           type               destroyed
+;w1           integer            no of positions
+;w2                              unchanged
+;w3           link               link
+;
+d71: ds. w0      i0.     ; save registers
+     jl. w3     d22.     ; writeinteger(integer)
+     ws. w1      i0.     ;
+     sl  w1       0      ; fill with spaces
+     jl.        (i1.)    ; according to type
+     ac  w1  x1          ;
+     jl.        i10.     ; return through writespace
+i1:0
+i0:0
+e.z.
+c.(:c23>14a.1:)-1
+
+b. i24
+;
+; procedure get_segment(segno)
+; comment: performs the transport of the stated segment
+; from <:susercat:>
+;      call:     return
+; w0             destroyed
+; w1   segno     destroyed
+; w2   address   destroyed
+; w3   link      destroyed
+w.d77:                   ; get_segment:
+     rs. w3     i10.     ;
+     al. w3     c69.     ;
+     jd     1<11+52      ; create areaprocess(susercat)
+     sl  w0       2      ; if result <> 0
+     jl.        g12.     ; then goto end line
+     se  w0       0      ;
+     jl.         g6.     ;
+i22: rs. w1     e50.     ;
+     al. w1     e47.     ;
+     rs. w2     e48.     ;
+     al  w2  x2+512      ; prepare inputmessage
+     rs. w2     e49.     ;
+     jd     1<11+16      ; send message
+     al. w1     e51.     ; 
+     jd      1<11+18     ; 
+     lo. w0     e51.     ; 'or' status and result
+     rl  w1       0      ; save result
+     jd     1<11+64      ; remove area.susercat
+     se  w1       1      ; if <>1 then
+     jl.        g11.     ; error goto end line
+     jl.       (i10.)    ;
+i10:0
+
+; procedure find_entry(name)
+; comment: finds the entry identified by the given name
+; returns with the value -10 if entry not found in this segment or -1 if entry not exist
+;       call:     return:
+; w0              destroyed
+; w1              destroyed
+; w2              entry address or -10 or -1
+; w3    link      destroyed
+w. d78:                  ; find_entry:
+     rs. w3     i10.     ;
+     rl. w1     e71.     ;
+i0:  rl  w2  x1          ; if entry not exsist
+     sn  w2      -1      ;
+     jl.       (i10.)    ; then return
+     sn  w2      -2      ; if entry deleted then
+     jl.        i1.      ; try next entry
+     al  w2  x1          ;
+     dl  w0  x1  +6      ;
+     sn. w3    (e20.)    ; compare names
+     se. w0    (e21.)    ;
+     jl.         i1.     ; if names unequal then
+     dl  w0  x1+10       ; try next entry
+     sn. w3    (e22.)    ; else return
+     se. w0    (e23.)    ;
+     jl.         i1.
+     jl.       (i10.)    ; entry found
+i1:  rl. w2     e70.     ;
+     al  w2  x2  +2      ;
+     rl. w3     e71.     ;
+     wa  w1  x2          ;
+     am.       (e85.     ;
+     sl  w3  x1          ;
+     jl.         i0.     ;
+     al  w2     -10      ; entry not found
+     jl.       (i10.)    ;
+e.z.
+
+; parameter table:
+; contains a byte for each character type in the follwoing states:
+;     0   initial state
+;     1   after letter
+;     2   after digit
+; each entry defines the address of an action (relative to the
+; procedure next param) and a new state:
+;     entry=action<2 + new state
+
+b.i24
+i0=(:d3-d2:)<2+0, i1=i0+1,  i2=i0+2
+i3=(:d4-d2:)<2+1, i4=(:d5-d2:)<2+2,  i5=(:d6-d2:)<2+2
+i6=(:d7-d2:)<2+0, i7=(:d8-d2:)<2+0
+i9=(:d11-d2:)<2+0
+
+; initial state:
+h.h1: i3, i5, i4, i0    ;   letter 1, digit 2, unknown 0, continue 0
+i6, i9, i6, i0    ;   unknown 0, endline, unknown 0, continue 0
+; after letter:
+i3, i3, i6, i7    ;   letter 1, letter 1, radix 0, delimit 0
+i7, i9, i6, i1    ;   delimit 0, endline, unknown 0, continue 1
+; after digit:
+i6, i5, i4, i7    ;   unknown 0, digit 2, radix 2, delimit 0
+i7, i9, i6, i2    ;   delimit 0, endline, unknown 0, continue 2
+e.
+     jl.         d2.     ;
+d2=k-2
+     jl.         d9.     ;
+d9=k-2
+     jl.        d10.     ;
+d10=k-2
+     jl.        d15.     ;
+d15=k-2
+     jl.        d16.     ;
+d16=k-2
+     jl.        d19.     ;
+d19=k-2
+     jl.        d20.     ;
+d20=k-2
+     jl.        d21.     ;
+d21=k-2
+     jl.        d22.     ;
+d22=k-2
+     jl.        d23.     ;
+d23=k-2
+     jl.        d24.    ;
+d24=k-2
+     jl.       d25.     ;
+d25=k-2
+     jl.        d26.   ;
+d26=k-2
+     jl.        d27.     ;
+d27=k-2
+     jl.        d29.     ;
+d29=k-2
+     jl.        d32.     ;
+d32=k-2
+     jl.        d34.     ;
+d34=k-2
+     jl.        d35.     ;
+d35=k-2
+     jl.        d36.
+d36=k-2
+     jl.        d37.     ; added / onn880508
+d37=k-2
+     jl.        d38.
+d38=k-2
+     jl.        d39.     ;
+d39=k-2
+     jl.        d42.     ;
+d42=k-2
+     jl.        d46.     ;
+d46=k-2
+     jl.        d61.     ;
+d61=k-2
+     jl.        d77.     ;
+d77=k-2
+     jl.        d78.     ;
+d78=k-2
+     jl.        d79.     ;
+d79=k-2
+
+
+
+c69:<:susercat:>,  0, 0   ; name of s-usercat, incl. name table table entry
+m.                mons2 - monitor operatins system s, part 2
+
+c.-880504
+
+
+
+b.i30 w.
+i0=82 03 30 , i1=13 00 00
+
+; if newtime (i0,i1) > oldtime (a133,a134) then oldtime:=newtime;
+c.i0-a133
+c.i0-a133-1, a133=i0, a134=i1, z.
+c.i1-a134-1,          a134=i1, z.
+z.
+
+i10=i0, i20=i1
+
+i15=i10/100000 , i10=i10-i15*100000 , i25=i20/100000 , i20=i20-i25*100000 
+i14=i10/10000  , i10=i10-i14*10000  , i24=i20/10000  , i20=i20-i24*10000 
+i13=i10/1000   , i10=i10-i13*1000   , i23=i20/1000   , i20=i20-i23*1000
+i12=i10/100    , i10=i10-i12*100    , i22=i20/100    , i20=i20-i22*100
+i11=i10/10     , i10=i10-i11*10     , i21=i20/10     , i20=i20-i21*10
+
+i2:<:                              date  :>
+(:i15+48:)<16+(:i14+48:)<8+46
+(:i13+48:)<16+(:i12+48:)<8+46
+(:i11+48:)<16+(:i10+48:)<8+32
+
+(:i25+48:)<16+(:i24+48:)<8+46
+(:i23+48:)<16+(:i22+48:)<8+46
+(:i21+48:)<16+(:i20+48:)<8+ 0
+
+i3:  al. w0      i2.     ; write date:
+     rs  w0  x2  +0      ;   first free:=start(text);
+     al  w2       0      ;
+     jl      x3          ;   return to slang(status ok);
+
+     jl.         i3.     ;
+e.
+j.
+
+z. ; 880504
+
+
+
+w.e0: c0     ; <first addr>
+;e1        ; defined below
+
+e2:c4     ; <own buf>
+e3:c5     ; <own area>
+e4:0      ; <max device>
+e5:h0     ; <char table>
+e6:h1     ; <param table>
+e7:h2     ; <first command>
+e12:h3    ; <top command table>
+e8:0-0-0  ; <last of initcat code>
+e9:h4     ; <first console>
+e10:h5     ; <last console>
+e11:h6     ; <first device>
+e13:h8     ; <first work>
+e14:h9     ; <last work>
+e33:h10    ; fictive element before first core table
+e15=k-c20
+e15,e15
+e16:h11    ; <first core>
+e17:0      ; <top core>
+e18:0      ; <param type>
+e19:0      ; <integer>
+e24:h8     ; <work>  ( initially: first work )
+; *** the following variables must match part of work-area
+e20:0      ; <name>
+e21:0      ;
+e22:0      ;
+e23:0      ;
+0
+e78:0 ; used in list
+e79:-1  ; segment in susercat or -1
+e81:0      ;remove,1<21 indicator 
+e25:h21    ; <console>  ( initially: first console )
+e26:0      ; <console buf> or <last addr>
+e27:8      ; <char shift>  (initially: prepared for empty char buf)
+e28:0      ; <char addr>
+e29:0      ; <child>
+e30:0      ; <core addr>
+; *** end of work-area match
+e31:h21
+
+e34:0
+e35=k-c20
+h4,h22
+e36:
+e37:0
+e38:0
+e32:0,r.8  ; <message>
+
+e88:0      ; expected answer
+e89:0      ; executing reentrant code: 0=false, -1=true (initially = false)
+
+e39:0      ; <event>
+e40:0      ; <receiver>
+e41:0      ;
+e42:0      ;
+e43:0,0    ; 
+e55:0      ; <write shift>
+e44:5<12   ; <type mess>
+e45:0      ; <line addr>
+e46:0      ; <write addr>
+0
+e47:3<12   ; <area mess> or <input mess>
+e48:0      ; <first addr>
+e49:0      ; <last addr>
+e50:0      ; <segment>
+e87: 0                  ; areabuf state: 0=defined, else undef (initially defined)
+e51:0      ; <entry tail> or <answer> or <message>
+e52:0      ;
+e53:0      ;
+e54:0      ; <convert area>
+0
+e56:0      ; <read shift> or <radix> or <start>
+e57:0      ; <read addr> or <state> or <size>
+e58:0      ; <save w1> or <first segment>
+e59:0      ; <save w2> or <content> or <keys> or <result>
+e60:0      ; <link> or <bytes to load>
+e61:0      ; <child w0>
+e62:0      ; <child w1>
+e63:0      ; <child w2>
+e64:0      ; <child w3>
+e65:0      ; <child ex>
+e66:0      ; <child ic>
+e67=e59+1  ; <ic in entry>
+e68=e66+2
+0,0
+e69:0     ;jobcount
+c.(:c23>14 a.1:)-1
+e70:h19
+e71:h20
+z.
+e72: -1     ; first logic address (default value)
+m.       s lock indicator.
+
+c.(:c23>13 a.1:)-1     ; if teminals shal be blocked after start up
+e80: -1                ; then e80=-1, else
+z.
+c.-(:c23>13 a.1:)      ;
+e80: 0                 ; e80=0
+z.
+e85:0   ; used in job command
+
+; end line:
+e1=e17-a17;********************
+g1:  jl. w1     g28.     ;
+g48=k+4
+<:ready  **date not initialized <0>:>   ; text until date initialized  
+g2:  jl. w1     g28.     ;
+<:syntax error:<0>:>
+g3:  jl. w1     g28.     ;
+<:not allowed<0>:>
+g4:  jl. w1     g28.     ;
+<:no core<0>:>
+g5:  jl. w1     g28.     ;
+<:no buffers<0>:>
+g6:  jl. w1     g28.     ;
+<:no areas<0>:>
+g7:  jl. w1     g28.     ;
+<:no internals<0>:>
+g8:  jl. w1     g28.     ;  key trouble / onn880517
+<:key trouble<0>:>
+g9:  jl. w1     g28.     ;
+<:process unknown<0>:>
+g10: jl. w1     g28.     ;
+<:process exists<0>:>
+g11: jl. w1     g28.     ;
+<:catalog error<0>:>
+g12: jl. w1     g28.     ;
+<:area unknown<0>:>
+g13: jl. w1     g28.     ;
+<:area reserved<0>:>
+g14: jl. w1     g28.     ;
+<:program too big<0>:>
+g15: jl. w1     g28.     ;
+<:area error<0>:>
+g16: jl. w1     g28.     ;
+<:device unknown<0>:>
+g17: jl. w1     g28.     ;
+<:device reserved<0>:>
+g18: jl. w1     g28.     ;
+<:not implemented<0>:>
+g19: jl. w1     g28.     ;
+<:base illegal<0>:>
+g20: jl. w1     g28.     ;
+<:bs claims exceeded<0>:>
+g21: jl. w1     g28.     ;
+<:bs device unknown<0>:>
+g22: jl. w1     g28.     ;
+<:name unknown<0>:>
+g23:<:message<0>:>
+g24:<:pause<0>:>
+g25: jl. w1     g28.     ;
+<:no entries in maincat<0>:>
+g26:<:max<0>:>
+g27: jl. w1     g28.     ;
+<:illegal priority<0> :>
+g29: jl. w1     g28.     ;
+<:prog name unknown<0>:>
+g47: jl. w1     g28.   ;
+<:input aborted<0>:>
+g101: jl. w1  g28.
+<:illegal relocation<0>:>
+
+g28:
+     ld  w3    -100      ; w2=w3=0
+     se  w3  (b13)      ; if clock initialized then
+     rs. w3  g48.       ; remove warning
+     sn. w1      g2.+2   ; if 'syntax' then
+     al  w2      10      ; set w2=10
+     se. w1      g1.+2   ; else
+     hs. w3     e81.     ; reset remove indicator
+     al  w3      -1      ;
+     rs. w3     e89.   ;   executing reentrant code := true;
+     rs. w3     e79.     ; reset segment no in susercat
+     jl. w3     d19.     ; init write
+     jl. w3     d21.     ; write text
+     se  w2      10      ; if syntax error  then
+     jl.        g46.     ;
+     al. w1     e20.     ; write last read parameter
+     jl. w3     d21.     ;
+     rl. w1     e19.     ;
+     rl. w0     e20.     ;
+     sn  w0       0
+     jl. w3     d22.     ;
+g46: al  w0      10      ;
+     jl. w3     d20.     ; write <nl>
+     jl. w3     d23.     ; type line
+     jl. w3     d42.     ;   save work(buf);
+     jl.          2      ;+2:  error
+     rl. w1     e25.     ;
+     jl. w3     d10.     ; decrease access
+
+g30: al  w2       0      ; exam first:
+     rs. w2     e81.   ;   reset remove list indicator
+     jl.        g32.     ;   event:=0;
+g31: rl. w2     e39.     ; exam next:
+g32: jd     1<11+24      ;   wait event(event,next,result);
+     rs. w2     e39.     ;   event:=next;
+     rl  w1  x2  +6      ;   sender:=word(event+6);
+c.(:c24>20a.1:)-1       ;   if event testoutput then
+     jd     1<11+30      ;   begin type w1(sender);
+     jd     1<11+32      ;         type w2(event);
+z.                      ;   end;
+     sz. w2    (e89.)  ;   if executing non-reentrant code
+     jl.        g41.   ;     and
+     se. w2    (e88.)  ;     event <> expected answer then
+     jl.        g32.   ;     goto exam next;
+g41:                   ;
+     sn  w0       0      ;   if result=0 then
+     jl.        g34.     ;   goto message received;
+     jl. w3     d41.   ;   find work(event,old work);
+     al. w1     e51.     ; answer received:
+     jd     1<11+18      ;   wait answer(event,answer,result)
+     al  w3       1      ;   w1 := logical status
+     ls  w3      (0)     ;      := 1 shift result
+     sn  w3     1<1      ;       + maybe status.answer;
+     lo  w3  x1          ;
+     rs. w3     e59.     ;
+     jl. w3     d43.     ;   restore work(work,event);
+
+g33: rl. w2     e39.     ; reject message:
+     jd     1<11+26      ;   get event(event);
+     al  w0       2      ;
+     al. w1     e51.     ;
+     jd     1<11+22      ;   send answer(event,answer,2);
+     jl.        g30.     ;   goto exam first;
+
+g34: rl. w3      e2.     ; message received:
+     sh  w3       1      ;   if own buf<=1
+     jl.        g31.     ;   then goto exam next;
+     sh  w1      -1      ;   if sender<0
+     jl.        g33.     ;   then goto reject message;
+     sn  w0 (x1  +0)     ;   if kind(sender)=0
+     jl.        g50.     ;   then goto internal message;
+     al  w0  x1          ;
+     jl. w3     d24.     ;   find console(device,console,
+     jl.        g33.     ;                reject message);
+     rs. w1     e25.     ;   console:= new console
+     jl. w3      d9.     ; increase access
+
+
+     jd     1<11+26      ;   get event(console buf);
+     al  w0       1      ;
+     al. w1     e51.     ;
+     jd     1<11+22      ;   send answer(console)
+     al  w2       0      ;
+     jl. w3     d41.     ;   find work(0,new work);
+     al  w0  x1+c73    ;   input stack pointer := stack base;
+     rs  w0  x1+c58    ;
+g39:                   ;     end;
+     al  w2  x1+c66      ;   first addr:= work+linebuf;
+     al  w3  x1+c67      ;   last addr:= work+outputlinebuf-2;
+     ds. w3     e49.     ;
+     al. w1     e47.     ;
+     jl. w3     d26.   ;   send buf (input mess, buf);
+     jl. w3     d42.     ;   save work(buf);
+     jl.         g47.    ;+2:  error:  goto end line;
+     al  w2  x1+c66-2  ;   char shift := > 0; (* i.e. change word *)
+     ds. w2     e28.   ;   char addr := work + linebuf - 2;
+     wa. w2     e52.   ;
+     rs. w2     e26.   ;   last addr := char addr + bytes;
+; next command:
+g35: jl. w3      d2.     ;   next param(type);
+g36: sn  w0       0      ; exam command:
+     jl.         g98.     ;   if type=0
+     se  w0       1      ;   or type<>1
+     jl.         g2.     ;   then goto end line;
+
+     jl. w3     d19.   ;   init write;
+     al  w3    -1      ;
+     rs. w3     e89.   ;   executing reentrant code := true;
+
+     rl. w3      e7.     ;   w3 := base of command table;
+g37:; next command:
+     al  w3  x3  +6      ;   increase (command pointer);
+     dl  w2  x3  +2      ;   w1w2 := command name;
+     sh  w1       0      ;   if first of command <= 0 then
+     jl.        g38.     ;     goto test end;
+     sn. w1    (e20.)    ;   if command.table <> name then
+     se. w2    (e21.)    ;
+     jl.        g37.     ;     goto next command;
+; notice:  only 6 first characters tested
+
+; command found in table:
+; test that it is allowed to call this command from this console
+
+     al  w2       0      ;
+     rl  w3  x3  +4      ;
+
+     ld  w3      10      ; w0:= command mask.console
+     ls  w3     -10      ; w1:= console
+     rl. w1     e25.     ; w2:= command bits.command table
+     bz  w0  x1+c27      ; w3:= relative command address
+     so  w2       1      ; if command not list max print or modify then
+     hs. w2     e81.+1   ; remove console=false
+     ls  w2      -1      ;
+     ls  w2       3      ;
+     sz  w0     1<3      ; if console privileged then
+     jl.        g40.     ; goto command base
+     so  w0  x2          ; if command not allowed(console) then
+     jl.         g3.     ; goto end line
+     so. w2    (e80.)    ; if locked and not a bit 3 command then
+     jl.         g3.     ; goto end line
+
+g40: jl.     x3+g45.     ;   goto command-action;
+; init write has been called
+; w0 = command mask(console)
+; w1 = console
+
+g38:; test found:
+     sn  w1       0      ;   if continuation = 0 then
+     jl.         g2.     ;     goto end line;  i.e. all commands tested
+
+; all commands, not contained in primary part of command table, are
+; considered non-reentrant
+
+     al  w3     0      ;
+     rs. w3     e89.   ;   executing reentrant code := false;
+
+
+     ac  w3  x1  +6      ;   w3 := continuation address for more commands;
+;   (notice w3 = base of commands)
+     jl.        g37.     ;   goto next command;
+
+g98: rl. w1     e24.      ; if stack=stackbase then
+     rl  w2  x1+c58       ; goto endline else
+     sn  w2  x1+c73       ; goto next command
+     jl.         g1.      ;
+     jl.        g35.      ;
+
+
+
+g50:; message:
+     dl  w0  x2 +10      ;
+     ds. w0     e32.+2   ;   move message from buffer to <message>;
+     dl  w0  x2 +14      ;
+     ds. w0     e32.+6   ;
+     dl  w0  x2 +18      ;
+     ds. w0     e32.+10  ;
+     dl  w0  x2 +22      ;
+     ds. w0     e32.+14  ;
+     al  w2  x1  +0      ;
+     jl. w3     d25.     ;   find parent(sender,parent,
+     jl.        g33.     ;                  reject message);
+     rs. w1     e25.     ;   console:= parent;
+     rs. w2     e29.     ;   child:= sender;
+     al  w2       0      ;
+     jl. w3     d41.     ;   find work(0,new work);
+     jl. w3     d19.     ;   init write;
+     rl. w3     e32.     ;   if message(0)(23)=1 then
+     so  w3       2.1    ;     begin stop child;
+     am     d33-d39      ;       writetext(<:pause:>)
+     jl. w3     d39.     ;     end
+     se. w3       0      ;   else
+     am     g24-g23      ;     begin child name;
+     al. w1     g23.     ;       writetext(<:message:>)
+     jl. w3     d21.     ;     end;
+     rl. w2     e39.     ;
+     jd     1<11+26      ;   get event(event);
+     al  w0       1      ;
+     al. w1     e32.     ;
+     jd     1<11+22      ;   send answer(event,message,1);
+     al. w1     e40.     ;
+     jl. w3     d21.     ;   writetext(receiver);
+     al. w2     e32.+2   ;   index:= 2;
+g43: rl  w1  x2  +0      ; next word:
+     bl. w3     e32.+1   ;   word:= message(index);
+     ls  w3       1      ;   bits:= message(1);
+     hs. w3     e32.+1   ;   message(1):= bits shift 1;
+     sh  w3      -1      ;   if bits(0)=1 then
+     jl.        g44.     ;   goto number;
+     sn  w1       0      ;   if word=0 then
+     jl.        g42.     ;   goto test more;
+     al  w0       0      ;   char:= word(0:7);
+     ld  w1       8      ;   word:= word shift 8;
+     jl. w3     d20.     ;   writechar(char);
+     al  w0       0      ;   char:= word(0:7);
+     ld  w1       8      ;   word:= word shift 8;
+     jl. w3     d20.     ;   writechar(char);
+     al  w0       0      ;   char:= word(0:7);
+     ld  w1       8      ;   word:= word shift 8;
+     am     d20-d22      ;   writechar(char);
+;   goto test more;
+; number:
+;   writeinteger(word);
+g44: jl. w3     d22.     ; test more:
+g42: al  w2  x2  +2      ;   index:= index+2;
+     sh. w2     e32.+14  ;   if index<=14 then
+     jl.        g43.     ;   goto next word;
+     al  w0      10      ;
+     jl. w3     d20.     ;   writechar(10);
+     jl. w3     d23.     ;   typeline(buf);
+     rs. w2     e23.+2   ; clear function
+     zl. w1     e32.+1   ; if stop bit on then
+     so  w1     8.200    ; begin
+     jl.        g97.     ;
+     zl. w1     e32.     ; save function
+     rs. w1     e23.+2   ;
+     se  w1     10       ; if function = replace then
+     jl.        g97.     ;  save areaname
+     rl. w3     e24.     ; save name in input buffer
+     al  w3  x3+c66      ;
+     dl. w1     e32.+10  ;
+     ds  w1  x3+2        ;
+     dl. w1     e32.+14  ;
+     ds  w1  x3+6        ; end
+     dl. w1     e26.     ; simulate empty input string
+     ds. w1     e28.     ; ( after unstack command)
+g97: jl. w3     d42.     ; save work
+     am          0       ; +2 error (dont care)
+     rl. w3     e23.+2   ; if function =finis or replace then
+     se  w3     10       ;
+     sn  w3      2       ; 
+     sz                  ;
+     jl.        g30.     ;
+     jl. w3     d76.     ; adjust bs claim
+     jl. w3     d40.     ; remove process
+     rl. w3     e23.+2   ; if function =replace then
+     se  w3     10       ;
+     jl.        g30.     ;
+     rl. w2     e24.     ; stack input and
+     al  w2  x2+c66      ;
+     jl. w3     d79.     ; goto next command
+     jl.        g35.     ;
+
+g45: ; base for command-relatives
+
+; define pseudo-entries for conditinally-assembled commands
+g70: ; break
+g72: ; include
+g73: ; exclude
+g74: ; call
+g75: ; list
+g76: ; max
+g77: ; replace
+g83: ; all
+g96: ; get      / onn880520
+g89: ; job
+g90: ; print
+g91: ; modify
+; commands removed in RC4000 implementation / onn880520
+g55: ; mode
+g92: ; autorel
+g93: ; prio
+g102:; relocate
+g105:; cpa ; originally g59 now used in pk / onn880520
+     jl.        g18.   ;   goto not implemented;
+
+
+
+; command syntax:  read <area name>
+g103:                   ; read:
+     jl. w3     d15.   ;   next name;
+     al. w2     e20.   ;
+     am        -2048   ;
+     jl. w3     d79.+2048;   stack input (name);
+     jl.        g35.   ;   goto next command;
+
+
+; command syntax:  unstack
+g104:                   ; unstack:
+     am        -2048   ;
+     jl. w2     d80.+2048;   unstack input;
+     jl.        g35.   ;   goto next command;
+
+
+; command syntax:  date <year> <month> <date> <hour> <min> <sec>
+
+b. i20, j30 w.         ;
+j0:                    ; minimum values:
+     82  ,  1  ,  1  ,  0  ,  0  ,  0
+j1:                    ; top values:
+     99+1, 12+1, 31+1, 23+1, 59+1, 59+1
+j2:                    ; year,month,day,hour,min,sec
+      0  ,  0  ,  0  ,  0  ,  0  ,  0
+j5:                    ; month table: jan, ..., dec
+h. 365, 396, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334
+w.
+j11: 4                 ; minutes per four minutes
+j13: 24                ; hours per day
+j14: 60                ; minutes per hour
+j17: 365*3+366         ; days per four years (inclusive leap year)
+j18: 10000             ; units per second
+j20: 60*4 * 10000      ; units per four minutes
+
+j30: <:oldcat:>        ; name of successor-command
+
+g49:                   ; date:
+     al  w1     0      ;   for i := 0 step 2 until 10 do
+i0:                    ;     begin
+     jl. w3     d16.   ;     next integer;
+     sl. w0 (x1+j0.)   ;     if number < min value
+     sl. w0 (x1+j1.)   ;     or number >= top value then
+     jl.        g2.    ;       goto syntax error; (* i.e. illegal date *)
+     rs. w0  x1+j2.    ;     save number;
+     al  w1  x1+2      ;
+     se  w1     12     ;
+     jl.        i0.    ;     end;
+
+     dl. w2     j2.+2  ;   w1 := year; w2 := month;
+     sh  w2     2      ;   if month > february then
+     al  w1  x1-1      ;     year := year - 1;
+
+     al  w1  x1-68     ;   days := (year - 68)
+     wm. w1     j17.   ;     * days in four years
+     as  w1    -2      ;     / 4
+     ba. w1  x2+j5.-1  ;     + month table (month)
+     wa. w1     j2.+4  ;     + day;
+
+     wm. w1     j13.   ;   w1 := hours := days * 24
+     wa. w1     j2.+6  ;     + hour;
+
+     al  w2     0      ;   w2w3 := min;
+     rl. w3     j2.+8  ;
+
+     wm. w1     j14.   ;   w0w1 := minutes := hours * 60
+     aa  w1     6      ;     + min;
+
+     wd. w1     j11.   ;   w1 := fourmin := minutes / 4;
+     wm. w0     j14.   ;   seconds := minutes mod 4 * 60
+     wa. w0     j2.+10 ;     + sec;
+
+     wm. w0     j18.   ;   msec := seconds * 10000;
+     rl  w3     0      ;   (w2=0) w3 := msec;
+
+     wm. w1     j20.   ;   clock := fourmin * 2400000
+     aa  w1     6      ;     + msec;
+     jd         1<11+38;   set clock (clock);
+
+     dl. w1     j30.+2 ;   name := successor command name;
+     ds. w1     e21.   ;
+     al  w0     1      ;   type := 1;  <* i.e. pretend that 'oldcat' has been read *>
+     sl  w0    (b25)   ;   if maincat not defined yet then
+     jl.        g36.   ;     goto next command; <* i.e. interpret 'oldcat' *>
+
+     jl.        g35.   ;   goto next command;
+
+e.                     ;
+
+
+b.i30 w.                ; new:
+g51:
+     la. w0      i0.     ;   abs addr(console):= all bs(console):=
+     lo. w0      i1.     ;   abs protection(console):=false;
+     rs  w0  x1+c26      ;   keys(console):=1; / onn880517
+     hs  w0  x1+c37      ;   pr(console):=illegal pr;
+     dl. w3      i2.     ;   buf claim(console):=standard buf;
+     ds  w3  x1+c34      ;   area claim(console):=standard area;
+     rl. w3      i3.     ;   internal claim(console):=standard int;
+     rs  w3  x1+c39      ;   cat mask(console):=standard cat;
+     rl. w0      i9.     ;
+     rl. w3      i9.     ;
+     ds  w0  x1+c41+2    ; max interval(console):=max interval(s)
+     ds  w0  x1+c42+2    ; standard interval(s)
+     ds  w0  x1+c43+2    ;
+     jl. w3     d46.     ;   reset last of console;
+     rl. w2     i25.     ; get work device name
+     jl. w3     d61.     ; get devno*8
+     jl.        g16.     ; sorry goto end line
+     wa. w2     e25.   ;
+     dl. w0     i6.    ;   perm claim(work device) :=
+     ds  w0  x2+c44+6  ;     standard segment,entries;
+i10: dl. w3      i4.     ;   size(console):=standard size;
+     rl. w1     e25.     ;
+     ds  w3  x1+c40+2    ;
+     dl. w3      i5.     ;
+     ds  w3  x1+c40+6    ;   prog(console):=standard prog;
+     jl.        g52.     ;   goto process;
+i0:8.1771            ;
+i1:1<12              ; std keys / onn880517
+c7<12+c8          ; standard buf and area:
+i2:c9<12+c10         ; standard int and func:
+i3:c12               ; standard size:
+i4=k+2, i5=k+6        ; standard prog:
+<:fp:>,0,0,0      ;
+c13               ; standard segment claim
+i6:c14               ; standard entry claim
+i8:8.2000            ; all bs resources bit
+i9:8388605
+i25:   c15               ; work device name
+c.    (:c23>16a.1:)-1    ;
+
+g83 = k                ; all:
+     la. w0      i0.     ; abs addr(console):=
+     lo. w0      i8.     ; abs prot(console):= false
+     rs  w0  x1+c26      ; all bs(console):= true
+     rl  w2      b1      ;
+     dl  w0  x2+a45      ;
+     ds  w0  x1+c41+2    ; maxbase:=standardbase(s)
+     ds  w0  x1+c42+2    ; standardbase:=  ------
+     ds  w0  x1+c43+2    ; userbase:=  -------
+     bz  w0  x2+a19      ; bufclaims(s)
+     ws. w0      e2.     ; - ownbuf
+     hs  w0  x1+c32      ; =: bufclaims(console)
+     bz  w0  x2+a20      ; areaclaims(s)
+     ws. w0      e3.     ; - own area
+     hs  w0  x1+c33      ; =: areaclaims(console)
+     bz  w0  x2+a21      ; internalclaims(s)
+     bs. w0       1      ; -1
+     hs  w0  x1+c34      ; =:internalclaims(console)
+     bz  w0  x2+a22      ; functionmask(s)
+     hs  w0  x1+c35      ; =: functionmask(console)
+     jl. w3     d29.     ; find max(size)
+     sn  w1       0      ; if max size =0 then
+     jl.         g4.     ; return  "no core "
+     rl. w2     e25.     ;
+     rs  w1  x2+c39      ; size(console):= size
+c.4000                  ; only in rc4000:
+     al  w2       8      ; keys:= 8
+     jl. w3     d32.     ; find keys(keys,pr,pk,notused)
+     am           0      ;
+     ac  w0  x2  -8      ;
+     rl. w1     e25.     ;
+     hs  w0  x1+c26      ; keys(console):= 8-keys
+z.                       ;
+;
+;
+     jl. w3      d46.    ;   clear claimlist;
+     jl.        i10.     ;
+z.                       ;
+e.
+b. j5 w.
+g94: am  c95-c96        ; i:
+g95: al  w1  x1+c96+2   ; o:
+     jl. w3  d16.       ; get kind
+     rs  w0  x1-2       ;
+     jl.     j1.        ; continue with get name
+
+g52: am     c29-c40      ; process:
+g53: al  w1  x1+c40      ; program:
+ j1: jl. w3     d15.     ;   next name;
+     rl. w3      j2.     ; test name
+     sn. w3    ( e20.)   ; if name="s"
+     jl.          g3.    ; then goto error : not allowed
+     dl. w3     e21.     ; 
+     ds  w3  x1  +2      ;
+     dl. w3     e23.     ;
+     ds  w3  x1  +6      ;   name(console):=name;
+c.(:c24>18a.1:)-1       ;   if console testoutput
+     jl. w3     d44.     ;   then type description;
+z.    jl.     g35.      ;   goto next command;
+ j2: <:s<0>:>            ; (prevent blocking communication with s)
+e.
+
+b.i24
+w.g54:lo. w0  i0.       ; address:
+     hs  w0  x1+c27      ;   abs addr(console):=true;
+     am     c30-c39      ;
+g56: al  w2  x1+c39      ; size:
+     jl. w3     d16.     ;   next integer(integer);
+     sz  w0       2.1    ;
+     bs. w0       1      ;   integer(23):= 0;
+     rs  w0  x2  +0      ;   word param(console):=integer;
+c.(:c24>18a.1:)-1       ;   if console testoutput
+     jl. w3     d44.     ;   then type description;
+z.    jl.     g35.      ;   goto next command;
+i0:1<1
+e.
+
+b.i10
+w.
+c.-880504
+
+                         ; mode :
+; syntax mode <short integer>
+g55=k
+     la. w0      i2.     ; abs protection=false
+     rs  w0       4      ; w2=command mask
+     jl. w3     d16.     ; next integer
+     sn  w0       0      ; if mode=0 then
+     lo. w2      i3.     ; abs protection=true
+     rs  w2  x1+c26      ; 
+     jl.        g35.     ; next command
+z. ; 880504
+
+c.4000                  ; only in rc4000
+
+   g57:al  w2  x1+c26    ; key claim:
+     la. w0      i2.     ;   abs protection(console):=false;
+     jl.         i0.     ;   goto set param;
+g59: al  w2  x1+c38      ; pk:
+     lo. w0      i3.     ;   abs protection(console):=true;
+i0:  hs  w0  x1+c27      ; set param:
+     jl.         i1.     ;
+z.
+
+g60: am     c32-c33      ; buffer claim:
+g61: am     c33-c34      ; area claim:
+g62: al  w2  x1+c34      ; internal claim:
+i1:  jl. w3     d16.     ;   next integer(integer);
+     hs  w0  x2  +0      ;   byte param(console):=integer;
+c.(:c24>18a.1:)-1       ;   if console testoutput
+     jl. w3     d44.     ;   then type description;
+z.    jl.     g35.      ;   goto next command;
+i2:8.7773
+i3:1<2
+e.
+c.4000
+
+b.i24                   ; pr:
+w.g58:jl. w3  d45.      ;   next bitnumbers(bits, type);
+     ls  w2     -16      ;   bits:=bits shift -16;
+     lx. w2      i0.     ;   bits:=bits exor 8.377;
+     lo. w2      i1.     ;   bits(16):=1;
+     hs  w2  x1+c37      ;   pr(console):=bits(12:23);
+c.(:c24>18a.1:)-1       ;   if console testoutput
+     jl. w3     d44.     ;   then type description;
+z.    jl.     g36.      ;   goto exam command;
+i0:8.377
+i1:1<7
+e.
+z.
+c.-880504
+
+; cpa <cpavalue> or 0 or 1 :
+g105=k
+     jl. w3     d16.     ; next integer
+     sh  w0      -1      ; if < 0 then
+     jl.         g8.     ; write : illegal cpa
+     rs  w0  x1+c98      ;
+     jl.        g35.     ; goto next command
+
+z. ; 880504
+
+
+
+; function mask:
+g63: jl. w3     d45.     ;   next bitnumbers(bits, type);
+     ls  w2     -12      ;
+     hs  w2  x1+c35      ;   function mask(console):=bits(0:11);
+c.(:c24>18a.1:)-1       ;   if console testoutput
+     jl. w3     d44.     ;   then type description;
+z.    jl.     g36.      ;   goto exam command;
+
+g64:; create:
+     jl. w3     d35.     ;
+     rl. w2     e29.     ;   create child;
+     rl  w0  x2+a17      ;
+c.-880504
+     wa  w0  x2+a182
+z. ; 880504
+     jl. w3     d36.     ;   modify child(first addr(child));
+c.(:c24>18a.1:)-1       ;   if console testoutput
+     jl. w3     d44.     ;   then type description;
+z.    jl.     g35.      ;   goto next command;
+
+; init:
+g65: jl. w3     d35.     ;   create child;
+     jl. w3     d37.     ;   load child;
+     jl.        g35.     ;   goto next command;
+
+; run:
+g66: jl. w3     d35.     ;   create child;
+     jl. w3     d37.     ;   load child;
+     jl. w3     d38.     ;   start child;
+     jl.        g35.     ;   goto next command;
+
+; load:
+g67: jl. w3     d34.     ;   check child;
+     jl. w3     d37.     ;   load child;
+     jl.        g35.     ;   goto next command;
+
+; start:
+g68: jl. w3     d34.     ;   check child;
+     jl. w3     d38.     ;   start child;
+     jl.        g35.     ;   goto next command;
+
+; stop:
+g69: jl. w3     d34.     ;   check child;
+     jl. w3     d39.     ;   stop child;
+     jl.        g35.     ;   goto next command;
+c.(:c23>22a.1:)-1       ; if break option then
+g70 = k                ; break:
+     jl. w3  d34.      ; begin check child;
+     jl. w3     d39.     ;   stop child;
+     rl. w2     e29.     ;
+     rl  w3  x2+a27      ;   addr:=interrupt addr(child);
+     sn  w3       0      ;   if addr<>0 then
+     jl.        g35.     ;   begin
+     dl  w1  x2+a29      ;   word(addr):=save w0(child);
+     ds  w1  x3  +2      ;   word(addr+2):=save w1(child);
+     dl  w1  x2+a31      ;   word(addr+4):=save w2(child);
+     ds  w1  x3  +6      ;   word(addr+6):=save w3(child);
+     dl  w1  x2+a33      ;   word(addr+8):=save ex(child);
+     ds  w1  x3 +10      ;   word(addr+10):=save ic(child);
+     al  w1       8      ;   word(addr+12):=8;
+     rs  w1  x3 +12      ;
+     al  w0  x3+a180     ;   modify child(addr+a180);
+     jl. w3     d36.     ;   start child;
+     jl. w3     d38.     ;   end;
+     jl.        g35.     ;   goto next command;
+z.
+
+; remove:
+b. i24
+w. g71:              ;
+     jl. w3     d34.     ;   check child;
+     al  w0       1      ;
+     hs. w0     e81.     ;
+     jl. w3     d39.     ;   stop child;
+     jl. w3     d76.     ; adjust bs-claims
+     jl. w3     d40.     ;   remove child;
+     jl.        g35.     ;   goto next command;
+i1:0   ;
+e.
+c.(:c23>21a.1:)-1       ; if include/exclude option then
+g72 = k                ; include:
+     am         2      ;
+g73 = k                ; exclude:
+b.i24                   ; begin
+w.    rl. w3  i2.       ;
+     rs. w3      i1.     ;
+     jl. w3     d34.     ;   check child;
+i0:  jl. w3      d2.     ; more:
+     se  w0       2      ;   next param(type);
+     jl.        g36.     ;   if type<>2
+     rl. w1     e25.     ;   then goto exam command;
+     al  w3  x1+c29      ;
+     rl. w1     e19.     ;   include/exclude(name(console),
+i1:  am           0      ;       integer,result);
+     se  w0       0      ;   if result=0
+     jl.        g16.     ;   then goto more
+     jl.         i0.     ;   else goto end line;
+i2:  jd     1<11+14      ;
+     jd     1<11+12      ;
+e.z.
+c.(:c23>20a.1:)-1       ; if call option then
+g74 = k                ; call:
+b.i24                   ; begin
+w.i0: jl. w3  d2.       ; more: next param(type);
+     se  w0       2      ;   if type<>2 
+     jl.        g36.     ;   then goto exam command;
+     rl. w1     e19.     ;   device:=integer;
+     jl. w3     d15.     ;   next name;
+     al. w3     e20.     ;   create peripheral process(
+     jd     1<11+54      ;   name,device,result);
+     sn  w0       3      ;   if result=3
+     jl.        g10.     ;
+     sn  w0       4      ;   or result=4
+     jl.        g16.     ;
+     sn  w0       5      ;   or result=5
+     jl.        g17.     ;   then goto end line
+     jl.         i0.     ;   else goto more;
+e.
+z.
+c.(:c23>19a.1:)-1       ; if list option then
+b.i24 w.                ; begin
+i7:  <: error <0>:>
+i8:  <: stop  <0>:>
+i9:  <: run   <0>:>
+i10: <: wait  <0>:>
+g75 = k                ; list:
+   rl  w2  b6        ; :
+i1:  sl  w2     (b7)     ; for i:=first internal step 1
+     jl.        g35.     ; until last internal do
+     rl  w1  x2          ;
+     rl  w0  x1+a11      ; if name=0
+     rl  w3  x1+a34      ; or
+     al  w2  x2  +2      ; parent=0
+     rs. w2     e78.     ;
+     se  w0       0      ;
+     sn  w3       0      ; else
+     jl.         i1.     ; begin
+     jl. w3     d19.     ; initwrite
+     rl  w2  x2  -2      ;
+     al  w1  x2+a11      ;
+     jl. w3     d21.     ; writetext(processname)
+     ac  w1  x1 -12      ;
+     jl. w3     d70.     ; writespace(no af spaces)
+     rl  w1  x2+a17      ;
+c.-880504
+     wa  w1  x2+a182
+z. ; 880504
+     al  w0       8      ;
+     jl. w3     d71.     ; writeint(first core,8)
+     rl  w1  x2+a18      ;
+     ws  w1  x2+a17      ; 
+     al  w0       8      ;
+     jl. w3     d71.     ; writeint(coresize,8)
+     zl  w1  x2+a25      ; 
+     al  w0       3      ;
+     jl. w3     d71.     ; writeint(key,4)
+     zl  w1  x2+a12      ;
+     al  w0       4      ;
+     jl. w3     d71.     ; writeint(stopcount,4)
+     bl  w0  x2+a13    ;   w0 := process state;
+     al. w1     i7.    ;
+     sz  w0     2.10000000;
+     al. w1     i10.   ;
+     sz  w0     2.00100000;
+     al. w1     i8.    ;
+     sz  w0     2.01000000;
+     al. w1     i9.    ;
+     jl. w3     d21.   ;   writetext(process state);
+     rl  w1  x2+a34    ;
+     al  w1  x1+a11      ;
+     jl. w3     d21.     ; writetext(parent)
+     al  w0      10      ;
+     jl. w3     d20.     ; writechar(nl)
+     jl. w3     d23.     ; typeline(buf)
+     jl. w3     d42.     ; save work(buf)
+     jl.         g47.    ; +2 error goto end line
+     rl. w2     e78.     ;
+     jl.         i1.     ;
+e.
+z.
+c.(:c23>18a.1:)-1       ; if max option then
+g76 = k                ; max:
+b.i24                   ; begin
+w.
+     al. w1     g26.     ;
+     jl. w3     d21.     ;   writetext(<:max:>);
+     am       -2048      ;
+     jl. w3     d29.+2048;   find max(size);
+     jl. w3     d22.     ;   writeinteger(size);
+     al  w0      32      ;
+     jl. w3     d20.     ;   writechar(32);
+     rl  w2      b1      ;
+     bz  w1  x2+a19      ;
+     ws. w1      e2.     ;   writeinteger(buf claim(s)
+     jl. w3     d22.     ;                -own buf);
+     al  w0      32      ;
+     jl. w3     d20.     ;   writechar(32);
+     bz  w1  x2+a20      ;
+     ws. w1      e3.     ;   writeinteger(area claim(s)
+     jl. w3     d22.     ;                -own area);
+     al  w0      32      ;
+     jl. w3     d20.     ;   writechar(32);
+     bz  w1  x2+a21      ;
+     jl. w3     d22.     ;   writeinteger(internal claim(s));
+     al  w0      32      ;
+     jl. w3     d20.     ;   writechar(32);
+c.4000
+     al  w2       8      ;   keys:=8;
+     jl. w3     d32.     ;   find keys(keys,pr,pk,
+     jl.         i0.     ;             typekeys);
+     am           0      ;
+i0:  ac  w1  x2  -8      ; typekeys:
+     jl. w3     d22.     ;   writeinteger(8-keys);
+z.
+     al  w0      10      ;
+     jl. w3     d20.     ;   writechar(10);
+     jl. w3     d23.     ;   typeline(buf);
+     jl. w3     d42.     ;   save work(buf);
+     jl.         g47.    ;+2:  error:  goto end line;
+     jl.        g35.     ;   goto next command;
+e.
+z.
+
+
+
+c.(:c23>17a.1:)-1       ; if replace option then
+g77 = k                ; replace:
+b.i24                   ; begin
+w.      am    d15-e0    ;
+     jl. w3      e0.     ;   next name;
+     al. w3     e20.     ;
+     jd     1<11+52      ;   create area process(name,result);
+     sn  w0       2      ;
+     jl.        g11.     ;   if result=2
+     se  w0       3      ;       or result=3
+     sn  w0       4      ;       or result=4 then
+     jl.        g12.     ;     goto end line;
+     al. w1     e51.     ;
+     rl  w3      b1      ; next buffer:
+i0:  al  w2       0      ;   buf:=0;
+     jd     1<11+24      ;   wait event(buf);
+     jd     1<11+26      ;   get event(buf);
+     ba. w0       1      ;   result:=result+1;
+     sn  w0       1      ;   if result=1 then
+     jd     1<11+22      ;     send answer(buf,answer,result);
+     rl  w0  x3+a15      ;   next:=word(event q(proc));
+     se  w0  x3+a15      ;   if next<>event q(proc) then
+     jl.         i0.     ;     goto next buffer;
+     al. w3     e20.     ;
+     jd      1<11+8      ;   reserve process(name,result);
+     sn  w0       1      ;   if result=1 then
+     jl.         i2.     ;     goto give up;
+     al. w1     e51.     ;
+     jd     1<11+42      ;   lookup entry(name,tail,result);
+     sn  w0       2      ;   if result=2 then
+     jl.         i3.     ;     goto give up;
+     bz. w0     e59.     ;
+     se  w0       8      ;   if content<>8 then
+     jl.         i4.     ;     goto give up;
+     rl. w1     e60.     ;
+     al  w1  x1+511      ;
+     ls  w1      -9      ;   load size:=
+     ls  w1       9      ;       (bytes(tail)+511)/512*512;
+     jl. w3     d27.     ;   find size(start,size,give up);
+     jl.         i6.     ;
+     wa  w1       0      ;   last addr(area mess):=
+     al  w1  x1  -2      ;     first addr+load size-2;
+     ds. w1     e49.     ;   first addr(area mess):= first addr;
+     rl. w1     e58.     ;   segment(area mess):=
+     rs. w1     e50.     ;       segment(tail);
+     bz. w1     e67.     ;
+     wa  w1       0      ;
+     rs. w1     i20.     ;   entry:= first addr+entry(tail);
+     sh. w1    (e49.)    ;   if entry>last addr(area mess) then
+     jl.          4      ;
+     jl.         i5.     ;     goto give up;
+     al. w1     e47.     ;
+     al. w3     e20.     ;
+     jd     1<11+16      ;   send mess(name,area mess,buf);
+     al. w1     e51.     ;
+     jd     1<11+18      ;   wait answer(buf,answer,result);
+     rl. w1     e51.     ;
+     lo  w1       0      ;   res:= status or result;
+     jd     1<11+64      ;   remove process(name,result);
+     se  w1       1      ;   if res <> 1 then
+     jl.        g15.     ;     goto sorry;
+     rl. w0     i22.     ;
+     rs. w0     g30.     ;
+     jl.         g1.     ;
+i12: rl. w1     e24.     ; ok:
+     rl  w2  x1+c50      ;   buf:= state(work);
+     jd     1<11+18      ;   wait answer(buf,work,result);
+     ld  w1     -100      ;   w0:= w1:= 0;
+     rl. w2     e25.     ;   
+     rl  w2  x2+c25      ;    w2:=process descr.(console)
+     xl.          0      ;   ex:= 0;
+     jl.       (i20.)    ;   goto entry;
+
+i2:  am         g13-g11;
+i3:  am         g11-g12;
+i4:  am         g12-g14;
+i5:
+i6:  al. w2     g14.     ; give up:
+     al. w3     e20.     ;
+     jd     1<11+64      ;   remove process(name,result);
+     jl      x2  +0      ;   goto end line;
+i20:0               ; entry
+i22: jl.    i12-g30      ; return to ok
+e.
+z.
+
+
+;
+; stepping stone
+;
+jl. d2., d2=k-2 
+jl. g2., g2=k-2
+jl. d15., d15=k-2
+jl.        d16.
+d16=k-2
+jl. g27., g27=k-2 
+jl.        d34.
+d34=k-2
+jl. g35., g35=k-2
+jl.        d42.
+d42=k-2
+jl. d46., d46=k-2
+jl.        d61.
+d61=k-2
+     jl.        d77.     ;
+d77=k-2
+     jl.        d78.     ;
+d78=k-2
+
+;
+; v. block
+; indirect adressing of all e-names
+;
+v16: e16
+
+v19: e19
+v20: e20 
+v21: e21
+v23: e23
+v25: e25
+v30: e30
+v46: e46
+c.(:c23>14a.1:)-1    ; if job and get then include ,  onn/880701
+v70: e70
+v71: e71
+z.
+v72: e72
+v79: e79
+v87: e87
+
+b.i24                   ; dump:
+w.g79:am      d15-e0
+     jl. w3      e0.     ;   next name;
+     jl. w3     d34.     ;   check child;
+     dl  w1  x2+a43      ; get catbase of pr descr(child)
+     al. w3      i1.     ; name=0
+     jd     1<11+72      ; catbase(s)=catbase(child)
+     se  w0       0      ; if not ok then
+     jl.        g19.     ; goto end line: base illegal
+     al. w3     e20.     ; name adr
+     jd     1<11+52      ; create area process(name)
+     al. w3     i1.    ;   (prevent remove process(name))
+     sn  w0       2      ; if result=2 or
+     jl.        i10.     ;
+     sl  w0       2      ; result>2 then 
+     jl.        i11.     ; goto give up
+     al. w3     e20.   ;
+     jd      1<11+8      ;   reserve process(name,result);
+     se  w0       0      ;   if result<>0 then
+     jl.         i12.     ;   goto give up;
+     jl. w3     d39.     ;   stop child;
+     rl. w2     e29.     ;
+     al  w1     0        ;
+     rs. w1   e46.+2     ; segmentno(mess)=0
+c.-880504
+     rl  w1  x2+a182     ; load base (child)
+z. ; 880504
+     dl  w3  x2+a18      ;
+c.-880504
+     wa  w2     2        ; add base
+     wa  w3     2        ; 
+z. ; 880504
+     al  w3  x3  -2      ;   line addr:= first addr(child);
+     ds. w3     e46.     ;   write addr:= top addr(child)-2;
+     al. w3     e20.     ;
+     al. w1     e44.     ;
+     jd     1<11+16      ;   send mess(name,output,buf);
+     al. w1     e51.     ;
+     jd     1<11+18      ;   wait answer(buf,answer,result);
+     rl. w2     e51.     ;
+     sn  w0       1      ;   if result<>1
+     se  w2       0      ;   or status(answer)<>0 then
+     jl.         i9.   ; give up: area error
+     jd     1<11+42    ; lookup entry (area)
+     se  w0     0      ; if not ok then
+     jl.         i9.   ; goto area error
+     al  w0     7      ; else
+     hs. w0     e59.   ; contents key(area):= core dump
+     jd     1<11+36    ; get clock
+     ld  w1     5      ;
+     rs. w0     e56.   ; set shortclock(area)
+     al. w1     e51.   ;
+     jd     1<11+44    ; change entry
+     se  w0     0      ; if not ok then 
+ i9: am     g15-g35      ; give up: area error
+     am     g35-g11      ; goto next command
+i10: am     g11-g12      ; give up: catalog error
+i11: am     g12-g13      ;  - - - : area unknown
+i12: al. w2     g13.     ;  - - - : area reserved
+     jd     1<11+64      ; remove area process
+     al. w3      i1.     ;
+     dl. w1      i2.     ;
+     jd     1<11+72      ; reset catalogbase(s)
+     jl      x2+  0      ; exit , 
+
+ i1: 0
+     a107
+ i2: a108-1
+e.
+
+b. i4
+w.                     ;
+; command syntax:  user <lower> <upper>
+; command syntax:  login <lower> <upper>
+; command syntax:  project <lower> <upper>
+g86: am         c43-c42; user: update userbase;
+g82: am         c42-c41; login: update loginbase;
+g80: al  w2  x1+c41    ; project: update projectbase;
+     jl. w3     d16.     ; next integer
+     rs  w0  x2+0      ; lower := integer;
+     jl. w3     d16.     ; next integer
+     rs  w0  x2+2      ; upper := integer;
+     jl.        g35.     ; next command
+e.
+
+
+b.i12                   ; bs:
+w.                     ;
+i2:  dl. w2     e21.     ;
+     ds. w2      i4.     ;
+     dl. w2     e23.     ;
+     ds. w2      i5.     ;
+     jl      x3          ;
+g81: jl. w3     d34.     ; check child
+     jl. w3     d15.     ;
+     jl. w3      i2.     ;
+     jl. w3     d16.     ; next integer
+i0:  rs. w0     e52.     ; more:
+     jl. w3     d16.     ; next integer
+     rs. w0     e51.     ;
+     dl. w0     e52.     ;
+     al. w1     e51.+a110*4; index:= claim list end
+i1:  ds  w0  x1  +2      ; repeat begin
+     al  w1  x1  -4      ; claimlist(index):=claimchange
+     se. w1     e51.     ; index:= index-4
+     jl.         i1.     ; until index = claim list start
+     al. w2      i3.     ;
+     rl. w3    (v25.)    ;
+     al  w3  x3+c29      ; w3 = process name(console)
+     jd     1<11+78      ; set bs claims
+     sn  w0       1      ; if result = 1
+     jl.        g20.     ; then goto end line
+     se  w0       0      ; if result <> 0
+     jl.        g21.     ; then goto end line
+     jl.        g35.     ; then goto exam command
+
+; command syntax:  temp <docname> <segments> <entries>
+g84:                   ; temp:
+     am         c45-c47;   (update temp claims)
+
+; command syntax:  perm <docname> <segments> <entries>
+g85:                   ; perm:
+     al  w3     c47    ;   (update perm claims)
+     wa. w3    (v25.)  ;                  e25. changed to (v25.) / onn880508
+     rs. w3     i6.    ;   save abs addr of claim;
+
+     jl. w3     d15.     ;
+     jl. w3      i2.     ;
+     jl. w3     d16.     ; get segments
+     rs. w0     e52.     ;
+     jl. w3     d16.     ; get entries
+     rs. w0     e51.     ;
+     al. w2      i3.     ; name adr.
+     jl. w3     d61.     ; get devno*8
+     jl.        g16.     ; sorry goto end line
+     dl. w1     e52.     ;
+     am.       (i6.)   ; update segments and entries;
+     ds  w1  x2        ;
+     jl.        g35.     ; next command
+ i3:0
+i4:0
+0
+i5:0
+i6:  0                 ; abs addr of claim (in console descr)
+e.
+b.i40,j10
+w.
+c.(:c23>14a.1:)-1
+g96 = k                ; get:
+          am -1        ;
+g89 = k                ; job:
+     al  w0  0         ; set startflag
+     rs. w0  i16.      ;
+     al  w3  0         ;
+     rs  w3  x1+c95+2  ; clear primin and primout
+     rs  w3  x1+c96+2  ;
+     jl. w3     d46.   ;   clear claimlist;
+     jl. w3     d15.     ; get jobname
+     al  w1       0      ; then get segment(0)
+     rl. w2     e70.     ;
+     jl. w3     d77.     ;
+     rl. w1     e70.     ;
+     rl  w3  x1+6        ; get no. of segments
+     rs. w3     i14.     ;
+     rl  w1  x1  +2      ;
+     rs. w1     i12.     ;
+     al  w2       0      ; find number of
+     al  w3     512      ; entries in one
+     wd  w3       2      ; susercatentry
+     al  w3  x2-510    ;   w3 := last used in segment;
+     rs. w3     e85.     ;
+j8:  dl. w2     (v21.)    ;
+     aa. w2     (v23.)    ; compute hashvalue
+     wa  w2       2      ;
+     al  w1       0      ;
+     sh  w2      -1      ;
+     ac  w2  x2          ;
+     wd. w2     i14.
+     rs. w1     i13.     ;
+ j3: rl. w2    (v71.)    ;
+     rs. w1     (v79.)    ;
+     jl. w3     d77.     ; get segment
+     jl. w3     d78.     ; find entry
+     sl  w2       0      ; if entry address then
+     jl.         j4.     ; copy information
+     se  w2     -10      ; if entry ndon' excist then
+     jl.        g22.     ; goto end line
+     rl. w1     (v79.)    ; if entry not found on this segment
+     al  w1  x1+1        ; then increase segment no.
+     sn. w1    (i14.)    ; search cyclical through
+     al  w1       0      ;
+     se. w1    (i13.)    ;
+     jl.         j3.
+     jl.        g22.
+ j4: rl  w1       4      ;
+     wa. w1     i12.     ; last adr. +2 in userentry
+     rs. w1     i15.
+     rl. w1     (v25.)    ;
+     rl  w3  x2+2        ; command mask(job) :
+     rl  w0  x1+c26      ; if abs.protection, abs.addr or
+     la. w0     i17.     ; 
+     la. w3     i10.     ; all bs= true then
+     lo  w0       6      ; 'or' these bits to
+     rs  w0  x1+c26      ; command mask(console)
+     al  w3  x1+c29      ; copy job to console buffer
+     al  w2  x2+4        ; from process name
+ j5: rl  w0  x2          ; to claim list
+     rs  w0  x3          ;
+     al  w2  x2+2        ;
+     al  w3  x3+2        ;
+     se  w3  x1+c95      ; (until i and o are defined in susercat) end
+     jl.         j5.     ;
+;
+; create claim list(console)
+;
+     rs. w2      i1.     ;
+     rl. w2(v70.)    ;
+     al  w2  x2+8        ; name adr. first dev(entry0)
+     rs. w2      i2.     ;
+     al  w2  x1+c44      ; start of claim list(console)
+     rs. w2      i0.     ;
+ j0: rl. w2      i2.     ;
+     sl. w2    (i15.)    ; kan fjernes nar newcat er rettet !!!!!!!!!!!!!
+     jl.         j2.     ; ---------""---------""-------""!!!!!!!!!!!
+     jl. w3     d61.     ; get devno*8(next dev)
+     jl.         j1.     ; not found: goto next dev.
+     rl. w3      i1.     ; found: copy claim list:
+     dl  w1  x3+2        ; begin
+     wa. w2      i0.     ;
+     ds  w1  x2+2        ;
+     dl  w1  x3+6        ;
+     ds  w1  x2+6        ; end
+ j1: dl. w3      i2.     ; next device: get claim list adr.(userentry)
+     al  w3  x3+12       ; and dev. name adr.(entry0)
+     al  w2  x2+8        ;
+     ds. w3      i2.     ;
+     se. w2    (i15.)    ;
+     jl.         j0.     ; then find next dev.
+j2:                    ;
+     rl. w1    (v25.)   ; restore console
+     al  w2    -1      ;   areabuf := undef;
+     rs. w2     (v87.)  ;
+     sn. w2  (i16.)    ; if only load then
+     jl.        g35.   ;   goto next command;
+     jl.     g66.        ; else goto run
+;
+ i0: 0                   ; claim list start(console)
+ i1: 0                   ; -2  claim list adr(userentry)
+ i2: 0                   ; +0  dev. name adr.(entry0)
+i10: 8.77772006          ; prio+all bs, abs. protc., abs. addr.
+i12: 0                   ; entry lenght
+i13: 0                   ; name key
+i14: 0                   ; catalog lenght
+i15: 0                   ; last adr.+2(userentry)
+i16: 0                   ; job indicator : 0=job command
+i17: 8.1770
+z.e.
+b.i24
+w.
+g87: am         1<8    ; lock:  lock := true;
+g88: al  w0     0      ; unlock:lock := false;
+     rs. w0     (i0.)  ;
+     jl.        g35.   ;   goto next command;
+ i0: e80               ; lock indicator
+e.
+
+
+
+c. (:c23>15a.1:)-1
+
+
+
+b. i30, j10           ;
+w.                    ;
+
+; command syntax:  modify <addr> <old contents> <new contents>
+
+g91 = k                ; modify:
+     jl. w3    (i22.)    ;   addr := next integer;
+     sl  w0       0      ;   if illegal core-address then
+     sl  w0    (116)     ;
+     jl.        g15.     ;     goto end line;
+     rl  w2       0      ;
+
+     jl. w3    (i22.)    ;
+     se  w0 (x2)         ;   if next integer <> core(addr) then
+     jl.        g15.     ;     goto end line;
+
+     jl. w3    (i22.)    ;
+     rs  w0  x2          ;   core(addr) := next integer;
+
+     jl.        g35.     ;   goto next command;
+
+g90 = k                ; print:
+     jl. w3    (i22.)    ; next integer
+     am        -500      ;
+     rs. w0     e37.+500 ;
+     jl. w3    (i22.)    ; next integer
+     am        -500      ;
+     rs. w0     e38.+500 ;
+     al. w3     i11.     ;
+     jd      1<11+8      ; reserve printer
+     se  w0       0      ; if result <> 0
+     jl.       (i23.)    ; then goto end line
+j0:  dl. w1     i12.     ; next:  init output area
+     ds. w1      i1.     ;
+     ds. w1      i3.     ;
+     ds. w1      i7.     ;
+     dl. w1     i13.     ;
+     ds. w1      i4.     ;
+     ds. w1      i5.     ;
+     rl. w1     i14.     ;
+     rs. w1      i2.     ;
+     rs. w1      i6.     ;
+     am        -500      ;
+     rl. w1     e37.+500 ; print address(decimal)
+     al  w0      10      ;
+     al. w2      i1.     ;
+     jl. w3      j3.     ;
+     am        -500      ;
+     rl. w2     e37.+500 ; print word(octal)
+     rl  w1  x2          ;
+     al  w0       8      ;
+     al. w2      i3.     ;
+     jl. w3      j3.     ;
+     al  w1      -2      ;
+     am        -500      ;
+     la. w1     e37.+500 ;
+     bz  w1  x1          ; print byte 1(decimal)
+     al  w0      10      ;
+     al. w2      i4.     ;
+     jl. w3      j3.     ;
+     al  w1      -2      ;
+     am        -500      ;
+     la. w1     e37.+500 ;
+     bz  w1  x1  +1      ; print byte 2(decimal)
+     al  w0      10      ;
+     al. w2      i5.     ;
+     jl. w3      j3.     ;
+     am        -500      ;
+     rl. w2     e37.+500 ;
+     rl  w1  x2          ; print word(decimal)
+     sl  w1       0      ; if word < 0
+     jl.         j2.     ; then begin
+     ac  w1  x1          ; change sign
+     rl. w0     i15.     ;
+     rs. w0      i6.     ; set minus
+j2:  al  w0      10      ; end
+     al. w2      i7.     ;
+     jl. w3      j3.     ;
+     am        -500      ;
+     rl. w1     e37.+500 ;
+     rl  w2  x1          ; print word(text)
+     rl. w1     i26.     ;
+j1:  ld  w2       8      ;
+     sz  w1       8.340  ;
+     sz  w1       8.200  ;
+     la. w1     i25.     ;
+     sz  w1       8.177  ;
+     sz                  ;
+     al  w1  x1 +32      ;
+     sh  w1       0      ;
+     jl.         j1.     ;
+     rs. w1      i8.     ;
+     al. w1     i10.     ;
+     al. w3     i11.     ;
+     jd     1<11+16      ; send message
+     jl. w3     d42.     ;   save work(buf);
+     jl.         j6.     ;+2:  error:  goto end print;
+     am        -500      ;
+     rl. w1     e37.+500 ; first addr
+     al  w1  x1  +2      ; +2
+     am        -500      ;
+     rs. w1     e37.+500 ; =: first addr
+     am        -500      ;
+     rl. w2     e38.+500 ;
+     sh  w1  x2          ; if first addr<=last addr
+     jl.         j0.     ; then goto next
+j6:; end print:
+     al. w3     i11.     ;
+     jd     1<11+10      ; release printer
+     jl.       (i24.)    ; goto next command
+j3:  ds. w0     i19.     ; save return and radix
+j4:  al  w3       0      ; next word: s:= 0
+j5:  al  w0       0      ; next char:
+     wd. w1     i19.     ;
+     wa. w0     i16.     ;
+     as  w0  x3          ; remainder shift s
+     wa  w0  x2          ; + word(i)
+     rs  w0  x2          ; =: word(i)
+     sn  w1       0      ; if quotient = 0
+     jl.       (i18.)    ; then return
+     al  w3  x3  +8      ; s:= s+8
+     se  w3      24      ; if s<>24
+     jl.         j5.     ; then goto next char
+     al  w2  x2  -2      ; i:=i-2
+     jl.         j4.     ; goto next word
+i0:0                ;
+i1:0                ; addr
+<:   :>          ;
+i6:0                ;
+0                ;
+i7:0                ; decimal
+0                ;
+i4:0                ; byte 1
+0                ; 
+i5:0                ; byte 2
+<:   :>          ;
+i2:0                ;
+0                ;
+i3:0                ; octal
+<:   :>          ; 
+i8:0                ; text
+i9:<:<10>:>         ;
+i10:5<12             ; message
+i0               ;
+i9               ;
+0               ;
+i11:<:printer:>,0,0  ; name
+<:      :>           , i12=k-2
+<:      :>           , i13=k-2
+<:   :>              , i14=k-2
+<:-  :>              , i15=k-2
+<:<0><0><16>:>       , i16=k-2
+i18:0                ; link
+i19:0                ; radix
+i22:d16              ; next integer
+i23:g1               ; error
+i24:g35              ; next command
+i25:8.7777 7400      ;
+i26:128<16+128<8+128 ;
+z.
+e.
+c.-880504
+
+
+
+b. i24
+w. g93=k            ; prio:
+     jl. w3     d16.     ; read priority
+     sz. w0    (i1.)   ;   if prio < 0 or prio >= 4096 then
+     jl.        g27.     ; goto end line: illegal priority
+     hs  w0  x1+c26      ;
+     jl.        g35.     ; else goto next command
+ i1:  -1<12
+e.
+
+z. ; 880504
+
+
+
+b.i10
+w.g99:              ; jobremove
+       am      -2046      ;
+     jl.  w3     d34.+2046   ; check child
+     al  w2  -1      ;
+     rs  w2  x3+c22   ; coretableelement:=not job
+     jl.     g71.    ; goto remove
+e.
+
+
+b.i3
+w.g100:             ; base
+     jl. w3     d16.     ; next integer
+     rs. w0      i3.     ;
+     jl. w3     d16.     ; next integer
+     rl. w3      i3.     ;
+     ds  w0  x1+c42+2    ; set bases
+     ds  w0  x1+c41+2    ;
+     ds  w0  x1+c43+2    ;
+     jl.        g35.     ;
+i3:0
+e.
+c.-880504
+
+; autorel and relocate
+;
+;                  yes
+; syntax: command <first logic address>
+;                  no
+;
+b. i10, j10 w.
+g92=k
+     rl. w3      v72.      ; autorel
+     jl.          j0.      ; set destination address
+g102=k
+     al  w3  x1+c97        ; relocate :
+ j0: rs. w3       i1.      ;
+     jl. w3       d2.      ; examine next param
+     se  w0        1       ; if name then
+     jl.          j1.      ; begin
+     rl. w2     (v20.)     ; if name:= <:no :> then
+     al  w3       -1       ; first logic address :=
+     se. w2      (i0.)     ; -1 (no relocation) 
+     jl.          j2.      ; else
+     rl. w3     (v16.)     ; set first logic address
+     jl.         j2.       ; top of s own code
+j1:  se  w0        2       ; if not integer then 
+     jl.          g2.      ; syntax
+     rl. w3     (v19.)     ; integer:
+     sh  w3       -1       ; if <0 then write
+     jl.          g2.      ; syntax
+j2:  rs. w3      (i1.)     ;
+     jl.         g35.      ; goto next command
+
+i0: <:yes:>                ; 
+i1: 0                      ;
+
+e.
+
+z. ; 880504
+
+
+; adjust rest claims in usercat.
+; comment: change the perm rest claims in susercat
+; to the value given by the internal process descr. for key=3.
+; temp claims are unchanged.
+;
+;     call         return
+; w0               destroyed
+; w1               destroyed
+; w2               destroyed
+; w3  link         destroyed
+;
+ b.i20, j10
+ w.
+
+d76: rs. w3     i10.     ; store return in save area
+     am       -2046      ;
+     rl. w3  e30.+2046   ;
+     rl  w1  x3+c22      ; if segmentno= -1 then
+     sh  w1      -1      ; return: no susercatjob
+     jl.       (i10.)    ;
+ c.(:c23>14 a.1 :)-1
+     rl. w2      i2.     ; 
+     jl. w3     d77.     ; get segment
+     am       -2046       
+     rl. w1  e30.+2046   ;
+     rl  w1  x1+c22      ;
+     am       -2046      ;
+     rs. w1  e46.+2+2046 ; store segmentno in output mess
+     am       -2046      ;
+     rl. w1  e29.+2046   ; get procname(child)
+     al  w2  x1+a11      ; and store in name area
+     am       -2046      ;
+     al. w3  e20.+2046   ;
+     dl  w1  x2+2        ;
+     ds  w1  x3+2        ;
+     dl  w1  x2+6        ;
+     ds  w1  x3+6        ;
+     jd     1<11+4       ; get pr descr.(proc name)
+     rs. w0      i0.     ;
+     se  w0       0      ;
+     jl.         j0.     ;
+     am       -2046      ; if error then
+     jl.    g9.+2046     ; goto end line: process unknown
+ j0: jl. w3     d78.     ; find entry
+     sh  w2      -1      ; if entry not found then
+     jl.         j4.     ; goto end line: catalog error
+     al  w2  x2+48       ;
+     rs. w2      i3.     ; perm claim adr(userentry)
+     rl. w2      i1.     ;
+     al  w2  x2+8        ;
+     rs. w2      i4.     ;
+ j1: rl. w2      i4.     ; adjust rest claims
+     jl. w3     d61.     ; for i=0 step 1 
+     jl.         j2.     ; until last dev.(entry0)
+     rl  w2  x3-a88-2    ; begin
+     wa. w2      i0.     ; find chaintable(dev.)
+     al  w2  x2+6        ; if not found goto next device
+     zl  w0  x2          ; perm entries(suserentry)
+     rl. w1      i3.     ; = entry claim(pr.descr.) , key=3
+     rs  w0  x1          ;
+     zl  w0  x2+1        ; perm segments
+     wm  w0  x3-a88+26   ; = slicelenght(dev)*slice claim(pr.descr.)
+     rs  w0  x1+2        ; end
+ j2: dl. w2     i4.      ; next device:
+     al  w2  x2+12       ; 
+     al  w1  x1+8        ;
+     ds. w2      i4.     ;
+     rl. w1      i1.     ;
+     rl  w1  x1+4
+     am.       ( i1.)    ; if  dev.name.adr. <
+     sh  w2  x1          ; last used of entry0 then
+     jl.         j1.     ; goto next , else
+     rl. w2      i2.     ; store segment:
+     al  w3  x2+510      ; create output mess.
+     am       -2046      ; first adr. h20
+     ds. w3  e46.+2046   ; last adr. h20+510
+     rl. w3      i5.     ; segment no:stored above
+     jd     1<11+52     ; create area.susercat
+     jd      1<11+8      ; reserve(susercat)
+     sn  w0       0      ;
+     jl.         j5.     ;
+     am        -2046     ; if error then
+     jl.     g15.+2046   ; write: area error
+ j5: am       -2046      ;
+     al. w1  e44.+2046   ;
+     jd     1<11+16      ; send mess.
+     rl. w1     i11.     ;
+     jd      1<11+18     ; wait answer
+     lo. w0    (i11.)    ; 'or' status and result
+     sn  w0       1      ; if <> 1 then goto error
+     jl.         j6.     ;
+ j4: am       -2046      ; error
+     al. w1  g11.+2046   ; write catalog error
+     rs. w1     i10.     ;
+ j6: rl. w3      i5.     ;
+     jd     1<11+64      ; remove area susercat
+     am        -2048    ;
+     rs. w3     e87.+2048;   areabuf := undef;
+     jl.       (i10.)    ; return
+;
+ i0: 0                   ; pr.descr.adr(procname)
+ i1: h19                 ; entry0 adr.
+ i2: h20                 ; user segment adr.
+z.
+      am  -2046
+     jl.  g18.+2046
+
+ i3: 0                   ; -2, perm claim list adr(userentry)
+ i4: 0                   ; +0, dev.name adr(entry0)
+ i5: c69                 ; susercat name adr.
+ i6: 0                   ; segmentno in susercat
+i10: 0                 ; return adr.
+i11: e51               ; answer status adr.
+e.
+
+
+; character table:
+; contains an entry of 3 bits defining the type of each
+; character in the iso 7 bit character set.
+
+w.h0: 8.7777 7777       ; nul soh stx etx eot enq ack bel
+8.7757 7777       ; bs  ht  nl  vt  ff  cr  so  si
+8.7777 7777       ; dle dc1 dc2 dc3 dc4 nak syn etb
+8.7667 7777       ; can em  sub esc fs  gs  rs  us
+8.3666 6666       ; sp
+8.6636 4244       ; (   )   *   +   ,   -   .   /
+8.1111 1111       ; 0   1   2   3   4   5   6   7
+8.1125 6466       ; 8   9   :   ;   <   =   >
+8.6666 6666       ;     a   b   c   d   e   f   g
+8.6666 6666       ; h   i   j   k   l   m   n   o
+8.6666 6666       ; p   q   r   s   t   u   v   w
+8.6666 6666       ; x   y   z   {   |           _
+8.6000 0000       ;     a   b   c   d   e   f   g
+8.0000 0000       ; h   i   j   k   l   m   n   o
+8.0000 0000       ; p   q   r   s   t   u   v   w
+8.0000 0067       ; x   y   z   {   |          del
+
+; command table:
+; each entry consists of two words defining the name of the
+; command, a eigth bits defining a bit to test in the console mask,
+; and a sixteen bits defining the address of the command action
+; relative to g45.
+
+w.h2 = k-6        ; base of command:
+<:all<0>:>  , 1<17+g83-g45
+<:addr:>    , 1<17+g54-g45
+<:area:>    , 1<17+g61-g45
+<:autore:>   , 1<15+g92-g45
+<:base:>,1<18+g100-g45
+<:break:>   , 1<20+g70-g45
+<:bs<0><0>:>, 1<17+g81-g45
+<:buf<0>:>  , 1<17+g60-g45
+<:call:>    , 1<17+g74-g45
+<:cpa<0>:>  , 1<17+g105-g45
+<:create:>  , 1<16+g64-g45
+<:date:>    , 1<21+1<14+g49-g45
+<:dump:>    , 1<20+g79-g45
+<:exclud:>  , 1<19+g73-g45
+<:i:>,0     , 1<20+g94-g45
+<:functi:>  , 1<17+g63-g45
+<:includ:>  , 1<19+g72-g45
+<:init:>    , 1<16+g65-g45
+<:intern:>  , 1<17+g62-g45
+<:job<0>:>,1<20+g89-g45
+<:get<0>:>  , 1<20+g96-g45
+<:list:>    , 1<20+1<14+g75-g45
+<:load:>    , 1<20+g67-g45
+<:lock:>, 1<15+g87-g45
+<:login:>, 1<18+g82-g45
+<:max<0>:>  , 1<20+1<14+g76-g45
+<:modify:>  , 1<21+1<14+g91-g45
+<:new<0>:>  , 1<16+g51-g45
+<:jobrem:>, 1<15+g99-g45
+<:o:>,0     , 1<20+g95-g45
+<:perm:>,1<17+g85-g45
+<:prio:>,1<18+g93-g45
+<:proc:>    , 1<20+g52-g45
+<:prog:>    , 1<20+g53-g45
+<:projec:>,1<18+g80-g45
+<:read:>    , 1<20+1<14+g103-g45
+<:reloca:>  , 1<18+g102-g45      ;  
+<:remove:>  , 1<20+g71-g45
+c.(:c23>17a.1:)-1
+<:replac:>  , 1<15+g77-g45
+z.
+<:run<0>:>  , 1<16+g66-g45
+<:size:>    , 1<18+g56-g45
+<:start:>   , 1<20+g68-g45
+<:stop:>    , 1<20+g69-g45
+<:temp:>,1<17+g84-g45
+<:unlock:>,1<15+g88-g45
+<:unstac:>  , 1<20+1<14+g104-g45
+<:user:>,1<18+g86-g45
+<:mode:>     , 1<21+g55-g45
+c.4000
+<:key<0>:>        , 1<17+g57-g45
+<:pk<0><0>:>   , 1<18+g59-g45
+<:pr<0><0>:>   , 1<18+g58-g45
+z.
+<:print:>   , 1<21+1<14+g90-g45
+h3:h13   ; continue command list
+
+; define b-names for transferring variables to mons2-text
+
+b110 = g45   ; command base
+b112 = d2    ; call next param
+b113 = d15   ; call next name
+b114 = d16   ; call next integer
+b115 = g2    ; goto syntax error
+b116 = g35   ; goto next command
+b117 = g36   ; goto exam command
+b118 = e19   ; integer just read
+b119 = e20   ; name just read
+b120 = e8    ; pointer to: last of init code
+b121 = d19   ; call init write
+b122 = d20   ; call write char
+b123 = d21   ; call write text
+b124 = d23   ; call type line
+b125 = d42   ; call save work
+b126 = g47   ; goto input aborted
+b129 = g11   ; goto catalog error
+b130 = d79   ; call stack input
+
+; console table:
+
+h4:0, r.c81*c1>1     ; lay out standard console descriptions
+h22=k-c1               ; last description
+
+; initialize standard console descriptions.
+;  c20, c21 queue element  (queued up on the queue head)
+;  c27      command mask           (standard mask)
+b.i4,j2 w.
+
+i0:0                 ; saved link
+h4+c1             ; next element
+i1:h4-c1             ; last element
+i2:e35               ; queue head
+
+j0:  rs. w3      i0.     ; start:
+     al. w1      i0.     ;
+     rs  w1  x2  +0      ;   first free:=start of init code;
+     al  w0     c82      ;
+     dl. w2      i1.     ;
+      am      -2046     ;
+           al. w3      h4.+2046     ;
+j1:  rs  w0  x3+c27      ;   for console desc:=first stop 1 until last do
+     ds  w2  x3+c21      ;     mask(console desc):=standard mask;
+     al  w1  x1 +c1      ;     next,last queue element:=next, last console desc;
+     al  w2  x2 +c1      ;
+     al  w3  x3 +c1      ;
+     sh. w3     h22.     ;
+     jl.         j1.     ;
+     rl. w2      i2.     ;   insert queue head in first and last console des;
+     am     -2046
+     rs. w2      h4.+c21+2046 ;
+     rs. w2     h22.+c20 ;
+     al  w0       0      ;
+     al  w2       0      ;
+     jl.        (i0.)    ;   return to slang;
+
+     jl.         j0.     ;   goto start;
+e.j.
+
+h21=k                  ; start of special console descriptions
+
+t.
+m.                s console table included
+
+
+h. h5=k-c1   ; last console
+ 
+; device exception table (devices not automatically included with users )
+; the numbers in order of increasing value:
+h6:                 ; start(table)
+t.
+m.                s device exclusion table included
+
+    2047            ; last(table)
+w.
+w.
+
+; work table:
+
+h. h8:       ; first work:
+0,r.c2*c3
+h9=k-c2   ; last work:
+c.(:c23>14a.1:)-1
+h. h19:  -1,r.c89
+z.           ;  moved two lines up, because h20 is used in the read command
+             ;  onn/880701
+h20:-1,r.512
+;z.
+
+; core table:
+; contains an entry for each storage area allocated to a child.
+; an entry defines the address of a child description within the
+; monitor. the entries are arranged in the same order as the
+; storage areas from low towards high addresses. the table is
+; terminated by a zero.
+
+w.
+h10 = k - c11 ; base of core table:
+-1, r.(:a3-2:)*c11>1 ; lay out core table
+h11=k                  ; top of coretable
+m.                first free addr
+
+
+; initialize core table.
+; all entries in the core table is initialised to this values-
+;   k, k-2, -1, r.5
+b.i1,j1 w.
+i0:h10+c11           ; absolute addr of core table
+i1:h10.+c11          ; relative addr of core table
+
+j0:  al. w1      i0.     ; start:
+     rs  w1  x2  +0      ;   first free:=start of init code;
+     rl. w1      i0.     ;
+     al. w2      i1.     ;
+     wa. w2      i1.     ;
+j1:  rs  w1  x2  +0      ;   for entry:=first stop 1 until last do
+     rs  w1  x2  +2      ;     word(entry+0,+2):=k, k-2;
+     al  w1  x1+c11      ;
+     al  w2  x2+c11      ;
+     se. w2      h11.    ;
+     jl.         j1.     ;
+     al  w0       0      ;
+     al  w2       0      ;   status:=ok;
+     jl      x3          ;   return to slang;
+
+     jl.         j0.     ;   goto start;
+e.j.
+
+
+h12:
+h13 = - (:h12 + 2:)  ;  command table continues in second word of next text
+
+b. i24 w.
+
+c.-880504
+
+
+; table of preoccupied claims:
+; mess buf      area          internal
+i0=1          , i1=a112+1   , i2=1          ; proc func
+i3=1+a117     , i4=0        , i5=1          ; std driver
+i6=a5-i0-i3   , i7=a1-i1-i4 , i8=a3-i2-i5   ; s
+
+z. ; 880504
+
+
+i10: rs. w3     i12.     ;    save return to autoloader;
+
+; initialize work table
+b. j1 w.
+     al. w3     h8.    ;
+j0:                    ; rep:
+     al  w1  x3+c73    ;   for all work table entries do
+     rs  w1  x3+c58    ;     stack pointer := stack base;
+     al  w3  x3+c2     ;
+     sh. w3     h9.    ;
+     jl.        j0.    ;
+e.                     ;
+
+; initialize special console descriptions.
+b.j10 w.
+     al. w3     (j2.)    ;
+     jl.         j1.     ;
+j0:  rl  w1  x3+c25      ;   for console desc:=first step 1 until last do
+     ls  w1       1      ;     proc desc addr(console):=
+     wa  w1      b4      ;       word(base name table(dev)+2*devno);
+     rl  w1  x1          ;
+     rs  w1  x3+c25      ;
+     al  w3  x3 +c1      ;
+j1:  sh. w3      (j3.)    ;
+     jl.         j0.     ;
+     rl  w1     b12     ; if coresize >
+     sh. w1     (j4.)   ; 1.000.000 hw then
+     jl.         i9.    ;
+
+     rl. w1    (j6.)    ;
+     rs. w1    (j5.)    ;
+     jl.         i9.    ;
+     jl.        i9.
+
+j2: h21
+j3: h5
+j4: 1000000             ; min coresize for automatic relocation ( hw) 
+j5: e72
+j6: e16                 ; first free address
+e.
+
+c.-880504
+
+
+; process description for process functions:
+;
+; rel address contents
+
+ i9: rl  w1     (b6)     ;    proc := first internal;
+     jl. w2     i18.     ;    init description;
+
+a48    , a107              ; interval low
+a49    , a108              ;    -     high
+a11    , 0                 ; name 0 : zero
+a11+2  , <:pro:>           ; name 2-6: <:procfunc>
+a11+4  , <:cfu:>           ;
+a11+6  , <:nc:>            ;
+a17    , b60-b60+8         ; first address
+a18    , b61               ; top address
+a301   , 0                 ; priority
+a26    , a89               ; interrupt mask
+a27    , b62               ; user exception address
+a170   , 0                 ; user escape address
+a32    , 0                 ; status = not monitor mode
+a33    , b63               ; ic = waiting point
+a182   , 0                 ; base = no relocation
+a183   , 8                 ; lower write limit = first core
+;*** a184   , core size         ; top write limit: special
+a185   , 6<12+b54          ; interrupt levels
+a42    , a107              ; catalog base low
+a43    , a108              ;    -     -   high
+a44-2  , a107              ; max interval low
+a44    , a108              ;  -     -     high
+a45-2  , a107              ; std    -     low
+a45    , a108              ;  -     -     high
+a302   , 0                 ; save area address
+
+a10    , 0;(end of words)  ; kind = 0
+
+a12    , 0                 ; stop count
+a13    , a102              ; state = waiting for message
+a19    , i0                ; buf claim
+a20    , i1                ; area claim
+a22    , 8.7777            ; function mask
+
+a10    , 0;(end of bytes)  ; (kind = 0)
+
+     rs  w0  x1+a184     ;    top write limit(proc func) := core size;
+
+; process description for initial operating system, s
+
+     al  w1  x1 +a4      ;    proc := second internal;
+     jl. w2     i18.     ;    init description;
+
+a48    , a107              ; interval low
+a49    , a108              ;    -     high
+a11    , <:s:>             ; name = <:s:>
+a11+2  , 0                 ;
+a11+4  , 0                 ;
+a11+6  , 0                 ;
+a17    , c0                ; first address
+;*** a18    , core size         ; top address
+a301   , 0                 ; priority
+a26    , a89               ; interrupt mask
+a27    , d0                ; user exception address
+a170   , 0                 ; user escape address
+;*** a171   , core size         ; initial cpa
+a172   , 0                 ;    -    base
+a173   , 8                 ;    -    lower write limit
+;*** a174   , core size         ;    -    upper   -     -
+a175   , b54<12+b54       ;    -    interrupt levels
+a32    , 0                 ; status = not monitor mode
+a33    , h12               ; ic = start init
+a34    , 0                 ; parent = undef
+;*** a181   , core size         ; current cpa
+a182   , 0                 ;    -    base
+a183   , 8                 ;    -    lower write limit
+;*** a184   , core size         ;    -    upper   -     -
+a185   , b54<12+b54        ;    -    interrupt levels
+a42    , a107              ; catalog base low
+a43    , a108-1            ;    -     -   high
+a44-2  , a107              ; max interval low
+a44    , a108-1            ;  -      -    high
+a45-2  , a107              ; std interval low
+a45    , a108-1            ;  -      -    high
+a302   , 0                 ; save area address
+
+a10    , 0;(end of words)  ; kind = 0
+
+a12    , 0                 ; stopcount
+a13    , a95               ; state = running
+a19    , i6                ; buf claim
+a20    , i7                ; area claim
+a21    , i8-1              ; internal claim
+a24    , 1<7               ; (protection register, for compatibility reasons)
+a25    , 0                 ; (protection key, for compatibility reasons)
+a22    , 8.7777            ; function mask
+
+a10    , 0;(end of bytes)  ; (kind = 0)
+
+     rs. w0    (4)     ;   top core :=
+     jl.        4      ;
+         e17           ;
+     rs  w0  x1+a18      ;    top address(s) :=
+     rs  w0  x1+a171     ;    initial cpa(s) :=
+     rs  w0  x1+a174     ;    initial upper write limit(s) :=
+     rs  w0  x1+a181     ;    current cpa(s) :=
+     rs  w0  x1+a184     ;    current upper write limit(s) := core size;
+
+; process description for std driver
+
+     al  w1  x1 +a4      ;    proc := next internal;
+     jl. w2     i18.     ;    init description;
+
+a48    , a107              ; interval low
+a49    , a108-1            ;    -     high
+a11    , <:dri:>           ; name = <:driver proc:>
+a11+2  , <:ver:>           ; 
+a11+4  , <:pro:>           ;
+a11+6  , <:c:>             ;
+a17    , 8                 ; first address
+a18    , b60               ; top address
+a301   , -1                ; priority
+a26    , a89               ; interrupt mask
+a27    , b87               ; user exception address
+a170   , 0                 ; user escape address
+a171   , b60               ; initial cpa
+a172   , 0                 ;    -    base
+a173   , 8                 ;    -    lower write limit
+a174   , b60               ;    -    upper   -     -
+a175   , 6<12+b54          ;   -    interrupt levels
+a32    , 0                 ; status = not monitor mode
+a33    , b85               ; ic = central waiting point
+a34    , 0                 ; parent = undef
+a181   , b60               ; current cpa
+a182   , 0                 ;    -    base
+a183   , 8                 ;    -    lower write limit
+a184   , b60               ;    -    upper   -     -
+a185   , 6<12+b54          ;    -    interrupt levels
+a42    , a107              ; catalog base low
+a43    , a108-1            ;    -     -   high
+a44-2  , a107              ; max interval low
+a44    , a108-1            ;  -     -     high
+a45-2  , a107              ; std interval low
+a45    , a108-1            ;  -     -     high
+a302   , b86               ; save area address
+
+a10    , 0 ;(end of words) ; kind = 0
+
+a12    , 0                 ; stopcount
+a13    , a95               ; state = running
+a19    , i3                ; buf claim
+a20    , i4                ; area claim
+a21    , i5-1              ; internal claim
+a24    , 1<7               ; (protection register)
+a25    , 0                 ; (protection key)
+a22    , 8.7777            ; function mask
+
+a10    , 0 ;(end of bytes) ; (kind = 0)
+
+
+     al  w2  x1+a16      ;
+     rl  w1      b2      ;    link(timer q, internal);
+     jl      b36      ;
+
+
+     jl. w3     i14.     ;   take control
+b3               ;     (first name table entry,
+b6               ;      first internal,
+b29+2*a4         ;      driver proc);
+
+     jl. w3     i14.     ;   take control
+b76              ;     (first secondary interrupt,
+k                ;      irrellevant,
+b29+2*a4         ;      driver proc);
+
+     al. w2     i10.     ;
+     jl.       (i12.)    ;   autoloader(first core);
+i13:e4                ;
+
+; take control
+; comment: searches through the specified part of name table and initializes driver
+;          proc address.
+
+i14: rl  w1 (x3)         ;   entry := param 1;
+
+i15: am     (x3  +2)     ; next:
+     sn  w1      (0)     ;   if entry = top entry (i.e. param 2)
+     jl      x3  +6      ;      then return;
+
+     rl  w2  x1  +0      ;   proc := nametable(entry);
+     sn  w2       0      ;   if end of table then
+     jl      x3  +6      ;      then return;
+
+     rl  w0  x3  +4      ;   if driverproc(proc) = 0 then
+     rx  w0  x2+a250     ;      driverproc(proc) := param 3;
+     se  w0       0      ;
+     rs  w0  x2+a250     ;
+
+     al  w1  x1  +2      ;   entry := entry + 2;
+     jl.        i15.     ;   goto next;
+
+; procedure init description
+; call: w1 = process description address, w2 = init table
+; exit: w0 = core size, w1 = unchanged
+i18: dl  w0  x2  +2      ; move words:
+     al  w2  x2  +4      ;    move contents to outpointed
+     am      x1          ;      relatives in process description
+     rs  w0  x3          ;
+     se  w3     a10      ;      until kind is moved;
+     jl.        i18.     ;
+
+i19: dl  w0  x2  +2      ; move bytes:
+     al  w2  x2  +4      ;    move contents to outpointed
+     am      x1          ;      relatives in process description
+     hs  w0  x3          ;
+     se  w3     a10      ;      until kind is moved;
+     jl.        i19.     ;
+     rl  w0     b12      ;
+     jl      x2          ;
+
+z. ; 880504
+
+
+w.i0=b29+a4             ; process description address:
+  i1: i0                ;
+  i2: i0+a16            ; process description:
+i3:   a107,a108         ; <interval>
+      0                 ; <kind>
+      <:s:>,0,0,0       ; <name>
+      a95               ; <stop count><state>
+      1<22              ; <identification bit>
+      i0+a15, i0+a15    ; <event queue>
+      i0+a16, i0+a16    ; <process queue>
+      c0                ; <first address>
+  i4: e17;changed        ; <top address>
+h.    a5-1-a117, a1-a112-1; <buffer claim><area claim>
+      a3-2, 8.7777      ; <internal claim><function mask>
+w.    0                 ; <pseudoprocess claim>
+      1<19              ; <protection register><protection key>
+      a89               ; <interrupt mask>
+      d0                ; <interrupt address>
+      0, r.5            ; <working registers>
+      h12               ; <instruction counter>
+      0, r.9            ; <parent etc.>
+      a107,a108-1       ; <catalog base>
+      a107,a108-1       ; <max interval>
+      a107,a108-1       ; <stand interval>
+h.    0, r.(:a4+i3.+1:) ; fill
+w.
+   i9:                  ; initialize segment:
+      rl  w1  b15+2     ;   get <no of storage bytes> from monitor table;
+      rs. w1 (i4.)      ;   insert <top addr>;
+      rs. w1  i4.       ;
+      rl  w1  b5        ;
+      ws  w1  b4        ;
+      al  w1  x1-2      ;   max device:=
+      ls  w1  -1        ;   (first area-first device-2)/2;
+      rs. w1 (i13.)     ;
+      al. w1  i3.       ;   from:=process description;
+      rl. w2  i1.       ;   to:=name table(first internal);
+  i11:rl  w0  x1+0      ;   repeat
+      rs  w0  x2-4      ;   word(to):=word(from);
+      al  w1  x1+2      ;   from:=from+2;
+      al  w2  x2+2      ;   to:=to+2;
+      se. w1  i9.       ;   until from=end description;
+      jl.     i11.      ;
+      al  w1  b2        ;   link(timer q,
+      rl. w2  i2.       ;        process q(process description));
+      jl  w3  b36       ;
+      al. w2  i10.      ;
+      jl.    (i12.)     ;   autoloader(first core);
+  i13:e4                ;
+
+
+
+i12:0                 ; after loading:
+     jl.        i10.     ;   goto initialize segment;
+c70= k-b127 + 2
+k=i10                  ;
+e.                      ;
+i.
+
+e.     ; end of operating system s
+m.                end of operating system s

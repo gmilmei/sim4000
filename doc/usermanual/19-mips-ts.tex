@@ -1,0 +1,992 @@
+\chapter{MIPS/TS: a terminal session}\label{mips-ts}
+\index{MIPS/TS}\index{SOS}\index{TEM}\index{PRIMO}
+
+\section{What this environment provides}\label{mips-ts-overview}
+
+MIPS/TS adds terminal and job services to the monitor. The supplied profile
+starts three resident subsystems: TEM manages terminal sessions, SOS handles
+account login and the user's process, and PRIMO provides peripheral transport
+services. SOS is the command interface used to log in; TEM is entered by the
+\texttt{run} command. Once enrolled, the user works in FP, using the guest
+commands described elsewhere in this manual. SOS is not a replacement for
+either FP or the emulator's \texttt{sim4000>} operator interface.
+
+Historically, SOS means \emph{Swopping Online System}. A SOS job is a
+process created from a named description in its user catalog. In this
+demonstration, \texttt{test} names that description: it supplies the initial
+program, memory limits, password and disk claims. It is not a host account,
+nor does logging in create a Unix-like home directory. The FP command
+\texttt{scope user} describes guest catalog retention, not a host user's
+ownership or a security boundary.
+
+This is a ready-to-try demonstration with one configured account. Automatic
+startup, TEM-mediated login, incorrect-password rejection, FP commands and
+normal logout have been checked. It uses the compatibility monitor with IX
+enabled and storage protection off. Keep this unprotected profile for MIPS/TS
+operation. The standalone protected-monitor profile is separate; do not enable
+protection in this configuration or substitute its disk images.
+
+\begin{operationnote}{Local demonstration credentials only}
+The account and password are both \texttt{test}. Telnet has no encryption;
+the supplied listener binds only to \texttt{127.0.0.1}. Do not expose this
+profile to a network or treat it as a secure multiuser service.
+\end{operationnote}
+
+\subsection{Choose a checked workflow}\label{mips-ts-workflow-guide}
+
+For a first visit, start the supplied profile, log in, try
+\texttt{message}/\texttt{lookup} and finish normally. The later exercises are
+independent: printing does not require the retained-file or batch exercise.
+Use one \texttt{test} job at a time, and finish it before submitting batch work.
+
+\begingroup
+\footnotesize
+\begin{longtable}{@{}>{\raggedright\arraybackslash}p{0.23\linewidth}>{\raggedright\arraybackslash}p{0.28\linewidth}>{\raggedright\arraybackslash}p{0.41\linewidth}@{}}
+\toprule
+Task & Main command context & Procedure \\
+\midrule
+\endhead
+\bottomrule
+\endfoot
+First terminal session & Host shell, then remote SOS/FP &
+\manualref{mips-ts-start}{Start}, then \manualref{mips-ts-login}{log in} \\
+Keep a small guest file & Preparation FP, then remote FP &
+\manualref{mips-ts-retained-file}{Retained-file exercise} \\
+Run a small jobfile & Preparation FP, then local SOS &
+\manualref{mips-ts-batch-jobs}{Batch exercise} \\
+Print guest text & Local PRIMO and administrative FP &
+\manualref{mips-ts-primo-printing}{Sequential printing} \\
+Resume a lost connection & Remote FP; no new login &
+\manualref{mips-ts-idle-reconnect}{Reconnect}, including \manualref{mips-ts-partial-input}{known partial input} \\
+Check a job or service & Local guest system \texttt{s} &
+\manualref{mips-ts-status}{Process status} \\
+Unexpected failure & Local operator; preserve the job &
+\manualref{mips-ts-unexpected-failure}{Preserve evidence and work} \\
+Stop or back up & Remote FP, then local operator &
+\manualref{mips-ts-normal-stop}{Normal stop and backup} \\
+\end{longtable}
+\endgroup
+
+Expected diagnostics are stated beside the relevant commands. In particular,
+an intentional \texttt{lookup ... unknown} is different from a failed import,
+an abnormal SOS removal or an unfinished PRIMO transport. Do not continue past
+an unexpected error just because another prompt or bell appears.
+
+\section{Select the files and start}\label{mips-ts-start}
+
+The ordinary build directory and binary archive contain the prepared files:
+
+\begin{center}
+\begin{tabular}{@{}ll@{}}
+\toprule
+File & Purpose \\
+\midrule
+\texttt{sim4000} & Emulator executable \\
+\texttt{MONITOR} & Compatibility monitor, shared with the default profile \\
+\texttt{UNIT0.mipsts} & System disk, account catalog and automatic startup \\
+\texttt{UNIT1.mipsts} & Prepared second disk, mounted as \texttt{disc1} \\
+\texttt{RC4000.mipsts.cfg} & Matching devices, Telnet and persistence settings \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Keep these files together and create \texttt{exchange/} for host transfers.
+No Python, preparation utility or guest rebuilding is needed to run them.
+Do not substitute the default or protected disk for either MIPS/TS disk.
+
+In a host shell, change to the build or unpacked distribution directory:
+
+\begin{commandexample}[language=sh]{Host shell: start the MIPS/TS profile}
+./sim4000 -a -c RC4000.mipsts.cfg
+\end{commandexample}
+
+The disk's startup file mounts the second disk, sets a fixed test date of
+30 September 1986, and starts TEM, PRIMO and SOS without a date prompt.
+Wait for \texttt{sos started}; the release messages can arrive in a different
+order. A banner alone is not a login prompt. Leave this terminal running;
+it remains the local monitor/operator console.
+
+\section{Connect and log in}\label{mips-ts-login}
+
+Open a second host terminal and connect to the configured port:
+
+\begin{commandexample}[language=sh]{Second host terminal: connect}
+telnet 127.0.0.1 4004
+\end{commandexample}
+
+Press Ctrl-A to request guest attention. After \texttt{att}, type
+\texttt{sos} and press Enter. At the SOS prompt enter the complete line:
+
+\begin{commandexample}{SOS: start a session through TEM}
+run test pass test
+\end{commandexample}
+
+A successful enrollment reports \texttt{from tem} and
+\texttt{test enrolled}, followed by the FP input prompt (a bell rather than
+a printed shell-style prompt). The inline password syntax above is the
+checked procedure; do not rely on a separate interactive password dialogue.
+
+\begin{commandexample}{Remote FP: a first session}
+message hello
+lookup fp
+finis
+\end{commandexample}
+
+The first command prints a message; the second identifies the FP program
+on the system disk. \texttt{finis} ends the user process, and SOS reports
+\texttt{test removed after finis}. To log in again, request attention with
+Ctrl-A, select \texttt{sos}, and repeat the login command. Only one terminal
+account is provisioned; adding a host listener alone does not configure an
+additional SOS terminal or account.
+
+\subsection{Recognize the command context}\label{mips-ts-command-contexts}
+
+The same terminal carries commands for different interpreters. Attention
+selects a recipient; it does not log out, remove a job or suspend the whole
+emulator. Enter one command at a time and wait for its complete reply.
+
+\begin{longtable}{@{}p{0.23\linewidth}p{0.32\linewidth}p{0.37\linewidth}@{}}
+\toprule
+Context & How to recognize or select it & Commands in this chapter \\
+\midrule
+\endhead
+\bottomrule
+\endfoot
+Host shell & Before starting the emulator, or a separate host terminal &
+\texttt{./sim4000}, \texttt{telnet} \\
+Emulator operator & Ctrl-E in the original terminal; \texttt{sim4000>} &
+\texttt{continue}, \texttt{quit} \\
+Guest system \texttt{s} & Escape in the original terminal, then \texttt{s} &
+\texttt{list} for process inspection \\
+SOS & Ctrl-A in Telnet, then \texttt{sos}; selection ends at \texttt{>} and a bell &
+\texttt{run test pass test} or \texttt{go test pass test} \\
+FP in job \texttt{test} & Successful enrollment, then the FP input bell &
+\texttt{message}, \texttt{lookup}, \texttt{finis} \\
+\end{longtable}
+
+Do not type \texttt{run test pass test} at \texttt{sim4000>}: the emulator's
+\texttt{run} command controls CPU execution, not a SOS login. Similarly,
+\texttt{finis} belongs to the user FP, whereas \texttt{quit} exits the host
+emulator. TEM's \texttt{from tem} header identifies the terminal path; it
+does not mean that ordinary FP commands must be entered at a TEM setup prompt.
+Ctrl-E in the original terminal suspends the entire emulated machine,
+including remote jobs. Enter \texttt{continue} at \texttt{sim4000>} before
+expecting more Telnet output. Guest attention alone does not suspend CPU
+execution.
+
+\subsection{Direct and TEM-mediated sessions}\label{mips-ts-go-and-run}
+
+The recommended login uses \texttt{run}, routing terminal traffic through
+SOS and TEM. TEM supplies terminal-output spooling. A direct alternative,
+also checked with this demonstration account, is:
+
+\begin{commandexample}{SOS: alternative direct session, after finishing the previous job}
+go test pass test
+\end{commandexample}
+
+\texttt{go} uses SOS without TEM terminal spooling. It still creates the
+same kind of FP job with the account's resource limits; it does not switch
+monitor profiles or disable a device. Expect \texttt{test enrolled} but no
+\texttt{from tem} header in the direct-login reply. Use one form or the
+other, not both for simultaneous logins to this single-account setup.
+
+\section{Small jobs and resource limits}\label{mips-ts-small-jobs}
+\index{MIPS/TS!resource claims}
+
+The first \texttt{message}/\texttt{lookup} exercise is intentionally small.
+The login starts FP, not a complete modern shell environment; guest program
+names still refer to installed RC catalog entries. See
+\manualref{files-catalog-entries-and-algol-programs}{Files, catalog entries,
+and Algol programs} for the general FP notation, but do not copy its process
+creation or resource assumptions into a SOS session.
+
+The demonstration description permits roughly 20,000--30,000 RC halfwords
+of job memory. Small FP commands and fixed batch allocation/copy examples
+have been checked; the larger Algol tutorial uses a different process with
+larger claims. A resource error here is not by itself an emulator defect.
+
+\begin{operationnote}{Small input does not imply a small allocation}
+The supplied \texttt{fromhost} can allocate 36 segments even for a short
+text. That exceeds this account's 30-segment temporary claim. Do not use
+the general host-import tutorial unchanged in the demo job, and do not
+increase free disk capacity or relabel \texttt{disc1} to address an account
+claim error. The account's allowance, not merely the length of the host text,
+limits allocation; device access is a separate requirement.
+
+An enlarged account alone does not grant access to the host device.
+Without explicit device inclusion, a larger-account check receives
+\texttt{reserve host-file process result 2} from a SOS job. Treat that message
+as failure even though it has no leading asterisks; an empty guest file may
+already have been created. Use the administrative staging procedure for the
+supplied demo account.
+
+\end{operationnote}
+
+\subsubsection{Beyond the supplied account}\label{mips-ts-provisioned-accounts}
+
+The supplied images contain only \texttt{test}; editing a host configuration
+does not create guest accounts or enlarge their claims. A separately
+provisioned larger account has been checked for Algol compilation and retained
+program execution across restart. It is not an additional ready-made profile.
+
+For that larger account, direct transfers have been
+checked after the operator enters \texttt{include 63} at the \emph{SOS}
+command prompt, after job enrollment. Expect a timestamped
+\texttt{sos: ready}, not an FP bell. This grants host-device access to
+\emph{all currently enrolled jobs}; it does not enlarge disk claims, configure
+future logins, or provide separate host directories per account. Only one job
+can reserve the device at a time. Repeat the deliberate inclusion after
+enrollment following a restart. Do not add this command to the demo's normal
+startup or treat it as permission to use the host directory indiscriminately.
+Two separately provisioned accounts also pass simultaneous sessions on devices
+4 and 5, with separate standard/user
+bases and two SOS child-process slots. An extra Telnet listener alone does
+not provide this setup: equal standard bases cause \texttt{user conflict},
+and insufficient child-process claims prevent the second job's creation.
+Normal logout and relogin are checked for that two-account setup. The
+\manualref{mips-ts-idle-reconnect}{idle reconnect procedure} below instead
+covers the supplied single-account environment. Do not add an account or
+replace \texttt{soscat} in a working installation merely to follow a recipe
+for the supplied \texttt{test} account.
+
+The corresponding checked batch fixtures import text in an administrative
+preparation process, copy it to a compact area, then make the compact file
+visible to the job. This is not an automatic feature of a remote import.
+Creating more accounts or changing \texttt{soscat} requires a deliberate
+guest-administration workflow; editing \texttt{RC4000.mipsts.cfg} alone
+does not change SOS memory or disk claims.
+
+\subsection{Background jobs and jobfiles}\label{mips-ts-batch-jobs}
+\index{MIPS/TS!batch jobs}
+
+SOS also offers background execution using \texttt{batch}. A jobfile is an
+existing retained guest text file containing the FP commands to execute;
+it is not a host shell script or a filename beneath \texttt{exchange/}.
+The following small exercise has been checked on the supplied unprotected
+profile, including both password forms and cleanup. Finish any interactive
+\texttt{test} session first: this recipe does not demonstrate concurrent jobs.
+
+\subsubsection{Prepare a compact jobfile}\label{mips-ts-batch-prepare}
+
+Use private runtime copies and their overlays. The supplied image has no
+\texttt{batchjob}; do not overwrite an entry left by another exercise.
+Create a new host file without replacing an existing one:
+
+\begin{commandexample}[language=sh]{Host shell: create the batch input}
+(set -C; printf 'message batchprobe\nfinis\n' > exchange/batchinput)
+\end{commandexample}
+
+Its two lines are FP commands, not SOS commands:
+
+% mips-batch: input
+\begin{commandexample}{Host file contents: exchange/batchinput}
+message batchprobe
+finis
+\end{commandexample}
+
+In the original terminal press Escape, select \texttt{s} and allocate an
+administrative preparation FP with intervals matching the demo account:
+
+% mips-batch: administrator
+\begin{commandexample}{Local Guest-s: allocate batch preparation}
+all bprep base 0 0 login 0 0 user 0 0 project 0 0 run
+\end{commandexample}
+
+Wait for \texttt{to bprep} and the FP bell, then check the name:
+
+% mips-batch: absent
+\begin{commandexample}{Local FP bprep: check the target is absent}
+lookup batchjob
+\end{commandexample}
+
+Expect \texttt{***lookup batchjob unknown}. If the name is found, stop and
+preserve that file. Otherwise prepare the compact retained guest input:
+
+% mips-batch: prepare
+\begin{commandexample}{Local FP bprep: import and retain the jobfile}
+batchtmp=fromhost batchinput
+batchjob=copy batchtmp
+scope user batchjob
+lookup batchjob
+finis
+\end{commandexample}
+
+The descriptor should say \texttt{=set 1 disc} and \texttt{; user}. Wait for
+\texttt{pause bprep finis fp}. The import uses administrative resources and
+\texttt{copy} compacts it; the batch job must not try to import its own input
+with the demo account's smaller temporary claim. Retention keeps the jobfile
+available after the preparation FP finishes. The 0/0 intervals establish
+visibility; a host pathname by itself does not.
+
+\subsubsection{Submit and recognize normal completion}\label{mips-ts-batch-submit}
+\index{SOS!batch jobs}\index{SOS!password forms}
+
+Still in the original terminal, press Escape, select \texttt{sos} and wait for
+\texttt{>} and its bell. Enter one line:
+
+% mips-batch: submit
+\begin{commandexample}{Local SOS: submit the prepared jobfile}
+batch test jobfile batchjob
+\end{commandexample}
+
+SOS asks \texttt{>password} and rings the bell. Only at that question enter:
+
+% mips-batch: password
+\begin{commandexample}{SOS password question: answer for the demo account}
+test
+\end{commandexample}
+
+The dummy password can be visible; do not infer masked input or secure
+authentication. The expected result, with a variable timestamp, is:
+
+\begin{commandexample}{Expected local output: completed batch job}
+08.00 sos: test enrolled
+ batchprobe
+08.00 sos: test removed after finis
+\end{commandexample}
+
+Enrollment alone is not completion. Wait for the actual message and removal
+\emph{after finis}; \texttt{removed after break} is a failure, not the expected
+result. The jobfile's \texttt{finis} terminates the batch FP automatically:
+do not type FP commands at SOS while waiting. Select \texttt{s} and use
+\texttt{list} if needed; the services remain present and \texttt{test} is gone.
+
+After normal removal, the jobfile is unchanged and can be submitted again.
+Request fresh attention and select SOS for the independently checked inline
+alternative:
+
+% mips-batch: inline
+\begin{commandexample}{Local SOS: repeat with the inline dummy password}
+batch test jobfile batchjob pass test
+\end{commandexample}
+
+This form does not ask a second password question. Expect the same single
+enrollment, message and normal removal. Never resubmit merely because a reply
+is delayed: first establish whether the previous job still exists.
+
+\subsubsection{Check and remove the exercise input}\label{mips-ts-batch-cleanup}
+
+Select \texttt{s} and create the same \texttt{bprep} FP again. Export the
+existing guest file to a new host filename, then deliberately delete the
+exercise entry:
+
+\begin{operationnote}{Cleanup removes the retained jobfile}
+Use these commands only for the \texttt{batchjob} created above and only after
+both jobs have finished. They do not cancel a running job or remove host input
+and output files. Preserve a backup instead if the guest file is wanted.
+\end{operationnote}
+
+% mips-batch: cleanup
+\begin{commandexample}{Local FP bprep: export and remove the exercise jobfile}
+batchcheck=tohost batchjob
+clear user batchjob
+lookup batchjob
+finis
+\end{commandexample}
+
+Expect \texttt{***lookup batchjob unknown} and
+\texttt{pause bprep finis fp}. The host export must have succeeded before
+deletion; it refuses an existing \texttt{exchange/batchcheck}. Compare the
+independent host copies with \texttt{cmp exchange/batchinput exchange/batchcheck}.
+No output and status zero mean that execution preserved the jobfile bytes.
+
+Historically, SOS schedules batch work in the background relative to
+interactive \texttt{go}/\texttt{run} jobs. A jobfile supplies input while the
+creating terminal receives output; this exercise submits from the local console.
+It does not establish arbitrary output destinations or remote batch submission.
+The plain \texttt{batch test} form does
+not supply that jobfile and is not the checked recipe for unattended work.
+Do not disconnect as a substitute for \texttt{finis}, or assume that this
+single-account demonstration establishes concurrent-job operation.
+
+\section{Files, persistence and shutdown}\label{mips-ts-persistence}
+\index{MIPS/TS!persistence}
+
+The demonstration account has a deliberately small disk claim: 30 temporary
+segments/six entries at key 0, and retained-file claims of two entries/six
+segments at each of keys 1 through 3. It is suitable for small FP experiments, not large compilation or
+data workloads. Retained files still need \texttt{scope user}; temporary
+files may be removed when the process finishes. See
+\manualref{keep-guest-files-across-sessions}{Keep guest files across sessions}.
+Do not assume an administrative FP's broader resource claims apply to this
+account. The second disk primarily supplies SOS's permanent working space;
+its existence does not automatically give the account that free space.
+
+Unlike the default profile, this configuration retains writes automatically
+in \texttt{UNIT0.mipsts.overlay} and \texttt{UNIT1.mipsts.overlay}. Both base
+images remain read-only. Keep the two sidecars with their exact base images
+and configuration. A complete restart with automatic subsystem startup and
+exact readback of administrative and remote-created user-scope files has been checked; this
+does not certify every application or file-recovery path.
+
+\subsection{Keep a small file in the demo account}\label{mips-ts-retained-file}
+\index{MIPS/TS!retained-file exercise}
+
+This exercise uses the supplied unprotected profile, one remote \texttt{test}
+session at a time and the existing small account quota. Work on private copies
+with their own overlays, not historical or shipped base images in write-through
+mode. The names \texttt{keepseed} and \texttt{keepsake} must be unused; do not
+overwrite files from earlier work. Start the profile as above.
+
+\subsubsection{Prepare the compact input}
+
+First prepare a short host text. This subshell refuses to overwrite an existing
+\texttt{exchange/keepinput}:
+
+\begin{commandexample}[language=sh]{Host shell: create the exercise input}
+(set -C; printf 'MIPS/TS file retained across sessions.\n' > exchange/keepinput)
+\end{commandexample}
+
+The file contains one line and a final LF:
+
+% mips-files: input
+\begin{commandexample}{Host file contents: exchange/keepinput}
+MIPS/TS file retained across sessions.
+\end{commandexample}
+
+In the original terminal, press Escape and select \texttt{s}. Create a separate
+administrative FP with catalog intervals matching the demo account:
+
+% mips-files: administrator
+\begin{commandexample}{Local Guest-s: create an administrative preparation FP}
+all verify base 0 0 login 0 0 user 0 0 project 0 0 run
+\end{commandexample}
+
+Wait for \texttt{to verify} and the FP bell, then check both names:
+
+% mips-files: absent
+\begin{commandexample}{Local FP verify: check that the exercise names are unused}
+lookup keepseed keepsake
+\end{commandexample}
+
+Expect \texttt{***lookup keepseed unknown} and
+\texttt{***lookup keepsake unknown}. These diagnostics are intentional.
+If either name is found, stop and preserve that file. Otherwise create a compact,
+retained seed:
+
+% mips-files: seed
+\begin{commandexample}{Local FP verify: import and compact the seed}
+keeptmp=fromhost keepinput
+keepseed=copy keeptmp
+scope user keepseed
+finis
+\end{commandexample}
+
+Wait for \texttt{pause verify finis fp}. The large import belongs only to this
+administrative process; \texttt{copy} makes the small seed fit in one segment.
+The explicit 0/0 intervals make it visible to the demo job. This does not enlarge
+the account's claims or create its own file on its behalf.
+
+\subsubsection{Create the account's retained copy}
+
+Connect by Telnet and log in with \texttt{run test pass test} as in
+\manualref{mips-ts-login}{Connect and log in}. At the remote FP bell:
+
+% mips-files: create
+\begin{commandexample}{Remote FP test: create and retain your own copy}
+keepsake=copy keepseed
+scope user keepsake
+lookup keepsake
+c=copy keepsake
+finis
+\end{commandexample}
+
+Expect a \texttt{keepsake =set 1 disc} descriptor ending in \texttt{; user},
+the exact input line on the terminal and normal SOS removal after
+\texttt{finis}. Plain \texttt{copy keepsake} reports copy statistics;
+\texttt{c=copy keepsake} selects console output and displays the text.
+The remote job creates and retains \texttt{keepsake}; the seed is only its input.
+
+\subsubsection{Read it after login and restart}
+
+Request attention, select SOS and log in again. Read the existing file without
+recreating it:
+
+% mips-files: read
+\begin{commandexample}{Remote FP test: verify the retained file in a later session}
+lookup keepsake
+c=copy keepsake
+finis
+\end{commandexample}
+
+The descriptor must still say \texttt{; user} and the line must be unchanged.
+
+For byte-exact verification, select \texttt{s} locally and create the same
+\texttt{verify} FP with 0/0 intervals. Before restarting use \texttt{keepcheck1};
+after it use the new host export name \texttt{keepcheck2}:
+
+% mips-files: export
+\begin{commandexample}{Local FP verify: export the existing retained file}
+lookup keepsake
+keepcheck1=tohost keepsake
+finis
+\end{commandexample}
+
+Both exports must be new host filenames; export refuses collisions. In a host
+shell compare each with \texttt{exchange/keepinput}, for example
+\texttt{cmp exchange/keepinput exchange/keepcheck1}. No output and exit status
+zero mean equal bytes. A base-image listing does not include overlays and is
+not a substitute for this live guest lookup/export.
+
+After the first export, perform a complete normal stop and restart with the same
+two overlays, following \manualref{mips-ts-normal-stop}{Stop, restart and back up}.
+Log in again, repeat the read-only remote sequence, log out and export locally
+as \texttt{keepcheck2}. Do not repeat seed preparation or
+\texttt{keepsake=copy keepseed}: that would test recreation, not persistence.
+Compare the second export with the host input before proceeding to cleanup.
+
+\subsubsection{Remove only the exercise files}
+
+\begin{operationnote}{Deliberate cleanup deletes the exercise files}
+Only after checking the retained data, log in again and delete the remote
+copy below. This removes that guest file; it is not a logout or overlay-reset
+command. Keep a backup instead if its contents are wanted.
+\end{operationnote}
+
+% mips-files: cleanup
+\begin{commandexample}{Remote FP test: remove only the exercise copy}
+clear user keepsake
+lookup keepsake
+finis
+\end{commandexample}
+
+Expect \texttt{***lookup keepsake unknown}, followed by normal logout. Finally
+create the local \texttt{verify} FP again, enter \texttt{clear user keepseed},
+check that both names are unknown and finish with \texttt{finis}. Host input/
+export files remain in \texttt{exchange/}; deleting a guest area does not delete
+those independent host copies.
+
+\subsection{Stop, restart and back up}\label{mips-ts-normal-stop}
+\index{MIPS/TS!normal shutdown}\index{MIPS/TS!backup}
+
+Before stopping, enter \texttt{finis} in the remote FP and wait for normal
+SOS removal. Disconnect the Telnet client. In the original emulator terminal,
+press Ctrl-E and enter \texttt{quit} at \texttt{sim4000>}. This exits the
+emulator; it is not a guest system-wide shutdown command. Restart with the
+same configuration and overlays to resume stored disk changes. The boot
+date is set again on each start; it is not the current host date.
+
+To return to the prepared demonstration, stop the emulator and remove both
+MIPS/TS overlay files together. This loses all guest changes since the images
+were prepared. Never remove an active overlay, reuse a different profile's
+overlay, or run two emulators on the same pair. Do not run \texttt{kitlabel}
+on the supplied second disk: it is already initialized.
+
+For a backup, stop the emulator first and copy the matching
+\texttt{UNIT0.mipsts}, \texttt{UNIT1.mipsts}, both overlay files,
+\texttt{RC4000.mipsts.cfg} and \texttt{MONITOR} as one set. Preserve wanted
+host files in \texttt{exchange/} separately. An offline catalog listing of
+\texttt{UNIT0.mipsts} reads only that base image, not a running session's
+sidecars; use guest \texttt{lookup} when checking current files.
+
+\subsection{Reconnect after losing an idle FP connection}\label{mips-ts-idle-reconnect}
+\index{MIPS/TS!Telnet reconnection}
+
+This procedure is checked only for the supplied unprotected profile when FP
+had finished its previous command and was waiting for input. Closing Telnet
+without \texttt{finis} leaves that guest job running; it is not a logout.
+Two successive disconnect/reconnect cycles preserve both a temporary file
+and a retained user file. A TCP close is not a guest terminal hard error.
+
+Keep the same emulator instance running. In its local terminal you can
+inspect \texttt{test} with \texttt{list} in guest \texttt{s}; see
+\manualref{mips-ts-status}{status checks}. At the simulator prompt,
+\texttt{show telnet} should report device 4 as \texttt{listening} once the
+old connection is closed. If you suspended the CPU with Ctrl-E, enter
+\texttt{continue} before expecting remote guest replies.
+
+Reconnect from a host terminal:
+
+\begin{commandexample}[language=sh]{Host shell: reconnect to the same running instance}
+telnet 127.0.0.1 4004
+\end{commandexample}
+
+Do not request attention or start another SOS job first. At the reconnected
+terminal, send this directly to the already waiting FP:
+
+\begin{commandexample}{Remote FP: confirm the existing session is responsive}
+message resumed
+\end{commandexample}
+
+Expect the message \texttt{resumed} and the FP bell. No new enrollment or
+password dialogue is expected. Use \texttt{lookup} on your known guest files
+before continuing work; temporary files still belong to this same job.
+Finish later with \texttt{finis} in the usual way. If the old job has already
+ended or no FP reply arrives, stop and inspect its status rather than
+replaying commands or removing the process blindly.
+
+\begin{operationnote}{Reconnection is not a new login or a saved-session restore}
+Anyone who can reach this local endpoint may resume the existing session
+without its password. Keep the listener on loopback and restrict access to
+trusted local users. Do not expose it as an authenticated remote service.
+
+Lost output is not replayed. This clean-prompt recipe does not cover unknown
+pending input, active transfers, programs still running, terminal hard errors or emulator
+restart/crash recovery. Preserve wanted files and complete commands normally
+before a planned disconnect; prefer \texttt{finis} when you intend to log out.
+\end{operationnote}
+
+\subsubsection{A known partial input line}\label{mips-ts-partial-input}
+\index{MIPS/TS!partial input after reconnection}
+
+Reconnecting does not clear characters already accepted by FP. The following
+two harmless cases have been checked on the supplied profile. They require
+that you know exactly what was typed and saw it echoed before the connection
+was lost. They are not a method for guessing the contents of an interrupted
+input buffer.
+
+At a waiting \emph{remote FP}, type the following prefix \emph{without
+pressing Enter}, then disconnect Telnet without \texttt{finis}:
+
+% mips-reconnect: prefix
+\begin{commandexample}{Remote FP: partial line, no Enter}
+message par
+\end{commandexample}
+
+Reconnect to the same running emulator as above. Do not request attention or
+log in again. Enter only the missing suffix and submit it:
+
+% mips-reconnect: suffix
+\begin{commandexample}{Reconnected remote FP: complete the existing line}
+tial
+\end{commandexample}
+
+Expect \texttt{partial} followed by the FP bell: FP has executed
+\texttt{message partial}, not a new command named \texttt{tial}.
+
+For a correction example, start another line, again without Enter:
+
+% mips-reconnect: correction-prefix
+\begin{commandexample}{Remote FP: known partial line to correct, no Enter}
+message wrong
+\end{commandexample}
+
+After disconnecting and reconnecting, press Ctrl-H exactly five times to
+erase the known suffix \texttt{wrong}, then type \texttt{right} and Enter.
+Ctrl-H is ASCII Backspace; the physical Backspace key is equivalent only
+when its DEL output is mapped to Ctrl-H by the active configuration.
+Expect \texttt{right} and the FP bell. This does not require removing the
+job, discarding files or restarting the emulator.
+
+Do not press Enter on an unknown partial line, and do not send a fresh whole
+command on top of it. Bytes typed just before a network failure may not have
+reached the guest; the examples only establish recovery of a fully echoed
+known prefix. For anything uncertain, use
+\manualref{mips-ts-unexpected-failure}{the non-destructive diagnostic steps}.
+
+\section{Check status without disturbing the job}\label{mips-ts-status}
+
+Keep the Telnet session for the user job. To inspect the guest from its
+original local terminal, press Escape, select \texttt{s}, then enter:
+
+\begin{commandexample}{Local guest system process s: inspect processes}
+list
+\end{commandexample}
+
+The list should include \texttt{tem}, \texttt{primo} and \texttt{sos}.
+During a login it also includes \texttt{test} under parent \texttt{sos};
+after normal \texttt{finis}, that child disappears. A waiting interactive
+child can be displayed as \texttt{stop} with stop count zero. That single
+state word is not proof of a crash: successful FP input/output and normal
+logout are the relevant checks. The resident services should remain active
+and have zero stop counts. Process addresses and exact scheduling states
+can change; do not copy addresses from an example into commands.
+
+\texttt{list} here is an \texttt{s} command. Do not replace it with SOS
+\texttt{display}: that input has returned \texttt{command unknown} in the
+checked setup. Nor does a SOS \texttt{ready} response to a diagnostic
+\texttt{call} prove login, password validation or a terminal connection.
+Use the actual enrollment and FP exercise instead. Do not use \texttt{proc
+test remove}, SOS \texttt{kill}, or a reset as routine logout commands;
+they can discard the job's temporary work.
+
+\section{Print through PRIMO}\label{mips-ts-primo-printing}
+\index{PRIMO!printing}
+
+The supplied configuration opens \texttt{printer.mipsts.txt} automatically.
+No change to the disk images, \texttt{startprimo} or PRIMO generation is
+required. This recipe uses the original local terminal for administration,
+not the resource-limited \texttt{test} login. Start the MIPS/TS profile and
+wait for \texttt{sos started} before proceeding.
+
+In a second host terminal, prepare the two input files. Do not overwrite
+existing exchange files without checking their contents first:
+
+\begin{commandexample}{Host shell: prepare a program and printable text}
+cp examples/primo_print.alg exchange/prbsource
+printf 'Hello from PRIMO.\n' > exchange/prbinput
+\end{commandexample}
+
+In the original terminal, press Escape, enter \texttt{primo}, and wait for
+its \texttt{=} prompt and bell. Sign up the real printer (kind 14):
+
+\begin{commandexample}{Guest PRIMO operator: assign the physical printer}
+signup printer 14
+\end{commandexample}
+
+Wait for the timestamped \texttt{primo:ready} reply. To inspect the
+assignment, request attention again with Escape, select \texttt{primo},
+then enter \texttt{display}. Expect a \texttt{printer} row ending in
+\texttt{,idle}. Each operator command requires a fresh attention/selection;
+the ready reply is not an invitation to type at a persistent prompt.
+
+Press Escape and select \texttt{s}, then allocate an administrative FP:
+
+\begin{commandexample}{Guest s: allocate a temporary printing session}
+all prbprep size 150000 temp disc 500 20 run
+\end{commandexample}
+
+Wait for \texttt{to prbprep} and the FP bell. The following creates only
+temporary guest entries in this process; do not substitute existing retained
+files as output targets:
+
+\begin{commandexample}{Guest FP: import, compile and submit one transport}
+psrc=fromhost prbsource
+ptmp=fromhost prbinput
+pin=copy ptmp
+plp=set lp printer
+prbprog=algol psrc connect.no
+prbprog
+\end{commandexample}
+
+Compilation must end with \texttt{algol end}, without errors. The program
+calls the installed \texttt{transfer} procedure to define a transport, then
+waits for it. Expect the following, with a positive, variable transport number:
+
+\begin{commandexample}{Expected FP result: accepted and completed transport}
+primo define 0 reply 0 transport 82
+primo wait 0 reply 0 state 5 cause -1
+end         26
+\end{commandexample}
+
+The numeric \texttt{end} value is also variable. State 5 with cause -1
+denotes normal completion in this checked recipe. At that point the host
+file already contains \texttt{Hello from PRIMO.} followed by LF; no emulator
+shutdown is needed to flush it. The payload must not merely appear on the
+console. \texttt{plp=set lp console1} would select a console substitute and
+is deliberately not used here.
+
+To print another text, replace the host \texttt{exchange/prbinput} with the
+new input, then repeat \texttt{ptmp=fromhost prbinput}, \texttt{pin=copy ptmp}
+and \texttt{prbprog} in the same FP. Do not change or remove \texttt{pin}
+before the previous transport has completed. Keep lines within 132 columns;
+the printer chapter describes character/control mapping and buffering limits.
+The current PRIMO trimming emits the input without job banners or extra page
+separators; do not assume that other PRIMO installations behave identically.
+
+After completion, enter \texttt{finis} in FP and wait for
+\texttt{pause prbprep finis fp}. Select PRIMO again and enter
+\texttt{signoff printer}; wait for ready. A fresh \texttt{display} must no
+longer show the assignment. Signoff removes the operator assignment; it does
+not detach the emulator output file. Keep completed output when restarting:
+the next run appends to it. The checked workflow includes repeated short and
+160-line jobs, signoff, two boots with persistent disk overlays, and successful
+TEM/SOS login/logout after printing on each boot.
+
+This is a bounded administrative printing example, not a general SOS user
+print command, concurrent queue test or protected
+MIPS/TS acceptance. If an operation reports an error or waits for an operator,
+retain its diagnostics and do not report the transport as completed.
+
+\subsection{Recover a job submitted with output detached}
+\label{mips-ts-printer-recovery}
+
+When a transport is submitted while the emulator output is detached, the
+checked PRIMO version reports \texttt{primo:***printer end document}.
+This is an operator request, not successful completion. Select PRIMO and
+enter \texttt{display}: the \texttt{printer} row identifies the input area
+\texttt{pin} and ends in \texttt{,waiting}. Leave the submitting FP and its
+input intact. Do not run \texttt{prbprog} again to retry the same transport.
+
+Suspend with Ctrl-E. Reconnect the existing, healthy output file in append
+mode, then resume CPU execution:
+
+\begin{commandexample}{Emulator CLI: reconnect detached output}
+attach 7 printer.mipsts.txt append
+continue
+\end{commandexample}
+
+These paths are relative to the emulator's working directory. Select PRIMO
+with Escape, then \texttt{primo}, and issue:
+
+\begin{commandexample}{Guest PRIMO operator: resume the waiting transport}
+start printer
+\end{commandexample}
+
+Wait for both \texttt{primo:ready} and the submitting program's completion:
+\texttt{primo wait 0 reply 0 state 5 cause -1}, a normal FP \texttt{end}
+and its input bell. The text is then present exactly once in the host file;
+earlier output is preserved. Use \texttt{start}, not \texttt{restart}:
+the latter deliberately starts the transport again from the beginning and
+can repeat printed text. Do not use an exclusive attach to an existing file
+or delete the output to make attachment succeed.
+
+The acceptance test deliberately detaches output between completed jobs,
+submits one new job, confirms the waiting state and unchanged file, then
+reattaches and resumes. It also checks healthy TEM/PRIMO/SOS while waiting,
+normal login/logout afterward and preservation across emulator restart.
+This does not certify recovery from partial host writes, disk-full errors,
+mid-job paper loss, unrestricted concurrent jobs or an emulator crash. Preserve diagnostics
+and output rather than applying this recipe blindly to another failure.
+
+\subsection{Multiple outstanding jobs: a bounded limit}
+
+Two transports from separate administrative processes have been checked:
+both are accepted while the printer is unavailable, then print exactly once
+in submission order after reattachment and \texttt{start printer}. A further
+transport completes on the same PRIMO instance after the second client is
+removed. This does not establish arbitrary queue capacity or every scheduling
+policy.
+
+There is an important restriction: the second simultaneous blocking wait
+returns reply 3 (\emph{missing resources}) in this session. The developer
+fixture handles that reply explicitly by querying transport state with action
+4 until completion, within finite test limits. It does not resubmit the data
+or treat the refused wait as a successful print. The installed
+\texttt{primotrim} generation text sets \texttt{waitops := 1}, unlike
+\texttt{waittrans := 300}: queued transports and blocking waits have different
+limits. A private test with eleven rather than ten runtime message buffers
+still refuses the second wait. This strongly points to the generated PRIMO
+waiter limit, not an emulator printer setting. Increasing startup buffers or
+editing the generation text alone does not regenerate the installed program.
+The PRIMO binary and shipped startup remain unchanged.
+
+The supplied \texttt{primo\_print.alg} example is intentionally synchronous
+and has no polling fallback. Use the sequential recipe above for ordinary
+printing. If its wait reports a nonzero reply, preserve the transport number
+and diagnostics: the original job may still be queued. Submitting it again
+can create duplicate output. Limited test coverage is not a reason to enlarge
+claims blindly or run \texttt{primotrim} on the installed system.
+
+\section{Troubleshooting and current limits}\label{mips-ts-troubleshooting}
+\index{MIPS/TS!troubleshooting}
+
+First identify the context in \manualref{mips-ts-command-contexts}{the command
+context guide}. Preserve the complete diagnostic and the selected config before
+changing anything. The checks below do not authorize deleting wanted data or
+resetting a working profile.
+
+\begin{description}
+\item[Connection refused.] Wait for startup, check that the emulator is still
+running and that port 4004 is free. Check the selected configuration, not
+the default \texttt{RC4000.cfg}, which has no active listener.
+\item[No SOS prompt.] Press Ctrl-A in Telnet, then select \texttt{sos}.
+If the local terminal is at \texttt{sim4000>}, enter \texttt{continue} there:
+Ctrl-E suspends the whole machine, including remote work. A running FP normally
+signals readiness with a bell, not a printed SOS or shell prompt.
+\item[Bad password.] Use \texttt{run test pass test} at SOS, not at FP or the
+emulator prompt. For the batch password question, answer \texttt{test} only
+after \texttt{>password}; the inline batch form does not ask that question.
+See \manualref{mips-ts-batch-submit}{batch submission}. Do not submit duplicate
+jobs while diagnosing a delayed reply.
+\item[Insufficient resources or an existing session.] Use one test job and
+finish it normally. A tiny host import can still exceed the 30-segment temporary
+claim; use the \manualref{mips-ts-retained-file}{compact-input procedure}, not
+\texttt{kitlabel} or a larger disk. For a lost connection to an idle FP, use
+\manualref{mips-ts-idle-reconnect}{the bounded reconnect procedure}; it does
+not cover interrupted commands or a failed guest job. Extra accounts and
+simultaneous terminals require deliberate guest provisioning, not just another
+listener in the configuration.
+\item[File unknown after login or restart.] Check whether it was retained with
+\texttt{scope user}, whether the administrative FP used the specified 0/0
+intervals, and whether both matching overlays were kept. A fresh overlay starts
+from the supplied image, not the previous session's retained files. Inspect
+with guest \texttt{lookup} before recreating or deleting anything.
+\item[Only copy statistics appear.] Use \texttt{c=copy keepsake} to display the
+exercise text. Plain \texttt{copy keepsake} is not the display command used in
+the retained-file recipe.
+\item[Host export refuses a file.] An existing export name must not be
+overwritten. Preserve that host file and select a new name; for other export
+failures, retain the diagnostic rather than assuming a name collision. Do not
+run guest cleanup until the needed export succeeds.
+\item[Batch enrolled but not finished.] Enrollment is only acceptance. The
+checked jobfile must contain both \texttt{message batchprobe} and \texttt{finis}.
+Wait for the message and \texttt{test removed after finis}; inspect \texttt{list}
+from local \texttt{s} before deciding whether another submission is safe.
+\item[Guest break or abnormal removal.] Record the originating process and
+numbers. \texttt{removed after break} is not normal completion. Check memory/
+storage claims before larger commands. Do not delete overlays containing wanted
+work, force-remove processes or reset as an automatic recovery measure.
+\item[Printer waiting or nonzero wait reply.] Preserve the transport number and
+input area. Do not resubmit: the original job may still be queued. Follow
+\manualref{mips-ts-printer-recovery}{detached-output recovery} only for that
+specific checked failure, not disk-full or partial-write errors.
+\item[Date prompt or missing disc1.] Select the matching \texttt{UNIT0.mipsts}
+and \texttt{UNIT1.mipsts} pair. Older overlays can preserve previous startup
+edits. Back up the stopped profile before resetting it; never initialize the
+supplied second disk again.
+\end{description}
+
+\subsection{Preserve work after an unexpected failure}\label{mips-ts-unexpected-failure}
+\index{MIPS/TS!failure diagnosis}
+
+When none of the specific checked recipes applies, do not try a sequence of
+SOS \texttt{stop}, \texttt{start}, \texttt{break} or \texttt{kill} commands.
+Use the following order instead:
+
+\begin{enumerate}
+\item Stop sending remote input. Keep the complete terminal diagnostic and
+the last command, noting whether Enter was sent, whether its output finished,
+and which interpreter was receiving input. Do not replay an import, batch job
+or print request merely because its acknowledgement was lost.
+\item In the original terminal, suspend execution with Ctrl-E and inspect
+the existing instance. These \emph{emulator CLI} commands do not remove a job:
+\begin{commandexample}{Local emulator CLI: inspect before changing state}
+show cpu
+show telnet
+show media
+\end{commandexample}
+Record the selected configuration and matching base/overlay names as well.
+While suspended, the guest cannot answer FP or SOS commands. Enter
+\texttt{continue} before a deliberate guest status check or export.
+\item If the guest remains responsive, inspect processes through local
+\texttt{s} as in \manualref{mips-ts-status}{the status procedure}. Inspect
+wanted files with \texttt{lookup}; export them under new host names only
+through a healthy FP with the appropriate intervals and resources. Successful
+export, not a prompt alone, is the evidence that a wanted file was saved.
+\item Prefer normal \texttt{finis} and shutdown only when the relevant jobs
+are usable. If this is not possible, preserve the running instance and its
+diagnostics before deciding to abandon it. Exiting loses core, pending input
+and uncompleted work; an overlay is not a resumable machine snapshot.
+\item After the emulator has stopped, preserve both overlay files with
+their exact base images and configuration before further experiments.
+Never copy active disks/sidecars as a consistent backup, reset by relabelling
+\texttt{disc1}, or discard the only copy of wanted guest data.
+\end{enumerate}
+
+This is a preservation procedure, not a promise to recover every failed job.
+Interrupted transfers/output, actual terminal hard errors, disk-full or
+partial host writes, power loss and emulator crashes have no general checked
+recovery sequence here. A future investigation must not be confused with a
+supported instruction to mutate the current guest.
+
+Punch/reader workflows and general printer error recovery are not certified.
+The subsystem binaries are historical programs; their generation sources have
+not been established as available on the image. Do not run \texttt{sostrim},
+\texttt{temtrim} or \texttt{primotrim} as setup commands.
+
+The default \texttt{UNIT0} does not start MIPS/TS. In \texttt{UNIT0.mipsts},
+\texttt{startarea} reads the three component scripts directly; an extra
+\texttt{read startmips} would exceed the monitor's two-level input stack and
+report \texttt{not allowed}. \texttt{startsos} places its normal
+2500-segment/200-entry claim on \texttt{disc1}, and \texttt{soscat} contains
+the demo account. These differences are confined to the MIPS/TS images.
+
+\section{Historical reference and coverage}\label{mips-ts-reference}
+
+The historical \emph{Swopping Online System (SOS)}, RCSL 31-D662
+(February 1982), explains job creation in section 2.2.1, printed pages
+14--15; terminal access in section 2.3, pages 20--21; and user-catalog
+resources in section 5.3.1. The \emph{MIPS/TS Operating Guide}, RCSL
+31-D585, second edition (October 1979), supplies operator and subsystem
+background. These manuals describe historical configurations, not a promise
+that all their devices, accounts or commands are configured here. Scanned
+OCR text can misread command syntax; prefer this chapter's checked recipes.
+
+The ready-to-run coverage is one compatibility-monitor terminal session,
+not multiterminal application attachment, invisible-password input,
+arbitrary guest generation, general peripheral recovery, or protected
+MIPS/TS. The historical SOS intervention commands \texttt{stop},
+\texttt{start}, \texttt{break} and \texttt{kill} are not a certified recovery
+sequence for this demonstration. In particular, historical \texttt{break}
+behavior depends on system trimming and need not preserve a job's files.

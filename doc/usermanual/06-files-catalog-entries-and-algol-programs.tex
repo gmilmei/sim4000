@@ -1,0 +1,131 @@
+\chapter{Files, catalog entries, and Algol programs}\label{files-catalog-entries-and-algol-programs}
+
+Begin with an idle \texttt{muser} FP created by
+\manualref{create-and-inspect-a-process}{Create and inspect a process}.
+Skip the optional stop/remove exercise until after this tutorial.
+If you already ended \texttt{muser}, request attention, select \texttt{s},
+check \texttt{list} and create it again with
+\texttt{new muser size 100000 temp disc 200 10 run}.
+Use a fresh disposable session if the example file names already exist.
+
+These examples use temporary entries and need the native image's
+\texttt{fromhost} and \texttt{tohost}. In a second host terminal, change to
+the emulator's working directory and use a text editor to create the ASCII/LF
+file \texttt{exchange/input} shown below. Ensure that \texttt{exchange/output}
+does not already exist: host exports deliberately refuse to overwrite files.
+
+\section{Import, copy, rename, and export}\label{import-copy-rename-and-export}
+\index{Files!import and export}
+\index{Files!copying and renaming}
+\index{lookup}
+\index{copy}
+\index{rename}
+
+For the display and editor examples later in this manual, use exactly these
+two lines as the contents of host \passthrough{\lstinline!exchange/input!},
+including the final LF newline:
+
+\begin{commandexample}{Host text file: exchange/input (not a command)}
+Monitor manual sample.
+Second line.
+\end{commandexample}
+
+Enter the following lines in FP, one at a time:
+
+\begin{commandexample}{Guest FP in muser: import, copy, rename and export}
+lookup fromhost tohost slang algol
+msrc=fromhost input
+lookup msrc
+mcopy=copy msrc
+rename mcopy.moved
+lookup moved
+output=tohost moved
+\end{commandexample}
+
+\passthrough{\lstinline!lookup!} displays catalog descriptors for the named entries. The first line locates the installed utilities; \passthrough{\lstinline!msrc!} and \passthrough{\lstinline!moved!} are temporary files in this user process. Their descriptors include allocation, device, date, and scope information. The simulator's offline disk listing is not a substitute for FP \passthrough{\lstinline!lookup!}: it cannot see changes that exist only in a running session's volatile overlay.
+
+\passthrough{\lstinline!name=command ...!} directs the result to an RC catalog entry, except that the left-hand name of \passthrough{\lstinline!tohost!} is the host destination. \passthrough{\lstinline!copy!} copies the text into a new entry. The copy may use fewer disk segments than the source; equal text does not imply identical allocation. \passthrough{\lstinline!rename old.new!} changes the catalog name: the dot between the two names is required. The final line creates host \passthrough{\lstinline!exchange/output!}, containing the original text with LF line endings. Transfer byte counts can include RC padding; they need not equal the host file length.
+
+Avoid naming entries after installed utilities. These are ordinary file operations, not disk initialization: do not use historical catalog creation or reset commands to prepare this session.
+
+\begin{operationnote}{Guest names and host names are different}
+\passthrough{\lstinline!msrc!} and \passthrough{\lstinline!moved!} are
+guest catalog names. \passthrough{\lstinline!input!} and
+\passthrough{\lstinline!output!} name host files beneath the configured
+exchange root. Do not enter \passthrough{\lstinline!exchange/input!} as a
+guest catalog name or try to use a guest name as a host pathname. If a host
+export already exists, choose a new output name instead of deleting unrelated
+files or assuming the export replaced it.
+\end{operationnote}
+
+\section{Display a text file on the guest console}\label{display-a-text-file-on-the-guest-console}
+
+In the same FP process, use the special console destination \passthrough{\lstinline!c!}:
+
+\begin{commandexample}{Guest FP in muser: display one text file}
+c=copy msrc
+\end{commandexample}
+
+For an imported ASCII/LF file containing \passthrough{\lstinline!Monitor manual sample.!} and \passthrough{\lstinline!Second line.!}, the two lines appear on the guest console. A \passthrough{\lstinline!segm.!} copy summary follows the text; it is a utility report, not part of the file. The command returns to FP without attention or a reset. It does not edit the source or create a new disk file named \passthrough{\lstinline!c!}.
+
+To display several text files consecutively, name them in the desired order:
+
+\begin{commandexample}{Guest FP in muser: display two text files}
+c=copy msrc moved
+\end{commandexample}
+
+Since \passthrough{\lstinline!moved!} is the unchanged copy in the earlier example, this displays the same two-line text twice, followed by input and destination summaries. The tested source and copy remain unchanged after both displays.
+
+The destination matters: \passthrough{\lstinline!result=copy source!} creates a disk result, whereas \passthrough{\lstinline!c=copy source!} sends text to the console. Do not assume bare \passthrough{\lstinline!copy source!} is a file-viewing command; it produced only a copy report in the exploratory session. Do not substitute host \passthrough{\lstinline!cat!}: the installed guest \passthrough{\lstinline!cat!} is an entry point in \passthrough{\lstinline!catsort!}, not the host text utility.
+
+This is a text display, not a pager, binary dump or full-screen editor. Large files can scroll past the terminal's history; export them with \passthrough{\lstinline!tohost!} and inspect the host file when necessary. Additional \passthrough{\lstinline!copy!} options, other console destinations and control-character handling remain unverified by this example.
+
+\section{Compile and run a small Algol program}\label{compile-and-run-a-small-algol-program}
+\index{Algol}
+
+The optional tutorial bundle includes this example as \passthrough{\lstinline!examples/hello.alg!}:
+
+\begin{commandexample}{Algol source: hello.alg (not an FP command)}
+begin
+   write(out, <:Hello from Algol<10>:>)
+end
+\end{commandexample}
+
+In a second host terminal, change to the same working directory as the
+emulator and copy the bundled source. If you did not copy \texttt{examples/},
+create \texttt{exchange/alginput} with exactly the source shown above instead.
+
+\begin{commandexample}[language=sh]{Host shell in the emulator's working directory: prepare Algol input}
+cp examples/hello.alg exchange/alginput
+\end{commandexample}
+
+Then enter these FP commands in the existing \passthrough{\lstinline!muser!} process:
+
+\begin{commandexample}{Guest FP in muser: compile and run Algol}
+asrc=fromhost alginput
+mprog=algol asrc connect.no
+mprog
+\end{commandexample}
+
+The supplied compiler prints \passthrough{\lstinline!algol end 24!} for this source. Running \passthrough{\lstinline!mprog!} prints \passthrough{\lstinline!Hello from Algol!}, then returns to FP with \passthrough{\lstinline!end 7!}. The end numbers are program reports, not host exit statuses. Compilation and execution both happen on the emulated RC4000, not through the host C compiler.
+
+\section{Clean up and keep results}\label{clean-up-and-keep-results}
+\index{clear}
+
+If you want to continue with the
+\manualref{edit-a-text-file-inside-the-guest}{editor} or
+\manualref{compare-text-files-inside-the-guest}{text comparison} examples,
+keep \passthrough{\lstinline!msrc!} and \passthrough{\lstinline!moved!}
+until those examples are complete. Skip cleanup for now if you will continue
+with those recipes; their prerequisites also explain how to recreate the files.
+The cleanup below deliberately removes both names.
+
+After exporting any wanted results, remove just the example entries in FP:
+
+\begin{commandexample}{Guest FP in muser: remove the example entries}
+clear temp msrc moved asrc mprog
+\end{commandexample}
+
+This deletes those temporary catalog entries. Successful \passthrough{\lstinline!rename!} and \passthrough{\lstinline!clear!} need not print a confirmation. Use \passthrough{\lstinline!lookup!} to inspect entries when unsure, and check the current command context before retrying a command that reports a syntax error or cannot find a program.
+
+Temporary catalog scope and emulator disk persistence are separate concepts. A persistent overlay or writable image does not turn a temporary entry into a permanent file: the guest can reclaim it when its process is removed. For the workflow above, \passthrough{\lstinline!tohost!} is the verified way to keep text beyond the guest session. See \manualref{keep-guest-files-across-sessions}{the persistent guest-file workflow}; advanced catalog administration and the full historical utility set are not covered by these examples. Bounded command-file examples are described separately in \manualref{call-one-command-file-from-another}{FP command-file input}.

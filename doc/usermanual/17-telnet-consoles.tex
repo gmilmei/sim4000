@@ -1,0 +1,119 @@
+\chapter{Telnet consoles}\label{telnet-consoles}
+For the preconfigured MIPS/TS service on port 4004, follow
+\manualref{mips-ts-login}{Connect and log in to MIPS/TS}; do not create another
+listener with the same device or port. This chapter describes the general
+console mechanism, not the SOS account setup.
+\index{Telnet}
+\index{Attention}
+\index{Terminals}
+
+\section{Enable a listener and connect a client}\label{enable-a-listener-and-connect-a-client}
+\index{Telnet!listener configuration}
+\index{Telnet!connection state}
+
+An additional configured \passthrough{\lstinline!CONSOLE!} can be exposed as a data-only ANSI/VT100 terminal over Telnet/NVT. The service is disabled by default. Enable the commented loopback example in \passthrough{\lstinline!RC4000.cfg!}:
+
+\begin{commandexample}{RC4000.cfg contents: enable the existing device-4 endpoint}
+TELNET DEVNO=4 ADDRESS=127.0.0.1 PORT=4004 ATTENTION=CTRL-A
+\end{commandexample}
+
+The endpoint must appear after its corresponding \passthrough{\lstinline!DEFINE CONSOLE!} line. Start the emulator in one host terminal, then connect an ANSI-capable Telnet client from a second host terminal. These are separate shell invocations:
+
+\begin{commandexample}[language=sh]{First host terminal: start the emulator}
+./sim4000 -a
+\end{commandexample}
+
+\begin{commandexample}[language=sh]{Second host terminal: connect to the remote guest console}
+telnet 127.0.0.1 4004
+\end{commandexample}
+
+Device 2 remains the local console and device 4 is isolated on its Telnet port. The listener is nonblocking, accepts one active client, performs Telnet option and NVT Return handling, and buffers console input. A second simultaneous client is rejected. DEL uses the configured console input mapping. Telnet does not expose emulator commands or the Control-E operator prompt. Listeners continue to accept, reject, disconnect, and reconnect clients while the CPU is stopped at \passthrough{\lstinline!sim4000>!}. Use \passthrough{\lstinline!show telnet!} there to inspect each endpoint's bind address, connection state, attention mode and count, buffer occupancy, and connection/drop counters.
+
+Each endpoint exposes its configured guest device, not a shared operator console. Keep the example bound to loopback for local use: the service provides neither authentication nor transport encryption. An endpoint bound to another address must be protected by the host's network-access controls; connecting does not require a guest login provided by this emulator.
+
+\begin{operationnote}{Telnet buffers are bounded}
+Input and output can lose bytes when their buffers fill; inspect the endpoint's drop counters with \passthrough{\lstinline!show telnet!} at the local simulator prompt. Send one guest command at a time and wait for its complete reply, especially while execution is suspended or the client is slow to read. Reconnecting does not reconstruct output that was dropped or discarded on disconnect. The local \passthrough{\lstinline!discard-input!} command does not clear a remote terminal's queued input.
+\end{operationnote}
+
+\section{Request guest attention, not emulator suspension}\label{request-guest-attention-not-emulator-suspension}
+\index{Telnet!attention key}
+
+Control-A is the default remote RC operator key. It is intercepted by the endpoint, is not delivered as RC console data, and avoids entering the Telnet client's command mode merely to issue \passthrough{\lstinline!send brk!}. Telnet \passthrough{\lstinline!BRK!} remains supported in every mode. The alternatives are configured per endpoint:
+
+\begin{commandexample}{Endpoint option alternatives: choose one ATTENTION value}
+ATTENTION=CTRL-A   request attention when Control-A is typed (default)
+ATTENTION=CONNECT  request attention whenever a client connects
+ATTENTION=NONE     disable the in-band key; Telnet BRK still works
+\end{commandexample}
+
+These \passthrough{\lstinline!ATTENTION=!} values are alternatives inside a \passthrough{\lstinline!TELNET!} declaration, not complete configuration lines or commands to type into the connection. A remote Control-E does not open the local \passthrough{\lstinline!sim4000>!} prompt; remote input belongs to the guest terminal. Use the local emulator escape key for simulator control.
+
+\section{Select a process on a second terminal}\label{select-a-process-on-a-second-terminal}
+\index{Telnet!process selection}
+
+Attention displays \passthrough{\lstinline!att!}, after which the terminal selects an available RC process by name. A process can be bound to only one terminal. The transcript labels \passthrough{\lstinline!local:!} and \passthrough{\lstinline!remote:!} identify where to type; they are not command text. The local starting context is the supervisor \passthrough{\lstinline!s!}; choose unused names for the example processes. For example, this verified two-terminal workflow first moves the local console away from \passthrough{\lstinline!s!} and then uses \passthrough{\lstinline!s!} remotely:
+
+\begin{commandexample}{Two-terminal transcript: move the supervisor to the remote console}
+local:  new telproc size 100000 run
+remote: <Control-A>
+remote: s
+remote: new remote size 100000 run
+remote: geo
+\end{commandexample}
+
+The remote terminal reaches \texttt{dansk/English ?}; enter \texttt{e} to
+reach \texttt{ARE YOU READY?!}. This is a guest program question, not the
+Telnet client's command prompt. Only one client can use an endpoint at a time.
+Use \texttt{show telnet} at the local simulator prompt to inspect rejection
+and connection counters. Disconnecting and reconnecting the client does not
+itself remove its guest process.
+
+\subsection{Keep local and remote FP processes independent}\label{keep-local-and-remote-fp-processes-independent}
+\index{Telnet!process lifecycle}
+
+For a separate two-terminal process-control exercise with MONITOR/RC433X,
+start a fresh session. With the local terminal selected to \passthrough{\lstinline!s!} and a connected device-4 Telnet console, the following sequence before starting \passthrough{\lstinline!geo!} is:
+
+\begin{commandexample}{Two-terminal transcript: independent FP process lifecycle}
+local:  new local size 100000 run
+remote: <Control-A>
+remote: s
+remote: new remote size 100000 run
+local:  montest internal name.local
+remote: montest internal name.remote
+remote: <Control-A>
+remote: s
+remote: proc remote remove
+remote: <Control-A>
+remote: s
+remote: list
+remote: <Control-A>
+remote: s
+remote: new remote size 100000 run
+\end{commandexample}
+
+The prefixes and \passthrough{\lstinline!<Control-A>!} notation identify the terminal or key; they are not literal command text. Wait for each operation's complete output, especially \passthrough{\lstinline!ready!} after removal and \passthrough{\lstinline!list!}, before requesting attention again. The completed list still contains \passthrough{\lstinline!local!} and no longer contains \passthrough{\lstinline!remote!}. \begin{operationnote}{Keep removal separate from reconnection}
+Only remove a process whose temporary work you are prepared to lose. This example deliberately removes and recreates \passthrough{\lstinline!remote!}; it is not a harmless reconnect procedure. A Telnet disconnect does not itself perform \passthrough{\lstinline!proc remote remove!}. Keep terminal reconnection separate from guest process administration.
+Direct removal is not a file-cleanup guarantee: clear unwanted temporary files
+inside FP first if you need predictable catalog cleanup.
+\end{operationnote}
+
+The two montest calls identify the separate \texttt{local} and \texttt{remote}
+processes. After removal and recreation, the local process remains available;
+the new remote process is ready for FP commands. Process addresses can change.
+For a demonstration, start \texttt{geo} separately in each idle FP only after
+finishing the process-control exercise.
+
+This is operation on two separate guest terminals, not two clients sharing one Telnet endpoint or two FPs competing for one console's pending reads. It is checked with the default monitor/device profile; the analogous live Telnet lifecycle has not been checked with STDMON/DFC403. It does not validate arbitrary process trees, storage isolation or protection.
+
+\section{Use the RC851 screen translation}\label{use-the-rc851-screen-translation}
+\index{RC851!ANSI translation}
+
+\passthrough{\lstinline!RC851!} devices use the same endpoint syntax and translate their historical screen protocol to ANSI/VT100. The implemented output operations include cursor addressing, cursor forward/up, Home, four-column Tab, clear screen, clear line, erase-to-end-of-line, erase-to-end-of-screen, Return, Line Feed, Backspace, and Bell. For example:
+
+\begin{commandexample}{RC4000.cfg contents: declare an RC851 screen endpoint}
+DEFINE RC851 DEVNO=5 INTNO=16,15
+TELNET DEVNO=5 ADDRESS=127.0.0.1 PORT=4005 ATTENTION=CTRL-A
+\end{commandexample}
+
+Common ANSI cursor and function-key sequences on input are consumed rather than leaking their Escape byte into the RC operator-key path. Printable input, Return, Backspace, and Delete mapping remain available. Additional key mappings can be added when an RC workload demonstrates a need for them.

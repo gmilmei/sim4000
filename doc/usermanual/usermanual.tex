@@ -1,0 +1,59 @@
+% LuaLaTeX main document; see README.md in this directory.
+\documentclass[11pt,a4paper,oneside,openany,parskip=half]{scrbook}
+\input{preamble}
+\title{SIM4000 User Manual}
+\subtitle{The native emulator and its supplied RC system}
+\author{SIM4000 project}
+\date{}
+\begin{document}
+\frontmatter
+\maketitle
+\chapter*{About this manual}
+\addcontentsline{toc}{chapter}{About this manual}
+\input{introduction}
+
+The original DOS emulator was written by Henrik Jacobsen. This manual
+describes the native reimplementation and the supplied historical
+software, not the original hardware in every detail.
+
+Read \manualref{build-and-start}{Build and start} followed by
+\manualref{first-monitor-session}{First monitor session} for the shortest path
+to a running system. Copying the runtime files is an optional alternative,
+not an extra startup step. Part II supplies task-oriented guest procedures;
+Part III is the emulator and device reference. Examples distinguish host shell commands, simulator
+commands and guest commands; always check the current command context.
+\begingroup
+\footnotesize
+\tableofcontents
+\endgroup
+\mainmatter
+\part{Getting started}
+\input{01-build-and-start}
+\input{03-first-monitor-session}
+\input{02-run-from-your-own-working-directory}
+\input{04-everyday-operation}
+\part{Working with the guest system}
+\input{05-processes-and-command-contexts}
+\input{06-files-catalog-entries-and-algol-programs}
+\input{07-keep-guest-files-across-sessions}
+\input{08-software-and-files-in-the-supplied-disk-image}
+\input{09-host-file-exchange}
+\input{19-mips-ts}
+\part{Emulator and device reference}
+\input{18-configuration-and-disk-persistence}
+\input{10-command-line-options}
+\input{11-paper-tape-files}
+\input{20-line-printer}
+\input{12-optional-v2-terminal-protocol}
+\input{13-magnetic-tape-files-rc749}
+\input{14-debugging-and-core-files}
+\input{15-execution-throttle}
+\input{16-keyboard-and-date-settings}
+\input{17-telnet-consoles}
+\backmatter
+\ohead{Index}
+\begingroup
+\small
+\printindex
+\endgroup
+\end{document}

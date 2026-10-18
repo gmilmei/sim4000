@@ -1,0 +1,5167 @@
+
+
+
+
+m.                monitor text 10
+
+; btj 1977.06.07
+
+
+; check maincat
+;   tests the existence of a main catalog
+;
+; call:  m0, <no maincat addr>
+; exit:  w2 = unchanged
+; error exits: goto-action
+
+m0:                    ; check maincat:
+     rl  w0     b25    ;
+     se  w0     0      ;    if maincat docaddr <> 0 then
+     jl.        n1.    ;      skip
+     jl.        n5.    ;    else goto next param;
+
+
+
+; check main catalog not on document
+;
+; call: m1
+; error exits: result 6, if maincat on document
+
+m1:                    ; check maincat not on document:
+     rl. w0     d4.    ;
+     se  w0    (b25)   ;    if curdoc <> maincat docaddr then
+     jl.        n0.    ;      next instruction;
+     jl.        j6.    ;    goto result 6;
+
+
+
+; clear maincat
+;
+; call: m2
+
+m2:                    ; clear maincat:
+     al  w0     0      ;
+     rs  w0     b25    ;    maincat docaddr := 0;
+     jl.        n0.    ;    next instruction;
+
+
+; if main-catalog entry then goto <addr>
+;
+; call: m3, <maincatalog entry addr>
+; error return: goto-action 1, if main catalog entry
+
+m3:                    ; test maincat entry:
+     rl  w2     b25    ;
+     se. w2    (d4.)   ;    if curdoc <> maincat docaddr then
+     jl.        n1.    ;      skip;
+
+     al. w2     d9.    ;    w2 := maincat pseudo chain;
+
+     jl. w3     e41.   ;    compare names (name.work, name.pseudochain);
+     jl.        n1.    ;+2:   not same:  skip;
+
+     bl. w0     v4.    ;    if first slice.work <>
+     bs  w0  x2+f54    ;       first slice.pseudochain then
+     se  w0     0      ;
+     jl.        n1.    ;      skip;
+
+     dl. w1     v2.    ;    if base.work <>
+     sn  w0 (x2+f1-f0) ;
+     se  w1 (x2+f2-f0) ;       base.pseudochain then
+     jl.        n1.    ;      skip;
+
+     jl.        n5.    ;    goto <main catalog entry>;
+
+
+
+; the two following routines terminate the use of the current catalog,
+;   and selects the new catalog.
+; the catalog may either be an auxilliary catalog or the main catalog.
+
+; set auxcat
+;
+; call: m4
+; error return: result 2, in case of catalog io-error
+
+m4:                    ; set auxcat:
+     jl.        e0.    ;    set auxcat and return;
+
+; set maincat
+;
+; call: m5
+; error return: result 2, in case of catalog io-error
+
+m5:                    ; set maincat:
+     jl.        e1.    ;    set maincat and return;
+
+
+
+; dump chaintable
+;
+;   the chaintable of curdoc is written back on the device
+;
+; call:  m6
+; error return: result 2, in case of io-error
+
+m6:                    ; dump chaintable:
+     jl.        e2.    ;    dump chaintable and return;
+
+
+
+
+
+
+; check function mask
+;   tests that the internal process is allowed to execute the current
+;     monitor call
+;
+; call: w1 = sender
+;       m8, <function bit>
+; error exits: result 1, if function bit is not in function mask.internal
+
+m8:                    ; check function mask:
+     jl. w3     n10.   ;    w0 := bit := next param;
+     bl  w3  x1+a22    ;    mask := function mask.sender;
+     so  w3    (0)     ;    if bit not contained in mask then
+     jl.        j1.    ;     goto result 1;
+     jl.        n0.    ;    next instruction;
+
+
+
+; check privileges
+;
+;   checks that the sender is allowed to manipulate with the catalog-system
+;     on the current bs-device:
+;          1. the sender must be user of the device
+;
+; call: w2 = chain
+;       m9
+; error exits: result 4, if not user
+
+m9:                    ; check privs:
+     rl. w1     d2.    ;    w1 := sender;
+     rl  w3 (x2+f62)   ;    w3 := bs-process (= nametable.nametab addr.chain)
+     rl  w0  x3+a53    ;    w0 := users.proc;
+     so  w0 (x1+a14)   ;    if sender is not user of proc then
+     jl.        j4.    ;      goto result 4;
+     jl.        n0.    ;    next instruction;
+
+
+
+; search best entry
+;
+; call: m10, <not found addr>
+; error exits: result 2, if catalog io-error
+;              result 6, if name format illegal
+;              goto-action 1,  if not found
+
+m10:                   ; search best entry:
+     jl. w3     e46.   ;    search best entry in catalog;
+     jl.        n5.    ;+2:   not found: goto
+     jl.        n1.    ;    skip
+
+
+
+; search best entry and test modification allowed
+;
+;   the best catalog entry is found. if an areaprocess exists for that
+;     entry, it will be tested that no other process is user (or reserver)
+;     as specified in parameter
+;
+; call: m11, <no user/no reserver>
+;            (no user = a53, no reserver = a52)
+; error exits: result 2, if catalog io-error
+;              result 3, if not found
+;              result 4, if base.entry is outside maxbase.sender
+;              result 5, if modification not allowed
+;              result 6, if nameformat illegal
+
+m11:                   ; search best entry and test modif allowed:
+     jl. w3     e46.   ;    search best entry;
+     jl.        j3.    ;+2:   not found: goto result 3;
+
+; w0w1 := base.entry
+     rl. w3     d2.    ;
+     dl  w3  x3+a44    ;    w2w3 := maxbase.sender;
+     sl  w0  x2        ;    if base.entry outside maxbase.sender then
+     sl  w1  x3+1      ;
+     jl.        j4.    ;      goto result 4;
+
+     al  w0     0      ;    cur proc nametable addr := 0;
+     rs. w0     d11.   ;    (i.e. no areaprocess found)
+
+     jl. w3     e43.   ;    for all area processes with same name do
+       b5              ;
+       b6              ;
+     jl.        n1.    ;+6:   no more: skip
+
+; w0w1 = base.proc, w2 = nametable address of area process, w3 = continue
+     sn. w0    (v1.)   ;    if base.proc <> base.work then
+     se. w1    (v2.)   ;
+     jl      x3        ;      continue search;
+
+; an area process is found with exact the same base as base.work
+     rs. w2     d11.   ;    cur proc nametable addr := nametable addr;
+
+     jl. w3     n10.   ;    w0 := rel addr in proc descr to test;
+     wa  w0  x2        ;
+     rl  w0    (0)     ;    w0 := reserver (or users) of proc;
+
+     rl. w1     d2.    ;    w1 := sender;
+     lo  w0  x1+a14    ;
+     ws  w0  x1+a14    ;    if reserver- (or user-word) contains no other
+     sn  w0     0      ;      bits than id-bit.sender then
+     jl.        n0.    ;        next instruction;  (notice: param is skipped)
+
+; the area process was protected by another internal process
+     jl.        j5.    ;    goto result 5;
+
+
+
+; test name format
+;
+;   the format of name.work is tested
+;
+; call: m13
+; error exits: result 6, if name format illegal
+
+m13:                   ; test name format:
+     jl.        e24.   ;    goto test name format;
+e24 = k-2              ; stepping stone
+
+
+
+; compute namekey
+;
+;   namekey.work is computed and set, according to name.work
+;
+; call: m14
+
+m14:                   ; compute namekey:
+     jl.        e3.    ;    compute namekey and return;
+
+
+
+; test new system name (maybe wrk-name)
+;
+;   the chaintables and the whole nametable and the current catalog
+;     are scanned in order to check, that (base.work,name.work) does
+;     not coincide with the already existing names.
+;
+;   (the reason for searching the chaintables too is, that a name,
+;     once reserved as a document-name, is protected against misuse
+;     in case of intervention on a disc (in which case the process-name
+;     is cleared). the name may only be reused by exactly the same
+;     process or it may be released by means of ..delete bs.. etc.
+;   this means that procfunc does not have to check with the catalog
+;     when ..create peripheral process.. is used to restore the name
+;       of the disc-process )
+;
+;   if name(0).work = 0 then a wrk-name is generated, which is
+;     completely unique (i.e. independant of base), and the wrk-name
+;     is moved to name.work.
+;
+; call: m15, <overlap addr>, <exact addr>
+; error exits: result 2, if catalog io-error
+;              result 6, if nameformat illegal
+;              goto-action 1, if overlap
+;              goto-action 2, if exact (base, name) exists
+
+; generate wrk-name
+;
+;   a wrk-name is generated, which is completely unique (i.e.
+;     independant of base),
+;     and the wrk-name is moved to name.work
+;
+; call: m16, <irrell>, <irrell>
+; error exits: result 2, if catalog error
+
+; test new system name (wrk-name not allowed)
+;
+;   function as ..test new system name, wrkname allowed.. except that
+;     wrk-name is not allowed
+;
+; call: m17, <overlap addr>, <exact addr>
+; error exits: as test new system name
+
+b. g30 w.
+
+m15:                   ; test new system name, wrk-name allowed:
+     rl. w0     v5.    ;    create wrkname := name(0).work = 0;
+     sn  w0     0      ;
+m16:                   ; generate wrk-name:
+     am        -1      ;    create wrkname := true;
+m17:                   ; test new system name , wrk-name not allowed:
+     al  w0     0      ;    create wrkname := false;
+     rs. w0     d17.   ;
+; d17 =  0 : create wrkname == false
+; d17 = -1 : create wrkname == true
+
+     se  w0    -1      ;    if not create wrk-name then
+     am         e24-e23;      test name format
+                       ;    else
+g0:                    ; next wrk-name:
+     jl. w3     e23.   ;      create next wrkname;
+                       ;      (i.e. maybe generate the next wrk-name)
+
+     jl. w3     e45.   ;    find chain (name.work);
+       v5              ;
+     jl.        g1.    ;+4:  not found:  goto test in nametable;
+                       ;+6:  found:
+     dl  w1     b45    ;    base := catalog interval;
+     jl. w3     g20.   ;    test overlap;
+
+g1:                    ; test in nametable:
+     jl. w3     e43.   ;    for all procs in nametable do
+       b3              ;
+       b7              ;
+     jl.        g8.    ;+6:   no more: goto test main catalog;
+     jl.        g20.   ;    goto test overlap and continue;
+
+g8:                    ; test main catalog:
+     rl  w0     b25    ;
+     se  w0     0      ;    if main catalog exists then
+     jl.        g10.   ;      goto test in current catalog;
+     jl.        n2.    ;    skip 2;
+
+
+
+; test new catalog name
+;
+;   the current catalog is scanned in order to test that
+;     (base.work, name.work) do not coincide with any entries
+;
+; call: m18, <overlap addr>, <exact addr>
+; error exits: as ..test new system name..
+; notice:    cur entry position is defined at <exact> return
+
+m18:                   ; test new catalog name:
+     jl. w3     e24.   ;    test format;
+     al  w0     0      ;    create wrkname := false;
+     rs. w0     d17.   ;
+g10:                   ; test in current catalog:
+     jl. w3     e42.   ;    for all named entries in catalog do
+     jl.        n2.    ;+2:   no more: skip 2 (notice params not skipped yet)
+
+; subprocedure test overlap
+;   if wrkname generated then goto test in nametable
+;   if overlap then goto first param addr
+;   if base = base.work then goto second param addr
+;
+; entry: w0w1 = base.entry(or proc), (maybe w2 = entry), w3 = link
+; exit:  all regs unchanged
+
+g20:                   ; test overlap:
+     sz. w3    (d17.)  ;    if create wrkname then
+     jl.        g0.    ;      goto next wrk-name;
+
+     sh. w0    (v1.)   ;    if lower base > lower.work then
+     jl.        g21.   ;      begin
+     sh. w0    (v2.)   ;      if lower base > upper.work
+     sh. w1    (v2.)   ;      or upper base <= upper.work then
+     jl      x3        ;        return;  i.e. inside base.work or above
+     jl.        n5.    ;      goto overlap-addr; i.e embraces upper.work
+g21:                   ;      end;
+     sl. w1    (v2.)   ;    if upper base < upper.work then
+     jl.        g22.   ;      begin
+     sl. w1    (v1.)   ;      if upper base < lower.work
+     sl. w0    (v1.)   ;      or lower base >= lower.work then
+     jl      x3        ;        return;  i.e. inside base.work or below
+     jl.        n5.    ;      goto overlap-addr; i.e. embraces lower.work
+g22:                   ;      end;
+     sn. w0    (v1.)   ;    if base <> base.work then
+     se. w1    (v2.)   ;
+     jl      x3        ;      return;  i.e. contains base.work
+     jl. w3     e48.   ;    save position;
+     jl.        n6.    ;    goto exact-addr;
+
+d17: 0                 ; create wrk-name:  0 == false, all ones == true
+
+e.                     ;
+
+
+; test chain error
+;
+;   tests that the previous call of ..copy chain.. did not
+;     give any overlap-errors etc
+;
+; call: m19
+; error exits: result 5, if any errors
+
+b. g20, h10 w.
+
+m19:                   ; test chain error:
+     rl. w0     h3.    ;
+     sn  w0     0      ;    if any errors = 0 then
+     jl.        n0.    ;      next instruction;
+     jl.        j5.    ;    goto result 5;
+
+
+
+; copy chaintable chain
+;
+; call: m20
+; error exits: result 5, if chain is too short
+; return: w2 = slices
+
+m20:                   ; copy chaintable chain:
+     bz. w1     v26.   ;    w1 := last slice number;
+     al  w1  x1+f0+1+511;   bytes := last slice + 1 + size of chainhead + round
+     ls  w1    -9      ;    w1 := number of segments used for chaintable;
+
+     al. w3     v27.   ;    w3 := addr of first slice information;
+
+     jl. w2     g10.   ;    copy chain(w1, w3);
+     jl.        n0.    ;+2:   chain ok:        next instruction
+     jl.        n0.    ;+4:   chain too long:  next instruction
+     jl.        j5.    ;+6:   chain too short: result 5
+
+
+
+; copy chain and cut down
+;
+; call: m21
+; return: w2 = slices
+
+m21:                   ; copy chain and cut down:
+     rl. w1     v7.    ;    w1 := size.work;
+     al. w3     v4.    ;    w3 := addr of first slice information;
+
+     jl. w2     g10.   ;    copy chain;
+     jl.        n0.    ;+2:   chain ok:        next instruction
+     jl.        n0.    ;+4:   chain too long:  next instruction
+                       ;+6:   chain too short:
+
+; w0 = 0
+; w1 = remaining number of slices without chains
+; w2 = irrellevant
+; w3 = irrellevant
+
+     rl. w3     d4.    ;    w3 := curdoc;
+     wm  w1  x3+f64    ;    segments := - slices * slicelength
+     ac  w1  x1        ;
+     wa. w1     v7.    ;                + size.work;
+     wd  w1  x3+f64    ;    slices := segments / slicelength (rounded);
+     se  w0     0      ;
+     al  w1  x1+1      ;
+     al  w2  x1        ;    w2 := slices;
+     wm  w1  x3+f64    ;
+     rs. w1     v7.    ;    size.work := slices * slicelength;
+
+     jl.        n0.    ;    next instruction;
+
+
+
+; subprocedure copy chain
+;
+;   copies a chain from senders area into the curdoc chaintable.
+;   all the new chain-elements in curdoc chaintable must be in
+;     state = free.
+;   the chain is copied until:
+;         1. a chain addresses outside the chaintable
+;     or  2. the areasize is reached
+;     or  3. the chain is terminated
+;     whichever occurs first.
+;   all new chain-elements are counted (unless already used).
+;   in case of chain overlap the copying will proceed, but will not
+;     destroy the chains already copied.
+;
+;   if the areasize is negative, it is a filedecriptor. in this case
+;     no chain is copied (of course), but first slice.work is set to
+;     doc-ident.
+;
+; call:  w1 = areasize, w2 = link, w3 = addr of first slice information
+; return: link+0: chain matches areasize :  w2 = slices
+;         link+2: chain too long         :  w2 = slices used
+;         link+4: chain too short        :  w0 = 0, w1 = slices not used
+
+g10:                   ; copy chain:
+     rs. w2     h0.    ;    save(return);
+
+     al  w0     0      ;   (w0 := 0;)
+     rs. w0     h3.    ;    any errors := false;
+
+     sl  w1     1      ;    if areasize > 0 then
+     jl.        g12.   ;      goto area;
+
+; the areasize is either zero or negative, prepare first slice := 0
+     al  w2     0      ;    first slice := 0;
+     hs  w2  x3        ;   (w2 = number of slices := 0;)
+     sn  w1     0      ;    if areasize = 0 then
+     jl.       (h0.)   ;      next instruction;
+     jl.        m91.   ;    goto compute docnumber;
+
+g12:                   ; area:
+     jl. w2     e62.   ;    w2 := abs addr (w3.sender);
+     rs. w2     h1.    ;    sender chain := abs addr of save w3.sender
+
+     rl. w2     d4.    ;    w2 := curdoc;
+; w0 = 0
+     wd  w1  x2+f64    ;
+     se  w0     0      ;    w1 := slices to use := areasize / slicelength;
+                       ;          (rounded)
+     al  w1  x1+1      ;
+     rs. w1     h2.    ;
+
+     bz  w2  x2+f66    ;    w2 := last slicenumber of chaintable;
+     bz  w3  x3        ;    w3 := first slice number;
+
+g13:                   ; next slice:
+; w1 = remaining slices to copy
+; w2 = last slicenumber of slicetable
+; w3 = current slicenumber
+     sl  w3     0      ;    if slicenumber outside
+     sl  w3  x2+1      ;      chaintable then
+     jl.        g16.   ;        goto chain outside limits;
+
+     am.       (d4.)   ;    if corresponding slice in chaintable
+     bl  w0  x3        ;      is not free then
+     sn  w0    -2048   ;
+     jl.        g14.   ;      begin
+     rs. w2     h3.    ;      any errors := true;
+     am.       (h1.)   ;      w0 := slicelink;
+     bl  w0  x3+f0     ;
+     jl.        g15.   ;      end
+g14:                   ;    else
+     am.       (h1.)   ;
+     bl  w0  x3+f0     ;      move chain element from user area
+     am.       (d4.)   ;      to curdoc chain;
+     hs  w0  x3        ;
+g15:                   ;
+     wa  w3     0      ;    slicenumber := next(slicenumber);
+     al  w1  x1-1      ;    decrease(remaining slices);
+     sn  w1     0      ;    if remaining slices = 0 then
+     jl.        g17.   ;      goto chain ok or too long;
+     se  w0     0      ;    if not end of chain then
+     jl.        g13.   ;      goto next slice;
+; the chain was too short
+     am.       (h0.)   ;
+     jl        +4      ;    return short-exit;  (independant of errors)
+
+g16:                   ; chain outside limits:
+     rs. w3     h3.    ;    any errors := true;
+     al  w1     0      ;
+
+g17:                   ; chain ok or too long:
+; w0 = contents of last slice
+; w1 = 0
+; w2 = irrellevant
+; w3 = next slicenumber 
+     rl. w2     h2.    ;    w2 := slices used;
+     se  w0     0      ;    if end of chain
+     se. w1    (h3.)   ;    or any errors then
+     jl.       (h0.)   ;      then return ok;
+
+     ws  w3     0      ;    w3 := last slicenumber;
+     am.       (d4.)   ;
+     hs  w1  x3        ;    slicelink(last slicenumber).curdoc := end of chain
+     am.       (h0.)   ;
+     jl        +2      ;    return chain too long;
+
+h0:  0                 ; saved return
+h1:  0                 ; saved chainhead address in sender area
+h2:  0                 ; slices used
+h3:  0                 ; any errors ( 0 == false, else true )
+
+e.                     ;
+
+
+
+; compute slices to claim
+;
+;   the current slice-chain of entry.work is scanned, thus counting the
+;     number of slices it used to occupy.
+;   this number is compared to the new size.work:
+;
+;           if new number of slices < counted number then
+;               save address of last slicelink to use
+;
+;           if new number of slices > counted number then
+;               save address of last used slicelink
+;
+; call: m22, <compute new slices>
+; return:  w2 = slices
+;          variables are defined for later call of: adjust chain
+
+b. g20, h10 w.
+
+m22:                   ; compute slices to claim:
+     jl. w3     n10.   ;    w0 := next param;
+
+     rl. w2     v7.    ;
+     sh  w2    -1      ;    if size.work < 0 then
+     jl.        g4.    ;      goto non-area;
+
+     so  w0     2.10   ;    if not compute new slices then
+     al  w2     0      ;      size := 0;
+
+     rl. w3     d4.    ;    w3 := curdoc;
+     al  w1     0      ;
+     wd  w2  x3+f64    ;    w2 := slices to use :=
+     se  w1     0      ;          size / slicelength (rounded);
+     al  w2  x2+1      ;
+
+     al. w0     v4.    ;    (prepare new area or no slices)
+     bz. w1     v4.    ;    w1 := first slice.work;
+     wa  w1  6         ;    w1 := abs addr of first slice;
+     rs. w1     h4.    ;    minslice := first slice;
+     sn  w1  x3        ;    if old size = 0 then
+     jl.        g2.    ;      goto after count;
+; notice: an area may not start in slice 0
+
+
+g1:                    ; count next:
+; w0 = abs addr of last slice link (either first slice.work  or  curr slice)
+; w1 = abs addr of next slice link
+; w2 = slices to use
+     al  w2  x2-1      ;    decrease(remaining slices to use);
+     sn  w2    -1      ;    if area must be cut down then
+     ds. w1     h1.    ;      save(curr slice addr, next slice addr);
+
+     al  w0  x1        ;    curr slice := next slice;
+     ba  w1  x1        ;    next slice := next(next slice);
+
+     sh. w1    (h4.)   ;    if next slice <= minslice then
+     rs. w1     h4.    ;      minslice := next slice;
+
+     se  w0  x1        ;    if current slice is not the last one then
+     jl.        g1.    ;      goto count next;
+
+g2:                    ; after count:
+
+; w0 = abs addr of current slice
+; w1 = abs addr of next slice  (if area exhausted then curr=next)
+; w2 = slice change
+
+     rs. w2     h2.    ;    save(slice change);
+     sl  w2     0      ;    if new size = old size  or  area must be extended
+     ds. w1     h1.    ;      then save(current slice, next slice);
+
+     jl.        n0.    ;    next instruction;
+
+g4:                    ; non-area:
+     al  w2     0      ;    slice change := 0;
+     jl.        g2.    ;    goto after count;
+
+h0:  0                 ; abs addr of current slice
+h1:  0                 ; abs addr of next slice
+h2:  0                 ; slice change
+h3:  0                 ; abs address of last slice in chaintable
+h4:  0                 ; abs addr of min slice
+
+
+
+; adjust chain to size
+;
+;   the chain of entry.work is extended or cut down, as
+;     decided by the previous function
+;
+;   if the area must be extended, it will preferably be extended
+;     with slices adjacent to the last slice, otherwise preferably
+;     as a contiguous area.
+;
+; call: (m22 must have been called prior to this function)
+;       m23
+
+m23:                   ; adjust chain:
+     rl. w3     d4.    ;    w3 := curdoc;
+     bz  w0  x3+f66    ;    last slice := last slice number.curdoc;
+     wa  w0     6      ;    abs last slice addr := last slice + curdoc;
+     rs. w0     h3.    ;
+
+     dl. w2     h2.    ;    w1 := abs addr of next slice;
+                       ;    w2 := remaining := slice change;
+     sn  w2     0      ;    if slice change = 0 then
+     jl.        n0.    ;      next instruction;
+
+g5:                    ; next portion:
+     sl  w2     1      ;    if remaining >= 1 then
+     jl.        g8.    ;      goto extend area;
+
+; chain is now ok or too long
+; w1 = abs addr of next slice, i.e. first slice to release
+; w2 = remaining
+; h0 = abs addr of last slice link, i.e. end of chain
+
+     sn  w2     0      ;    if remaining = 0 then
+     jl.        g7.    ;      goto set end of chain;
+
+; the old chain was longer than is has to be now, so release the
+;   superflouos chain-elements
+     al  w0    -2048   ;    w0 := free element;
+g6:  al  w3  x1        ;
+     ba  w1  x1        ;    release rest of chain
+     hs  w0  x3        ;
+     se  w1  x3        ;      until end of chain;
+     jl.        g6.    ;
+
+g7:                    ; set end of chain:
+     al  w0     0      ;
+     hs. w0    (h0.)   ;    last link := end of chain;
+     jl.        n0.    ;    next instruction;
+
+g8:                    ; extend area:
+
+; the area was too short
+;   try to extend the area with adjacent slices
+; w1 = abs addr of last used slice
+; w2 = remaining
+
+     sn. w1    (d4.)   ;    if old size = 0 then
+     jl.        g9.    ;      goto new area;
+
+     sn. w1    (h3.)   ;    if abs addr of last used slice =
+     jl.        g15.   ;      addr of last slice in chaintable then
+                       ;      goto get a slice;
+     bl  w0  x1+1      ;
+     se  w0    -2048   ;    if adjacent slice is occupied then
+     jl.        g15.   ;      goto get a slice;
+
+; the slice was free and may therefore be used for extending the area
+     al  w0     1      ;    slice link(last used slice) := 1;
+     hs  w0  x1        ;
+     al  w1  x1+1      ;    increase(addr of last used slice);
+g17:                   ; occupy byte:
+; w1 = new slice
+; w2 = remaining
+     al  w0     0      ;
+     hs  w0  x1        ;    slicechain (new slice) := 0; i.e. end of chain;
+     rs. w1     h4.    ;    min slice := new slice;
+     rs. w1     h0.    ;    addr of curr slice := addr of last used slice;
+     al  w2  x2-1      ;    decrease(remaining);
+     jl.        g5.    ;    goto next portion;
+; notice that end of chain will be set later
+
+
+g9:                    ; new area:
+; try to find a contigouos hole that fits the remaining number
+;   of slices
+
+     rl. w1     d4.    ;    slice := first slice of chaintable;
+; notice: the first slice of chaintable will never be allocated
+
+g10:                   ; get start of free area:
+     al  w2  x1+1      ;    w2 := free := next slice;
+     al  w3     0      ;    w3 := free size := 0;
+g11:                   ; test next slice:
+     sl. w1    (h3.)   ;    if slice = last slice of chaintable then
+     jl.        g13.   ;      goto take first free;
+     al  w1  x1+1      ;    increase(slice);
+     bl  w0  x1        ;
+     se  w0    -2048   ;    if slice <> free then
+     jl.        g10.   ;      goto get start of free area;
+     al  w3  x3+1      ;    increase(free size);
+     se. w3    (h2.)   ;    if free size < remaining then
+     jl.        g11.   ;      goto test next slice;
+
+; a hole of the sufficient size is found
+
+g12:                   ; connect slice to area:
+; w2 = abs addr of start of new slice
+; h0 = abs addr of last slice link  (maybe = first slice.work)
+; h1 = abs addr of previous slice   (maybe = chaintable start)
+     al  w1  x2        ;    curr slice := new slice;
+     ws. w2     h1.    ;    slicelink := addr of new slice - addr of previous;
+     hs. w2    (h0.)   ;    link(last slice) := slicelink;
+     rl. w2     h2.    ;    remaining := remaining - 1;
+     jl.        g17.   ;    goto occupy byte;
+
+g15:                   ; get a slice:
+; w1 = abs addr of last used slice
+; w2 = remaining
+
+     ds. w2     h2.    ;    save (last used, remaining);
+
+; it was not possible to get a contigouos area.
+; therefor just take the first free slice, and try once more
+; w1 = abs addr of last slice in chaintable
+g13:                   ; take first free:
+     rl. w2     h4.    ;    free := minslice;
+g14:                   ; test next:
+     sl. w2    (h3.)   ;    if free is the last slice of chaintable then
+     jl.        g16.   ;      goto test from first of chaintable;
+     al  w2  x2+1      ;    increase (free);
+     bl  w0  x2        ;
+     se  w0    -2048   ;    if slice(free) is not free then
+     jl.        g14.   ;      goto test next;
+     jl.        g12.   ;    goto connect slice to area;
+
+; it was not possible to find a slice between minslice and
+;   last of chaintable.
+; now try between first and last of chaintable
+g16:                   ; test from first of chaintable:
+     rl. w2     d4.    ;
+     rx. w2     h4.    ;    minslice := first of chaintable;
+     se. w2    (h4.)   ;    if not already tried from first of chaintable then
+     jl.        g13.   ;      goto take first free;
+
+; it was not even possible to find a single slice in the chaintable
+     jl.        j7.    ;    alarm;
+
+
+
+; if area extended then <function>
+;
+; call: (m23 must have been called prior to this function)
+;       m24, <instruction>
+; error return: skip action, if area was not extended
+
+m24:                   ; if area extended then:
+     rl. w0     h2.    ;    w0 := slice change;
+     sh  w0     0      ;    if slice change <= 0 then
+     jl.        n1.    ;      skip
+     jl.        n0.    ;    else next instruction;
+
+e.                     ;
+
+
+; stepping stones:
+jl. e5.  , e5  = k-2
+jl. e7.  , e7  = k-2
+jl. e8.  , e8  = k-2
+jl. e9.  , e9  = k-2
+jl. e10. , e10 = k-2
+jl. e14. , e14 = k-2
+jl. e22. , e22 = k-2
+
+
+
+; record work:
+; (format as a catalog entry)
+d1:  0, r. f0>1        ;
+
+; define v-names for compensating for the one-pass assembler
+v1 = d1 + f1
+v2 = d1 + f2
+v3 = d1 + f3
+v4 = d1 + f4
+v5 = d1 + f5
+v6 = d1 + f6
+v7 = d1 + f7
+v11= d1 + f11
+
+v13 = d1 + f5 + 2
+v14 = d1 + f5 + 6
+v15 = d1 + f5 + 7
+
+v26 = d1 + f66 + f0
+v27 = d1 + f67 + f0
+
+
+
+; common variables:
+d16: 0, r.8           ; answer area
+c. 4 * (:a110+1:)+d16.-1;   and
+     0, r. 2*(:a110+1:)+d16.>1;  claim change array  (set bs claims)
+z.                    ;
+d4:  0                ; curdoc:  address of current document (chaintable)
+d5:  d9               ; maincat pseudochain
+
+
+
+; the functions m25-m30 all have a common
+;   call-sequence and error-return actions:
+;
+; call:  w2 = slices
+;        m<number>, <claims exceeded addr>
+; error return: goto-action 1, if claims exceeded
+
+b. g20, h10 w.
+
+h0:  0                 ; entry-change
+h1:  0                 ; slice-change
+h2:  0                 ; maincat claim addr
+h3:  0                 ; auxcat  claim addr
+h4:  0, r. a109        ; pseudo maincat claim
+
+m25:                   ; prepare bs:
+     al  w1     0      ;    entries := 0;
+     al  w0     a110   ;    newkey := max catalog key;
+     jl.        g0.    ;    goto init pseudo claims;
+
+m26:                   ; create aux entry:
+     al  w1     1      ;    entries := 1;
+     al  w0    -f51-1  ;
+     la. w0     d1.+f3 ;    newkey := key.work;
+
+g0:                    ; init pseudo claims:
+     al  w3    -1      ;    oldkey := -1;
+     ds. w2     h1.    ;    save (entries, slices);
+
+     hs. w1     h4.    ;    save entries
+       r. a109         ;      in whole pseudo maincat entry claim;
+     al. w1     h4.    ;    maincat claim addr := pseudo claim;
+     jl.        g3.    ;    goto get auxcat claim addr;
+
+m27:                   ; permanent entry:
+; w2 = negative number of slices to claim
+     ac  w2  x2        ;    w2 := number of slices to claim;
+     al  w1     1      ;    entries := 1;
+     rl. w3     d10.   ;    oldkey := saved old key;
+     al  w0    -f51-1  ;
+     la. w0     d1.+f3 ;    newkey := key.work;
+     sl  w0  x3        ;    if newkey >= oldkey then
+     jl.        g2.    ;      goto get maincat claim addr;
+; the rest of the algorithm supposes an ascending key-change.
+; in order to do this the entry- and slice-claims are negated
+     ac  w2  x2        ;    slices  := - slices;
+     ac  w1  x1        ;    entries := - entries
+     rx  w3     0      ;    exchange keys;
+     jl.        g2.    ;    goto get maincat claim addr;
+
+m28:                   ; remove entry:
+; (as in permanent entry, the claims must be negated)
+; (w2 is already negative number of slices to claim)
+     am        -1-0    ;    entries := -1;
+m29:                   ; change entry:
+     am         0-1    ;    entries := 0;
+m30:                   ; create entry:
+     al  w1     1      ;    entries := 1;
+     al  w0    -f51-1  ;
+     la. w0     d1.+f3 ;    newkey := key.work;
+     al  w3    -1      ;    oldkey := -1;
+
+g2:                    ; get maincat claim addr:
+     ds. w2     h1.    ;    save (entries, slices);
+     rl  w1     b25    ;    w1 := maincat docaddr;
+     rl  w1  x1+f60    ;    w1 :=  rel claim addr.maindoc;
+     wa. w1     d2.    ;    w1 := abs addr of maincat claim in sender descr;
+
+g3:                    ; get auxcat claim addr:
+; w0 = newkey
+; w1 = maincat claim addr
+; w3 = oldkey   ( <= newkey )
+     rl. w2     d4.    ;
+     rl  w2  x2+f60    ;
+     wa. w2     d2.    ;    w2 := abs addr of auxcat claim in sender descr;
+
+     ds. w2     h3.    ;    save (maincat claim addr, auxcat claim addr);
+
+     ld  w0     1      ;    oldkey := oldkey * 2;
+     hs. w0     h5.    ;    newkey := newkey * 2;
+
+     al  w2  x3        ;    current key := oldkey;
+     jl.        g11.   ;    goto test key;
+
+g10:                   ; next claim:
+; w2 = current key  :   even = test entry-claim
+;                       odd  = test slice-claim
+; w3 = second scan  :   oldkey      == false
+;                       max key + 1 == true
+
+; the claims are scanned twice:
+;      first  time the claims are just tested for claims exceeded
+;      second time the claims are changed
+
+     al  w1  x2        ;    claim addr := current key
+     so  w2     2.1    ;      + if slice-claim
+     sl  w2     a109*2-2;       or current key >= minimum aux key then
+     am         h3-h2  ;          auxcat claim addr
+     wa. w1     h2.    ;        else maincat claim addr;
+
+     bz  w0  x1+2      ;    w0 := current claim(claim addr);
+     sz  w2     2.1    ;    rest := current claim
+     am         h1-h0  ;          - if slice claim then slices
+     ws. w0     h0.    ;                           else entries;
+
+     sh  w0    -1      ;    if rest < 0 then
+     jl.        n5.    ;      goto claims exceeded;
+
+     sn  w3     a110+1 ;    if second scan then
+     hs  w0  x1+2      ;      current claim(claim addr) := rest;
+
+     al  w2  x2+1      ;    increase(current key);
+
+g11:                   ; test key:
+h5 = k+1
+     se  w2 ; newkey*2 ;    if current key <> newkey then
+     jl.        g10.   ;      goto next claim;
+
+     al  w2  x3        ;    current key := oldkey;
+     al  w3     a110+1 ;    oldkey := second scan := true;
+     se  w2  x3        ;    if second pass not done yet then
+     jl.        g11.   ;      goto test key;
+
+; all claims in the interval oldkey-newkey have been tested and
+;   changed, without having claims exceeded
+
+     jl.        n1.    ;    skip
+
+e.                     ;
+
+
+
+; prepare maincat entry
+;
+;   the permanens key.work is set to the minimum of key.entry and
+;     min aux cat key - 1.
+;   slices to claim is set to zero
+;
+; call: w2 = entry address
+;       m31
+; exit: w2 = slices = 0
+
+m31:                   ; prepare maincat entry:
+     al  w0    -f51-1  ;
+     la  w0  x2+f3     ;    w0 := permkey.entry;
+     sl  w0     a109   ;    if permkey >= min aux key then
+     al  w0     a109-1 ;      permkey := min aux key - 1;
+     hs. w0     d1.+f3 ;    key.work := permkey;
+     al  w2     0      ;    w2 := slices to claim := 0;
+     jl.        n0.    ;    next instruction;
+
+
+; set bs claims
+;
+;   it is tested that the claims can be subtracted from
+;     the parent and added to the childs claims
+;   the claims are given to the child
+;
+;   notice:  the claims-change may be positive or negative
+;
+; call: m32
+; error return: result 1, if claims exceeded
+;               result 3, if process does not exist
+;               result 3, if process is not an internal process
+;               result 3, if process is not a child of calling process
+
+b. g10, h10 w.
+
+m32:                   ; set bs claims:
+     jl. w3     e17.   ;    first proc;
+     je. w3     e75.   ;    move bs-params from sender to claim-array;
+     al. w2     d16.   ;    w2 := claim array;
+     rl. w3     d4.    ;    w3 := curdoc;
+
+g0:                    ; convert next key:
+     al  w0     0      ;
+     se  w3    (b25)   ;    if curdoc = maincat docaddr
+     sl. w2     d16.+a109*4;  or key >= min aux key then
+     rl  w0  x2        ;      keep (entrychange.key)
+     rs  w0  x2        ;    else entrychange.key := 0;
+
+     rl  w0  x2+2      ;    w0w1 := signed segmentchange.key;
+     ad  w1    -24     ;
+     wd  w1  x3+f64    ;    slices := segments // slicelength.curdoc
+     sl  w0     1      ;
+     al  w1  x1+1      ;            + sign (remainder);
+     sh  w0    -1      ;
+     al  w1  x1-1      ;
+     rs  w1  x2+2      ;    save in claim-array;
+
+     al  w2  x2+4      ;    increase key;
+     sh. w2     d16.+4*a110;   if not all keys converted then
+     jl.        g0.    ;      goto convert next key;
+
+     rs. w2     d1.    ;    second pass := false;
+
+g5:                    ; next pass:
+     rl. w1     d2.    ;    w1 := sender;
+     rl. w2     d14.   ;    w2 := child;
+
+     wa  w1  x3+f60    ;    w1 := claimaddr.sender (curdoc);
+     wa  w2  x3+f60    ;    w2 := claimaddr.child  (curdoc);
+
+     al. w3     d16.   ;    w3 := start of claim-array;  ( = key 0 )
+
+g8:                    ; next key:
+; first test that the parent won't have claims exceeded
+     bz  w0  x1        ;    remainder := claim(key).sender
+     ws  w0  x3        ;               - claimchange(key);
+     sh  w0    -1      ;    if remainder < 0 then
+     jl.        j1.    ;      goto result 1;  (i.e. claims exceeded at sender)
+     sl. w3    (d1.)   ;    if second pass then
+     hs  w0  x1        ;      claim(key).sender := remainder;
+
+; parent claims was ok (till now)
+; test child claims
+
+     bz  w0  x2        ;    newclaim := claim(key).child
+     wa  w0  x3        ;              + claimchange(key);
+     sh  w0    -1      ;    if newclaim < 0 then
+     jl.        j1.    ;      goto result 1;  (i.e. claims excceded at child)
+     sl. w3    (d1.)   ;    if second pass then
+     hs  w0  x2        ;      claim(key).child := newclaim;
+
+; child-claims was also ok
+; try next key
+
+     al  w1  x1+1      ;    increase (sender claimaddr);
+     al  w2  x2+1      ;    increase (child  claimaddr);
+     al  w3  x3+2      ;    increase (key);
+
+     sh. w3     d16.+4*a110+3;   if not all keys tested then
+     jl.        g8.    ;      goto next key;
+
+; all keys have been tested (or updated)
+
+     al. w3     d16.-2 ;
+     sn. w3    (d1.)   ;    if second pass then
+     jl.        j0.    ;      goto result ok;
+
+     rs. w3     d1.    ;    second pass := true;
+     rl. w3     d4.    ;    w3 := curdoc;
+     jl.        g5.    ;    goto next pass;
+
+e.                     ;
+
+
+; if not bs-device then goto <not bs>
+;
+;   the kind of the process description of curproc is tested to
+;     find out whether or not it is a bs-device
+;
+; call: m34, <not bs addr>
+; error return: goto-action 1, if not bs-device;
+
+m34:                   ; check bs-device:
+     rl. w2    (d11.)  ;    proc := nametable (cur proc name table address);
+
+     rl  w1  x2+a10    ;    w1 := kind.proc;
+
+     se  w1     84     ;    if kind = rcnet subprocess then
+     sn  w1     85     ;
+     bz  w1  x2+a63    ;      kind := subkind.proc;
+
+     se  w1     6      ;    if kind = drum
+     sn  w1     62     ;    or kind = disc then
+     jl.        n1.    ;      skip;
+
+     jl.        n5.    ;    goto <not bs>;
+
+
+
+; search any chains (allowed state)
+;
+;   finds a document on which the sender has enough claims
+;     to create the entry described in entry.work
+;
+; call: m35, <allowed states>
+; error return: result 2, if document not found
+;               result 2, if state.document not allowed
+;               result 4, if no documents with enough claims
+;               result 6, if document nameformat illegal
+; return: curdoc is defined
+
+b. g10, h10 w.
+
+m35:                   ; search any chains:
+     rl. w0     d1.+f7 ;    w0 := size.work;
+     rl. w2     d1.+f11;    w2 := docname(0).work;
+
+     sl  w0     0      ;    if size < 0
+     sz  w2    -1<1    ;    or docname(0) is neither 0 nor 1 then
+     jl.        m36.   ;      goto search chain;
+
+     jl. w3     n10.   ;    w0 := allowed state := param;
+     hs. w0     h0.    ;
+
+     ls  w2     1      ;    w2 := first drum rel  or  first disc rel;
+
+g0:                    ; next device kind:
+     rl  w2  x2+b22    ;    w2 := first drum (or disc) chain entry in
+                       ;            name table;
+     jl.        g5.    ;    goto test end of bs-devices;
+                       ;    (only relevant if devicekind = disc)
+
+g1:                    ; test chain state:
+     rl  w3  x2        ;    doc := name table(entry);
+     bl  w1  x3+f68    ;    w1 := state.doc;
+h0 = k+1
+     al  w0 ; allowed state;
+     sh  w0 (x3+f61)   ;    if docname.doc = 0
+     so  w0  x1        ;    or state.doc not allowed then
+     jl.        g2.    ;      goto next chain;
+     rl  w1  x3+f60    ;
+     wa. w1     d2.    ;    w1 := abs addr of claims in sender descr;
+; just test slice-claim, because it is irrellevant to test entry-claim
+     bz  w1  x1+1      ;    w1 := slice claim(key 0);
+     wm  w1  x3+f64    ;    segments := slices * slicelength;
+     sl. w1    (d1.+f7);    if segments >= size.work then
+     jl.        g10.   ;      goto document found;
+
+g2:                    ; next chain:
+     al  w2  x2+2      ;    increase(entry);
+g5:                    ; test end:
+     se  w2    (b24)   ;    if entry <> top of chain list then
+     jl.        g1.    ;      goto test chain state;
+
+     al  w2     0      ;    device kind := drum;
+     rx. w2     d1.+f11;
+     se  w2     0      ;    if old device kind <> drum then
+     jl.        g0.    ;      goto next device kind;
+
+; all drums have been tested for slice-claims
+;   and all discs have been tested (maybe even twice) for slice-claims
+;   but no documents had enough claims
+     jl.        j4.    ;    goto result 4;  (claims exceeded)
+
+g10:                   ; document found:
+     rs. w3     d4.    ;    curdoc := doc;
+     al. w1     d1.+f11;
+     al  w2  x3+f61    ;    move docname.curdoc to docname.work;
+     jl. w3     e32.   ;
+     jl.        n0.    ;    next instruction;
+
+e.                     ;
+
+
+
+; procedure search chain (allowed state)
+;
+; searches the chaintables for a document with docname = docname.work
+;
+; call: m36, <allowed states>
+; error return: result 2, if document not found
+;               result 2, if state.document not allowed
+;               result 6, if document nameformat illegal
+; return: curdoc is defined
+
+b. g10 w.
+
+m36:                   ; search chain:
+     rl. w0     d1.+f7 ;
+     sl  w0     0      ;    if size.work >= 0 then
+     jl.        g1.    ;      goto area;
+
+     jl. w3     e15.   ;    compute document address;
+     jl.        g5.    ;    goto test state;
+
+g1:                    ; area:
+     jl. w3     e45.   ;    find chain (docname.work);
+       d1+f11          ;
+     jl.        g10.   ;+4:  not found:  goto test document name;
+                       ;+6:  found:
+
+g5:                    ; test state:
+     rs. w2     d4.    ;    curdoc := doc;
+     jl. w3     n10.   ;    w0 := allowed states := param;
+     bl  w1  x2+f68    ;    if state.curdoc is not allowed then
+     so  w0  x1        ;
+     jl.        j2.    ;      goto result 2;
+
+     jl.        n0.    ;    next instruction;
+
+g10:                   ; test document name:
+     al. w1     d1.+f5 ;
+     al  w2  x1+f11-f5 ;    move docname.work to name.work;
+     jl. w3     e32.   ;
+     jl. w3     e24.   ;    test format;
+     jl.        j2.    ;    goto result 2;
+j2 = k-2               ; (stepping stone)
+
+e.                     ;
+
+
+
+; set chainstate
+;
+;   the state of curdoc chain is set
+;
+; call: m37, <new state>
+
+m37:                   ; set chainstate:
+     jl. w3     n10.   ;    w0 := new state := param;
+     rl. w2     d4.    ;    w2 := curdoc;
+     hs  w0  x2+f68    ;    state.curdoc := new state;
+     jl.        n0.    ;    next instruction;
+
+
+
+; find empty chain and prepare
+;
+;   the kind is tested, whether it is a fast or slow device (drum/disc)
+;   the size of the chaintable is tested against the corresponding
+;     maximum size
+;   an empty chain is found, and all the chain-link are cleared
+;     (i.e. set to free)
+;   the chainhead is copied (except first word of docname)
+;   it is tested that the size of the catalog wont give too large
+;     entry-claim
+;   all claims on the device are given to the sender, while all other
+;     internal processes will have their claims cleared
+;
+; call: m38
+; error return: result 5: illegal kind (neither fast not slow device)
+;               result 5: too many slices
+;               result 5: catalog too big, i.e. too many entries
+;               result 7: no chains idle
+
+b. g20, h10 w.
+
+m38:                   ; find empty chain and prepare:
+     bz. w2     d1.+f53+f0; w2 := chain kind.chainhead;
+     ls  w2    -3      ;
+     sl  w2     2      ;    if illegal kind then
+     jl.        j5.    ;      goto result 5;
+; kind = 0 :  fast device, i.e. drum
+; kind = 1 :  slow device, i.e. disc
+
+     ls  w2     1      ;
+     bz. w0     d1.+f66+f0; if last slice.chainhead
+     sl. w0 (x2+h0.)   ;      >= chainsize(kind) then
+     jl.        j5.    ;      goto result 5;
+
+; find an empty chain of the specified kind
+; an empty chain is characterized by having first word of docname = 0
+     dl  w3  x2+b22+2  ;    w3 := top  entry;
+     al  w2  x2-2      ;    w2 := base entry;
+     al  w0     0      ;    (empty docname)
+g0:                    ; next chain:
+     al  w2  x2+2      ;    increase(entry);
+     sn  w2  x3        ;    if all chains(kind) are tested
+     jl.        j7.    ;      goto result 7;  (i.e. no chains idle)
+
+     rl  w1  x2        ;    doc := chain(entry);
+     se  w0 (x1+f61)   ;    if first word of docname.doc <> 0 then
+     jl.        g0.    ;      goto next chain;
+
+; a chaintable was found: clear all chainlinks
+     rs. w1     d4.    ;    curdoc := doc;
+     bz. w2     d1.+f66+f0;
+     wa  w2     2      ;    w2 := abs addr of last slice of curdoc chaintable;
+     al  w0    -2048   ;    w0 := free slice;
+g2:                    ; clear next slice:
+     hs  w0  x2        ;
+     al  w2  x2-1      ;    clear all slices in chain table
+     sl  w2  x1        ;      (notice: there is at least one slice)
+     jl.        g2.    ;
+
+; w1 = curdoc
+     jl.        g5.    ;    goto init chainhead;
+
+h0:  a114 + f60        ; size of fast-chains (i.e. drums)
+     a116 + f60        ; size of slow-chains (i.e. discs)
+
+
+
+d2:  0                 ; sender:  process description address of sender
+d11: 0                 ; cur proc name table address
+d13: 0                 ; children bits
+d14: 0         ; d13+2 ; address of a process description
+d15: 0         ; d13+4 ; end chain
+
+
+
+; set maincat and prepare
+;
+;   maincat docaddr is set to curdoc
+;   the pseudo-chainhead for main catalog is initialized
+;   the size of main catalog is tested for too large entry-claim
+;   all maincat entry-claims are given to sender, while all other
+;     internal processes will have their maincat entry-claims cleared
+;
+; call: m39
+; error return: result 5: catalog size illegal (i.e. too many entries)
+
+m39:                   ; set maincat and prepare:
+     rl. w1     d4.    ;
+     rs  w1     b25    ;    maincat docaddr := curdoc;
+
+     rl. w1     d5.    ;    w1 := pseudo chaintable;
+
+g5:                    ; init chainhead:
+; w1 = chaintable (or maincatalog pseudo chaintable)
+     rs. w1     h1.    ;    save(chaintable addr);
+     al  w1  x1-f0     ;
+     al. w2     d1.    ;    move chainhead from work to chaintable;
+     jl. w3     e33.   ;
+
+     rl. w1     h1.    ;    (docname.chain must stay cleared until
+     al  w0     0      ;    all checking is ended, because this is the
+     se. w1    (d5.)   ;
+     rs  w0  x1+f61    ;    way to characterize an empty chain)
+
+     rs  w0  x1+f70    ;    catalog name table addr := 0;
+
+; compute number of entries in the catalog and compare this to
+;   the maximum possible claim
+     al  w0     f10    ;
+     wm  w0  x1+f57    ;    if number of entries.catalog
+     ld  w0     12     ;      exceeds 12 bit then
+     se  w3     0      ;
+     jl.        j5.    ;      goto result 5;  (i.e. too many entries)
+
+     bz  w3  x1+f66    ;    slices := last slice number + 1;
+     al  w3  x3+1      ;
+     hl  w0     7      ;    maxclaim := entries < 12 + slices;
+
+g8:                    ; prepare claims:
+; w0 = max claims
+     rs. w0     h2.    ;
+
+; initialize claims for all internal processes:
+
+     rl  w2     b6     ;    w2 := first internal in nametable;
+                       ;      (there is at least one, namely sender itself)
+
+g10:                   ; next internal:
+     rl  w3  x2        ;    proc := nametable(entry);
+     sn. w3    (d2.)   ;    claim :=
+     am.       (h2.)   ;      if proc = sender then maxclaim
+     al  w0     0      ;                       else 0;
+
+     rl. w1     d4.    ;    w1 := curdoc;
+     wa  w3  x1+f60    ;    claim addr := proc + claimrel.curdoc;
+     se. w1    (h1.)   ;    if chain <> curdoc then
+     jl.        g15.   ;      goto init maincat entry-claim;
+
+     al  w1  x3        ;
+g11:                   ; init next key:
+     hs  w0  x3+1      ;    init slice-claim from claim;
+     sl  w3  x1+a109*2 ;    if key >= min aux key then
+     rs  w0  x3+1      ;      init entry-claim and slice-claim;
+     al  w3  x3+2      ;    increase(key);
+     sh  w3  x1+a110*2 ;    if key <= max cat key then
+     jl.        g11.   ;      goto init next key;
+
+g12:                   ; test more internals:
+     al  w2  x2+2      ;    increase(entry);
+     se  w2    (b7)    ;    if entry < last internal in nametable then
+     jl.        g10.   ;      goto next internal;
+
+; all internals have had their claims initialized
+     jl.        n0.    ;    next instruction
+
+g15:                   ; init maincat entry-claim:
+     al  w1  x3        ;
+     ls  w0    -12     ;    ( w0 := entries )
+g16:                   ; init next maincat key:
+     hs  w0  x3        ;    init entry-claim(key);
+     al  w3  x3+2      ;    increase(key);
+     sh  w3  x1+a109*2-1;   if key < min aux key then
+     jl.        g16.   ;      goto init next maincat key;
+
+     jl.        g12.   ;    goto test more internals;
+
+h1:  0                 ; chaintable to be initialized
+h2:  0                 ; maxclaim ( = entries, slices)
+
+
+; stepping stones:
+am  e17-e18 , e17 = k-2
+am  e18-e19 , e18 = k-2
+am  e19-e20 , e19 = k-2
+am  e20-e26 , e20 = k-2
+am  e26-e31 , e26 = k-2
+jl. e31. , e31 = k-2
+jl. e32. , e32 = k-2
+jl. e33. , e33 = k-2
+jl. e43. , e43 = k-2
+jl. e44. , e44 = k-2
+jl. e47. , e47 = k-2
+jl. e60. , e60 = k-2
+jl. e74. , e74 = k-2
+jl. e76. , e76 = k-2
+
+
+
+; terminate update of new chainhead
+;
+;   the chaintable and the disc-process are linked, and the slicelength
+;     is inserted in the process-description of the disc
+;   first word of docname.chaintable is initialized, thus indicating
+;     that the chain is no longer empty.
+;   procfunc itself is inserted as user and reserver of the disc-process
+;
+; call: m40
+
+m40:                   ; terminate update of new chainhead:
+     rl. w1     d4.    ;    w1 := curdoc;
+     rl. w2     d11.   ;    w2 := cur proc name table address;
+     rs  w2  x1+f62    ;    set document name table address;
+
+     rl. w0     d1.+f61+f0;
+     rs  w0  x1+f61    ;    first word of docname.chainhead := docname.work;
+; now the chaintable-head is completely initialized
+; (except state, which still is undefined)
+
+     rl  w3  x2        ;    proc := disc process description;
+
+     rl  w2  x1+f64    ;    slicelength.proc := slicelength;
+     ds  w2  x3+a72    ;    chaintable .proc := curdoc;
+
+     am        (b1)    ;    idbit := idbit.procfunc;
+     rl  w0    +a14    ;
+     rs  w0  x3+a52    ;    reserver.proc := procfunc;
+     lo  w0  x3+a53    ;    include procfunc as user of proc;
+     rs  w0  x3+a53    ;
+
+     jl.        n0.    ;    next instruction;
+
+
+
+; terminate use of chain and disc
+;
+;   **************************************************
+;   *                                                *
+;   * notice that the following is executed disabled *
+;   *                                                *
+;   **************************************************
+;
+;   the first word of docname.curdoc is cleared, thus indicating
+;     that the chain is empty
+;   removes the links between disc-process and chaintable
+;   removes the name of disc-proc
+;   excludes procfunc as user and reserver of disc-proc
+;   all internal processes will have their claims cleared
+;
+; call: m41
+
+m41:                   ; terminate use of chain and disc:
+     rl. w1     d4.    ;    w1 := curdoc;
+     rs. w1     h1.    ;    save (chaintable address);
+     jd.        2      ;    disable;
+     al  w2     0      ;
+     rs  w2  x1+f61    ;    first word of docname.curdoc := 0;
+
+     rx  w2  x1+f62    ;    document name table addr := 0;
+
+     rl  w2  x2        ;    proc := disc-process;
+
+     rl  w1     b1     ;    exclude procfunc as user of the process;
+     rl  w0  x2+a53    ;
+     ws  w0  x1+a14    ;    (it was already user)
+     rs  w0  x2+a53    ;
+
+     ld  w1    -100    ;
+     rs  w0  x2+a11    ;    name(0).proc := 0;
+                       ;    (this will prevent further use of disc-proc)
+     rs  w0  x2+a52    ;    reserver.proc := 0;
+
+     ds  w1  x2+a72    ;    chaintable.proc := slicelength.proc := 0;
+
+; w0 = 0  ( = max claims )
+     je.        g8.    ;    enable, goto prepare claims;
+
+e.                     ;
+
+
+
+; clean catalog
+;
+;   clears all segments in the current catalog (which must be maincat)
+;
+; call: m42
+; error return: result 2, if catalog io-error
+
+b. g10, h10 w.
+
+m42:                   ; clean catalog:
+     jl. w3     e7.    ;   (terminate update);
+; w2 = start of catalog buffer
+     al  w0    -1      ;    
+     al  w1  x2+f9     ;
+g1:                    ; clear next word of catalog buffer:
+     rs  w0  x2        ;
+     al  w2  x2+2      ;    set all words of catalog buffer to -1
+     se  w2  x1        ;      thus indicating all entries are free;
+     jl.        g1.    ;
+
+     al  w0     0      ;    entry count.catbuffer := 0;
+     rs  w0  x2        ;
+
+                       ;    segment number := 0;
+
+g2:                    ; next segment:
+     rs. w0    (h0.)   ;    save (segment number);
+     jl. w3     e9.    ;    prepare update;
+     jl. w3     e7.    ;    terminate update;  i.e. write the catalog buffer
+; w1 = segment number
+     al  w0  x1+1      ;    increase (segment number);
+     ws. w1    (h1.)   ;
+     se  w1    -1      ;    if segment number <> size of curcat then
+     jl.        g2.    ;      goto next segment;
+
+; now all catalog segments have been cleared
+     jl.        n0.    ;    next instruction
+
+h0:  d8 + f36          ; address of segment number in cat-message
+h1:  c0                ; address of size of curcat
+
+e.                     ;
+
+
+
+; check idle bs-device or still same name
+;
+;   if the disc-process has a link to a chaintable (i.e. chain.disc <> 0)
+;     the new name must correspond with docname.chain
+;     (used after intervention on a disc).
+;   otherwise there are no further limitations on the new process-name.
+;
+; call: m43, <idle bs addr>
+; error return: result 3, if chain.proc <> 0 and newname <> docname.chain.proc
+;               result 6, if newname(0) = 0
+;               goto-action 1, if chain.proc = 0
+
+m43:                   ; check idle bs-device or test still same name:
+     rl. w2    (d11.)  ;
+     rl  w2  x2+a71    ;    chain := chain.curproc;
+     sn  w2     0      ;    if chain = 0 then
+     jl.        n5.    ;      goto <idle bs-device>
+
+     rs. w2     d4.    ;    curdoc := chain;
+
+; test that name.work = docname.chain
+;  (e.g. find chain with docname = name.work and test same chain)
+
+     jl. w3     e45.   ;    find chain (name.work);
+       d1+f5           ;
+     jl.        j3.    ;+4:  not found:  result 3;  (not same name at all)
+                       ;+6:  found:
+     sn. w2    (d4.)   ;    if chain = curdoc then
+     jl.        n1.    ;      skip;  (i.e. name.chain = name.work)
+
+     jl.        j3.    ;    result 3;  (not same name)
+j3 = k-2               ; (stepping stone)
+
+
+
+; search best area process
+;
+; call: m45, <not found addr>
+; error return: goto-action 1, if area process not found
+
+m45:                   ; search best area process:
+     jl. w3     e47.   ;    search best process
+       b5              ;      between first area process
+       b6              ;      and     top   area process;
+     jl.        n5.    ;+6: not found: goto <not found>
+
+; w2 = area- (or pseudo-) process
+     rl  w0  x2+a10    ;    w0 := kind.proc;
+     sn  w0     f38    ;    if kind.proc = area process then
+     jl.        n1.    ;      skip;
+
+     jl.        n5.    ;    goto <not area>;
+
+
+
+; setup area process
+;
+;   if the area process already exists, the specified process
+;     is included as user (in case it has resources)
+;   otherwise the area-claim of the process is tested,
+;     and an empty area process is initialized according to entry.work
+;
+; call: (entry.work contains the entry)
+;       m46, <process code>    (code = 0 : procfunc, code = 2 : sender)
+;
+; error return: result 1, if area claims exceeded
+; return: cur proc name table address corresponds to the area process
+;         the specified process is included as user of the area process
+
+b. g10, h10 w.
+
+m46:                   ; setup area process:
+     jl. w3     n10.   ;    w0 := process code := param;
+     am        (0)     ;
+     rl. w1    (h0.)   ;    internal := proctable (process code);
+     rs. w1     h1.    ;
+
+     jl. w3     e47.   ;    search best area process;
+       b5              ;
+       b6              ;
+     jl.        g1.    ;+6:   not found: goto test area claim;
+
+; an area process was found, but was it the rigth one, i.e how about the base
+; w0w1 = base.proc
+     sn. w0    (d1.+f1);    if base.proc <> base.work then
+     se. w1    (d1.+f2);
+     jl.        g1.    ;      goto test area claim;
+
+; it was the correct area proces
+     jl.        g5.    ;    goto include;
+
+g1:                    ; test area claim:
+     rl. w1     h1.    ;
+     bz  w0  x1+a20    ;    if area claim.internal = 0 then
+     sn  w0     0      ;
+     jl.        j1.    ;      goto result 1;  i.e. claims exceeded
+
+; the internal process has the claim of at least one area process,
+;   i.e. at least one empty area process exist.
+; find that one and initialize it.
+     jl. w3     e44.   ;    find empty area process;
+       b5              ;
+     jl. w3     g10.   ;    init area(enabled);
+
+; an area process exists now, corresponding to entry.work
+g5:                    ; include:
+     rl. w2     h1.    ;    w2 := internal;
+     rl. w3    (d11.)  ;    w3 := area process;
+
+     rl  w1  x3+a53    ;    w1 := users.area process;
+     sz  w1 (x2+a14)   ;    if internal is already user then
+     jl.        n0.    ;      next instruction;
+                       ;      (only when it existed at start)
+
+     al  w0    -1      ;
+     ba  w0  x2+a20    ;
+     sn  w0    -1      ;    if area claim.sender = 0 then
+     jl.        j1.    ;      goto result 1;  i.e. claims exceeded
+j1 = k-2               ; (stepping stone)
+
+     hs  w0  x2+a20    ;    decrease (area claim.sender);
+     lo  w1  x2+a14    ;    include internal as user of area process;
+     rs  w1  x3+a53    ;
+
+     jl.        n0.    ;    next instruction
+
+
+
+; subprocedure init area
+;
+;   initializes the area process from information given in entry.work
+;
+; an empty    area process may  be initialized enabled
+; an existing  -      -    must  -      -      disabled
+;
+; call: w3 = link
+
+g10:                   ; procedure init area:
+     rs. w3     h2.    ;    save (return);
+     al. w2     d1.    ;    move from: entry.work
+     rl. w3    (d11.)  ;         to:   area process   the following:
+
+     al  w0     f38    ;
+     rs  w0  x3+a10    ;      kind ( = area process)
+
+     dl  w1  x2+f11+2  ;
+     ds  w1  x3+a62+2  ;      docname
+     dl  w1  x2+f11+6  ;
+     ds  w1  x3+a62+6  ;
+
+     bz  w0  x2+f4     ;
+     rs  w0  x3+a60    ;      first slice
+
+     rl  w0  x2+f7     ;
+     rs  w0  x3+a61    ;      size
+
+     dl  w1  x2+f2     ;
+     ds  w1  x3+a49    ;      base
+
+; notice: name(0) is moved last
+     dl  w1  x2+f5+6   ;
+     ds  w1  x3+a11+6  ;      name
+     dl  w1  x2+f5+2   ;
+     ds  w1  x3+a11+2  ;
+
+     jl.       (h2.)   ;    return;
+
+h0:  b1                ; process table: param = 0 : procfunc
+d20: d2                ;                param = 2 : sender
+
+h1:  0                 ; internal
+h2:  0                 ; return from init area
+
+
+
+; include in area process
+;
+;   the internal process, specified in the parameter is included
+;     as user of the area process
+;
+; call: m47, <process code>
+; error return: result 1, if area claims exceeded
+
+m47:                   ; include in area process:
+     jl. w3     n10.   ;    w0 := process code := param;
+     am        (0)     ;
+     rl. w1    (h0.)   ;    internal := proctable (process code);
+     rs. w1     h1.    ;
+     jl.        g5.    ;    goto include;
+
+
+
+; if area process then reinit area process
+;
+;   it is tested, that an area process was found earlier.
+;   in this case it will be re-initialized from the current entry.work
+;
+; call: m48
+
+m48:                   ; reinit area process:
+     rl. w2     d11.   ;    if cur proc name table address
+     sl  w2    (b5)    ;      does not outpoint an area process then
+     sl  w2    (b6)    ;
+     jl.        n0.    ;      next instruction;
+
+     jd. w3     g10.   ;    init area process disabled;
+
+     je.        n0.    ;    enable
+                       ;    next instruction
+
+e.                     ;
+
+
+
+; make sender to reserver of area process
+;
+; call: m49
+
+m49:                   ; make sender reserver:
+     rl. w1     d2.    ;    w1 := sender;
+     rl. w2    (d11.)  ;    w2 := area process;
+     rl  w0  x1+a14    ;    w0 := idbit.sender;
+     rs  w0  x2+a52    ;    reserver.areaproc := sender;
+
+     jl.        n0.    ;    next instruction
+n0 = k-2               ; (stepping stone)
+
+
+
+; if area process then delete area process
+;
+;   the first word of name.proc is cleared, indicating an empty areaprocess.
+;   reserver.proc and users.proc are cleared.
+;   all internal processes who were users of the area process will have
+;     their area-claim increased.
+;
+; call: m50
+
+b. g10 w.
+
+m50:                   ; if areaprocess then delete area process:
+     rl. w2     d11.   ;    w2 := name table address of possible area process;
+     sl  w2    (b5)    ;    if not an area process then
+     sl  w2    (b6)    ;
+     jl.        n0.    ;      next instruction
+
+     rl  w3  x2        ;    proc := area process;
+
+; notice: all the remove is performed enabled:
+     ld  w2    -100    ;
+     rl  w0  x3+a53    ;    current users := users.proc;
+     ds  w2  x3+a53    ;    clear:  reserver.proc, users.proc
+     rs  w2  x3+a11    ;            name(0)
+     rs  w2  x3+a50    ;            docaddr
+
+; scan all internal processes and maybe increase their area-claim
+     rl  w2     b6     ;    w2 := first internal in name table;
+g1:                    ; next internal:
+     rl  w3  x2+0      ;    proc := nametable(entry);
+     al  w1     1      ;
+     ba  w1  x3+a20    ;
+     sz  w0 (x3+a14)   ;    if proc was user of area process then
+     hs  w1  x3+a20    ;      increase (area claim.proc);
+     al  w2  x2+2      ;
+     se  w2    (b7)    ;    if not all internal processes tested then
+     jl.        g1.    ;      goto next internal;
+
+     jl.        n0.    ;    next instruction
+
+e.                     ;
+
+
+
+; find empty entry
+;
+;   the current catalog is searched for an empty catalog entry
+;
+; call: m55, <no room addr>
+; error return: result 2, if catalog io-error
+;               goto-action 1, if no empty entries were found
+
+m55:                   ; find empty entry:
+     jl. w3     e10.   ;    search free entry;
+     jl.        n5.    ;+2:  no room: goto <no room>
+     jl.        n1.    ;    skip
+
+
+
+; modify cur entry
+;
+;   the entry, previously found by ..find empty entry.. or some other
+;     search-routines is modified by the current contents of work.
+;
+; call: m56
+; error return: result 2, if catalog io-error
+
+m56:                   ; modify cur entry:
+     jl.       (2), e12;    set cur entry and return;
+
+
+
+; delete cur entry
+;
+;   the entry, previously found by some search-routines, is deleted
+;
+; call: m57
+; error return: result 2, if catalog io-error
+
+m57:                   ; delete cur entry:
+     jl.       (2), e13;    delete cur entry and return;
+
+
+
+; set aux entry
+;
+;   if the entry does not exist already in the auxcat, it will be
+;     created.
+;   finally entry.work is moved to that entry
+;
+; call: m58, <overlap or no room addr>
+; error return: result 2, if catalog io-error
+;               goto-action 1, if entry could not be created
+;                                (i.e. overlapping intervals or no room)
+
+m58:                   ; set aux entry:
+     al. w3     p0.    ;
+     jl.        n20.   ;    call(set aux);
+
+
+
+; delete aux entry
+;
+;   if the entry exists in the aux catalog, it will be removed
+;     (if it does'nt exist nothing will be deleted)
+;
+; call: m59
+; error return: result 2, if catalog io-error
+
+m59:                   ; delete aux entry:
+     al. w3     p1.    ;
+     jl.        n20.   ;    call(delete aux);
+
+
+
+; set base and name
+;
+;   base.work and name.work are taken from catbase.sender and w3-name.sender
+;
+; call: m65
+
+m65:                   ; set base and name:
+     rl. w1  d2.       ;   w1:=sender;
+     dl  w1  x1+a43    ;
+     ds. w1     d1.+f2 ;    base.work := catbase.sender;
+     jl. w3     e90.   ;    move name.sender to name.work;
+     jl.        n0.    ;    next instruction
+
+
+
+; docname.work := docname.chain
+;
+; call: m66
+
+m66:                   ; init docname.work from docname.curdoc:
+     am         f61-f55;    namerel := docname rel;
+
+; name.work := name.chain
+;
+; call: m67
+
+m67:                   ; init name.work from name.curdoc:
+     al  w2     f55    ;    namerel := name rel;
+     al. w1  x2+d1.+f0 ;    to-addr := work + namerel;
+     wa. w2     d4.    ;    from-addr := curdoc + namerel;
+     jl.        e32.   ;    move name
+                       ;      and return;
+
+
+
+; name.work := name.pseudochain ( = main catalog name )
+;
+; call: m68
+
+m68:                   ; init name.work from maincat name:
+     al. w1     d1.+f5 ;
+     rl. w2     d5.    ;
+     al  w2  x2+f55    ;    move name.pseudochain to name.work;
+     jl.        e32.   ;      (and return)
+
+
+
+; base.work := interval for catalogs
+;
+; call: m70
+
+m70:                   ; init base.work from catalog interval:
+     dl  w1     b45    ;
+     ds. w1     d1.+f2 ;    base.work := catalog interval;
+     jl.        n0.    ;    next instruction
+
+
+
+; test new base ( = w0w1.sender )
+;
+;   the new base must be either:
+;               1. equal to stdbase (or maxbase)
+;           or  2. inside stdbase
+;           or  3. between stdbase and maxbase
+;
+; call: m71
+; error return: result 4, if illegal new base
+; return:  w0w1 = new base
+
+b. g10 w.
+
+m71:                   ; test new base:
+     rl. w2     d2.    ;    w2 := sender;
+
+     dl  w1  x2+a29    ;    newbase := w0w1.sender;
+
+     sh  w1 (x2+a44-0) ;    if newupper > maxupper
+     sl  w0  x1+1      ;    or newlower > newupper then
+     jl.        j4.    ;      goto result 4;
+                       ;      (i.e. not inside maxbase or illegal base)
+
+     sl  w0 (x2+a45-2) ;    if newlower < stdlower then
+     jl.        g5.    ;      begin  <* test between stdbase and maxbase *>
+     al  w3  x1+1      ;      (trick)
+     sl  w0 (x2+a44-2) ;      if newlower < maxlower <* outside maxbase *>
+     sh  w3 (x2+a45-0) ;      or newupper < stdupper <* embraces stdlower *>
+     jl.        j4.    ;        then goto result 4;
+
+; at this point: maxlower <= newlower <  stdlower
+;                stdupper <= newupper <= maxupper
+     jl.        n0.    ;      next instruction
+
+g5:                    ;      end;
+
+; at this point: stdlower <= newlower
+;                            newupper <= maxupper
+
+     se  w0 (x2+a45-2) ;    if newlower = stdlower <* irrellevant newupper *>
+     sh  w1 (x2+a45-0) ;    or newupper <= stdupper <* inside stdbase *>
+     jl.        n0.    ;      then next instruction;
+
+; this time the following was allowed:
+;                stdlower = newlower <= newupper <= maxupper
+;            or  stdlower < newlower <= newupper <= stdupper
+
+     jl.        j4.    ;    goto result 4;
+j4 = k-2               ; (stepping stone)
+
+e.                     ;
+
+
+
+; save oldbase, base.work := w0w1.sender
+;
+; call: w0w1 = newbase
+;       m72, <same base addr>
+;
+; error return: goto-action 1, if newbase = oldbase
+
+b. g10, h10 w.
+
+m72:                   ; save oldbase:
+     dl. w3     d1.+f2 ;
+     ds. w3     h1.    ;    save (base.work);
+
+     ds. w1     d1.+f2 ;    base.work := newbase;
+
+     sn  w0  x2        ;    if newbase <> oldbase then
+     se  w1  x3        ;
+     jl.        n1.    ;      skip;
+
+     jl.        n5.    ;    goto <same base>;
+
+h0:  0                 ; old lower base
+h1:  0                 ; old upper base
+
+
+
+; restore old base
+;
+; call: m73
+
+m73:                   ; restore old base:
+     dl. w1     h1.    ;
+     ds. w1     d1.+f2 ;    base.work := oldbase;
+     jl.        n0.    ;    next instruction;
+
+e.                     ;
+
+
+
+; set catbase of internal
+;
+;   if first word of name.w3.sender = 0, the catbase of sender is set
+;     otherwise name must outpoint a child of sender:
+;       catbase.child := newbase
+;
+; call: w0w1 = newbase
+;       w2   = sender
+;       m74
+;
+; error return: result 2, if state.child <> waiting for start by parent
+;               result 3, if internal not found
+;               result 3, if internal not child
+;               result 6, if nameformat illegal
+; return: is always enabled
+
+b. g10 w.
+
+m74:                   ; set catbase of internal:
+     rl. w3     d1.+f5 ;    if name(0) = 0 then
+     sn  w3     0      ;      goto set base;
+     jl.        g5.    ;      (i.e. own process)
+
+     jl. w3     e17.   ;    first proc;
+; w1 = sender, w3 = child
+c.-1
+     bz  w0  x3+a13    ;    if state.child
+     se  w0     f47    ;          <> waiting for start by parent then
+     je.        j2.    ;      enabled goto result 2;
+z.
+     dl  w1  x1+a29    ;    w0w1 := newbase.sender;
+     al  w2  x3        ;    internal := child;
+
+g5:                    ; set base:
+; w0w1 = newbase
+; w2   = internal
+     ds  w1  x2+a43    ;    catbase.internal := newbase;
+     je.        n0.    ;    enable (if after check of child)
+                       ;    next instruction;
+
+e.                     ;
+
+
+
+; test base.work, key.work
+;
+;   the consistency of base and key is checked:
+;     if key < min global key then base must be inside stdbase
+;
+; call: m75, <error addr>
+; error return: goto-action 1, if base,key inconsistent
+
+m75:                   ; test base and key:
+     al  w0    -f51-1  ;
+     la. w0     d1.+f3 ;    key := key.work;
+     sl  w0     a111   ;    if key >= min global key then
+     jl.        n1.    ;      skip;
+
+     rl. w2     d2.    ;    w2 := sender;
+     dl. w1     d1.+f2 ;    w0w1 := base.work;
+     al  w1  x1-1      ;    (codetrick)
+
+     sl  w0 (x2+a45-2) ;    if base.work is outside stdbase.sender then
+     sl  w1 (x2+a45-0) ;
+     jl.        n5.    ;      goto <error>;
+
+     jl.        n1.    ;    skip;
+
+
+
+; test auxkey, interval
+;
+;   tests that:  min aux key <= key.work <= max cat key
+;     and that base.work is legal and not outside catalog interval
+;
+;   notice: it is thus allowed to make any kind of intervals,
+;           independant of maxbase.sender and stdbase.sender
+;
+; call: m76
+; error return: result 5, if key.work not a legal aux-key
+;               result 5, if base.work illegal
+
+m76:                   ; test auxkey and interval:
+     al  w0    -f51-1  ;
+     la. w0     d1.+f3 ;    key := key.work;
+     sl  w0     a109   ;    if key < min aux key
+     sl  w0     a110+1 ;    or key > max cat key then
+     jl.        j5.    ;      goto result 5;
+
+     dl. w2     d1.+f2 ;    w1w2 := base.work;
+
+     sl  w1    (b45-2) ;    if lower base < minimum
+     sl  w1  x2+1      ;    or lower base > upper base
+     jl.        j5.    ;
+
+     sh  w2    (b45)   ;    or upper base > maximum then
+     jl.        n0.    ;      goto result 5;
+     jl.        j5.    ;    next instruction;
+j5 = k-2               ; (stepping stone)
+
+
+
+; if key.work < min aux key then goto ...
+;
+; call: m77, <not aux key>
+; error return: goto-action 1, if key < min aux key
+
+m77:                   ; test aux key:
+     al  w0    -f51-1  ;
+     la. w0     d1.+f3 ;    key := key.work;
+     sl  w0     a109   ;    if key >= min aux key then
+     jl.        n1.    ;      skip;
+
+     jl.        n5.    ;    goto <not aux key>;
+
+
+
+; save oldkey and test newkey
+;
+;   old key is saved
+;   the new key must obey:  0 <= new key <= max cat key
+;   key.work := new key;
+;
+; call: m78
+; error return: result 4, if newkey illegal
+
+b. g10 w.
+
+m78:                   ; save oldkey and test newkey:
+     al  w0    -f51-1  ;
+     la. w0     d1.+f3 ;    key := key.work;
+     rs. w0     d10.   ;    oldkey := key;
+
+     rl. w1     d2.    ;    w1 := sender;
+     rl  w0  x1+a29    ;    newkey := w1.sender;
+     sl  w0     0      ;    if new key illegal then
+     sl  w0     a110+1 ;
+     jl.        j4.    ;      goto result 4;
+
+g0:                    ; set key.work:
+; w0 = key
+     al  w1     f51    ;
+     la. w1     d1.+f3 ;    (leave first slice and namekey unchanged)
+     wa  w1     0      ;
+     rs. w1     d1.+f3 ;    key.work := key;
+
+     jl.        n0.    ;    next instruction;
+
+d10: 0                 ; oldkey
+
+
+
+; restore oldkey
+;
+;   key.work := oldkey
+;
+; call: m79
+
+m79:                   ; restore oldkey:
+     am.       (d10.)  ;    key := oldkey;
+
+
+
+; key.work := 0
+;
+; call: m80
+
+m80:                   ; clear key.work:
+     al  w0     0      ;    key := 0;
+     jl.        g0.    ;    goto set key.work;
+
+e.                     ;
+
+
+
+; size.work := name table addr of area process
+;
+; call: m83
+
+m83:                   ; set name table addr:
+     am.       (d11.)  ;    size.work := cur proc name table addr;
+
+
+
+; size.work := 0
+;
+; call: m84
+
+m84:                   ; clear size.work:
+     al  w0     0      ;    size.work := 0;
+     rs. w0     d1.+f7 ;
+     jl.        n0.    ;    next instruction;
+
+
+
+; search bs-process and check reserved by sender
+;
+;   the document, specified in docname.work must be a bs-device,
+;     i.e. it must have base.proc = catalog interval.
+;   it must be reserved by sender, because this will ensure, that
+;     the document not already exists in the bs-system (otherwise
+;     it would have been reserved by procfunc)
+;   notice: chainhead.work is destroyed, but reinitialized
+;
+; call: m85, <not exist or not reserved addr>
+; error return: result 6, if document nameformat illegal
+;               goto-action 1, if not reserved bs-device
+; return: cur proc name table addr is defined (i.e. the bs-device)
+
+m85:                   ; check reserved bs-device:
+     al. w1     d1.+f5 ;
+     al  w2  x1+f11-f5 ;    move docname.work to name.work;
+     jl. w3     e32.   ;
+
+     jl. w3     e24.   ;    test format;
+     jl. w3     e47.   ;    search best process in device-part of name table;
+       b4              ; (first device in name table)
+       b5              ; (top   device in name table)
+     jl.        n5.    ;+6:   not found: goto <not exist>
+
+; w0w1 = base.proc, w2 = proc
+     sn  w0    (b45-2) ;    if base.proc <> catalog interval then
+     se  w1    (b45-0) ;
+     jl.        n5.    ;      goto <not bs interval>;
+
+     rl. w1     d2.    ;    w1 := sender;
+     rl  w0  x2+a52    ;    w0 := reserver.proc;
+     se  w0 (x1+a14)   ;    if sender is not reserver then
+     jl.        n5.    ;      goto <not reserver>;
+
+; (move chainhead.sender to work, because name.work was destroyed above)
+
+
+
+; move chainhead.sender to work, if catsize <= 0 then goto <illegal catsize>
+;
+;   (the catalog must have at least one catalog segment)
+;
+; call: m86, <illegal catsize addr>
+; error return: goto-action 1, if catsize illegal
+
+m86:                   ; move chainhead to work, test catsize:
+     jl. w3     e92.   ;    move chainhead.sender to work;
+
+
+
+; if size <= 0 then goto <illegal catsize>
+;
+; call: m87, <illegal catsize addr>
+; error return: goto-action 1, if size <= 0
+
+m87:                   ; test positive size:
+     am         1-0    ;    minimum size := 1;
+
+
+
+; if size < 0 then goto <file descriptor>
+;
+; call: m88, <file descr addr>
+; error return: goto-action 1, if size < 0
+
+m88:                   ; test size not negative:
+     al  w0     0      ;    minimum size := 0;
+     sh. w0    (d1.+f7);    if size.work >= minimum size then
+     jl.        n1.    ;      skip;
+n1 = k-2               ; (stepping stone)
+     jl.        n5.    ;    goto <illegal size  or  file descr>;
+n5 = k-2               ; (stepping stone)
+
+
+
+; move tail and test new size
+;
+;   if the old entry was a file-descriptor, it must still stay so
+;   if the old entry was an area          , it must still stay so
+;   (i.e. the sign of size.work may not change)
+;
+; call: m89
+; error return: result 6, if illegal size-change
+
+b. h10 w.
+
+m89:                   ; move tail and test new size:
+     rl. w0     d1.+f7 ;
+     rs. w0     h0.    ;    old size := size.work;
+
+     jl. w3     m105.  ;    move tail.sender to tail.work;
+
+     rl. w0     d1.+f7 ;    if sign (newsize)
+     lx. w0     h0.    ;     = sign (oldsize) then
+     sl  w0     0      ;
+     jl.        n0.    ;      next instruction;
+
+     jl.        j6.    ;    goto result 6;  (i.e. illegal size-change)
+
+h0:  0                 ; old size
+
+e.                     ;
+
+
+
+; slice.work := 0
+;
+; call: m90
+
+m90:                   ; clear first slice.work:
+     al  w0     0      ;
+     hs. w0     d1.+f4 ;    first slice.work := 0;
+     jl.        n0.    ;    next instruction;
+
+
+
+; compute docnumber
+;
+;   first slice.work := docnumber of curdoc
+;   if old firstslice was neither 0 nor docnumber then error
+;
+; call: m91
+; exit: w2 = unchanged
+; error return: result 5, if illegal document-change
+
+b. h10 w.
+
+m91:                   ; compute docnumber:
+     rl. w1     d4.    ;    w1 := curdoc;
+     rl  w1  x1+f60    ;    docnumber := (claimsrel.curdoc
+     al  w1  x1-a46    ;               - start of claimrel)
+     al  w0     0      ;               / number of keys;
+     wd. w1     h0.    ;
+     al  w1  x1-2048   ;
+     bl. w0     d1.+f4 ;    oldnumber := first slice.work;
+     hs. w1     d1.+f4 ;    first slice.work := docnumber + auxcat-mark;
+
+     se  w0     0      ;    if only in maincat
+     sn  w0  x1        ;    or still in same auxcat then
+     jl.        n0.    ;      next instruction;
+
+     jl.        j5.    ;    goto result 5;  (i.e. illegal document-change)
+
+h0:  a110 + 1          ; number of keys ( = max cat key + 1 )
+
+e.                     ;
+
+
+
+
+; the following set of routines all perform the different moves
+;   between sender and procfunc:
+;
+; they all have a common call- and return-sequence:
+;
+; call: m<number>
+
+m100:am         e90-e95; move name.sender to name.work;
+m101:am         e95-e96; move name.work   to name.sender;
+m102:am         e96-e70; move name.work + nametable address to name etc.sender
+m103:am         e70-e85; move newname.sender to/name.work;
+m104:am         e85-e72; move docname.sender to docname.work;
+m105:am         e72-e80; move tail.sender to tail.work;
+m106:am         e80-e73; move tail.work   to tial.sender;
+m107:am         e73-e81; move entry.sender to entry.work;
+m108:am         e81-e92; move entry.work   to entry.sender;
+m109:am         e92-e24; move chainhead.sender to entry.work;
+     jl.        e24.   ;
+
+
+
+; check any area processes
+;
+;   all area processes are scanned, and it is tested that no internal
+;     processes (except procfunc itself) are users of area processes
+;     belonging to curdoc. (of course procfunc has a single one, the
+;     auxcat area process).
+;   notice that pseudo processes share the same area, but no process
+;     can be user of a pseudo process
+;
+; call: m115
+; error return: result 5, if any processes has area processes on curdoc
+
+b. g10 w.
+
+m115:                  ; check area processes:
+     rl  w2     b5     ;
+     al  w2  x2-2      ;    w2 := entry := base of area processes in nametable
+g1:                    ; next area:
+     al  w0     0      ;    ( no users )
+g2:                    ;
+     al  w2  x2+2      ;    increase(entry);
+     sn  w2    (b6)    ;    if all area processes tested then
+     jl.        n0.    ;      next instruction;
+
+     rl  w1  x2        ;    proc := nametable(entry);
+     sn  w0 (x1+a53)   ;    if users.proc = 0 then
+     jl.        g2.    ;      goto next area;
+
+; an area process was found in use.
+; first test whether it is a file-descriptor-process or an area-process
+
+     rl  w3  x1+a61    ;    w3 := size.proc;
+     sh  w3    -1      ;    if size < 0 then
+     jl.        g3.    ;      goto file-descriptor;
+
+; it was an area: test the document-name
+     rl. w3     d4.    ;    w3 := curdoc;
+     dl  w0  x3+f61+2  ;
+     sn  w3 (x1+a62+0) ;    if docname.proc <> docname.curdoc then
+     se  w0 (x1+a62+2) ;
+     jl.        g1.    ;      goto next area;
+     rl. w3     d4.    ;
+     dl  w0  x3+f61+6  ;
+     sn  w3 (x1+a62+4) ;
+     se  w0 (x1+a62+6) ;
+     jl.        g1.    ;
+
+; the documentname corresponded to docname.curdoc.
+; procfunc is the only one allowed at this point
+
+     rl  w3     b1     ;
+     rl  w0  x3+a14    ;    w0 := idbit.procfunc;
+     sn  w0 (x1+a53)   ;    if users.proc = procfunc then
+     jl.        g1.    ;      goto next area;
+
+     jl.        j5.    ;    goto result 5;  (i.e. other users)
+
+g3:                    ; file-descriptor:
+     rl  w3  x1+a60    ;    w3 := first slice.proc;
+     sn  w3     0      ;    if first slice = 0 then
+     jl.        g2.    ;      goto next area;  (i.e. maincat entry)
+
+     am        (b22)   ;    if docnumber (entry) <> docnumber (curdoc) then
+     rl  w3  x3-2048   ;
+     se. w3    (d4.)   ;
+     jl.        g2.    ;      goto next area;
+
+     jl.        j5.    ;    goto result 5;  (i.e. entry in auxcat.curdoc)
+
+e.                     ;
+
+
+
+; prepare catalog scan
+;
+; call: m116
+
+m116:                  ; prepare catscan:
+     al  w0     0      ;
+     rl. w2     d4.    ;
+     hs  w0  x2+f69    ;    curkey.curdoc := 0;
+     jl.        n0.    ;    next instruction;
+
+
+
+; test more catalog segments
+;
+;   curkey is increased, and compared to size.maincat.
+;   if more segments then goto ...
+;
+; call: m117, <more segments addr>
+; error return: goto-action 1, if more segments in main catalog
+
+m117:                  ; test more catalog segments:
+     rl. w2     d4.    ;
+     al  w0     1      ;
+     ba  w0  x2+f69    ;    increase (curkey.curdoc);
+     hs  w0  x2+f69    ;
+
+     rl. w2     d5.    ;
+     se  w0 (x2+f57)   ;   if curkey <> number of segments in maincat then
+     jl.        n5.    ;      goto <more segments>;
+     jl.        n1.    ;    skip;
+
+
+
+; for all curkey.curdoc entries do
+;
+;   all entries, with key.entry = curkey, in main catalog are scanned
+;   when all entries are examined then goto <no more>, else continue
+;
+; call: m118, <no more addr>
+;       w2 = entry
+;       ...
+;       <actions for entries with key.entry = curkey>
+;       ...
+;       m119
+;
+; error return: result 2, if catalog io-error
+;               goto-action 1, when no more entries to examine
+
+b. g10, h10 w.
+
+m118:                  ; for all curkey entries do:
+     al  w0     0      ;
+     rs. w0     h0.    ;    entry-change := 0;
+
+     rl. w2     d4.    ;    w2 := curdoc;
+     bz  w2  x2+f69    ;    key := curkey.curdoc;
+     jl. w3     e14.   ;    for all key entries do
+     jl.        n5.    ;+2:  no more: goto <no more>;
+
+; w2 = entry
+; w3 = continue search
+     rs. w2     h1.    ;    save (entry);
+     am         n25-n35;    call (second instruction);
+n25 = k-2              ; (stepping stone)
+
+
+
+; endfor
+;
+;   continues with the previous for-procedure
+;
+; call: m119
+
+m119:                  ; endfor:
+     am         n35-e14;    goto return;
+     jl.        e14.   ;
+
+
+
+; multi-delete entry
+;
+;   the current entry is deleted, and entrycount is prepared for later update
+;
+; call: w3 = return
+;       m120
+; exit: w2 = entry address
+
+m120:                  ; multi-delete entry:
+     rl. w2     h1.    ;    restore (entry);
+     al  w0    -1      ;
+     rs  w0  x2+f4     ;    first word.entry := -1;
+     wa. w0     h0.    ;
+     rs. w0     h0.    ;    decrease (entry count change);
+     jl.        e9.    ;    prepare update
+                       ;      and return;
+
+
+
+; update entry-count
+;
+;   in case any entries have been multi-deleted then the key-segment
+;     will have its entry-count updated
+;
+; call: m121
+; error return: result 2, if catalog io-error
+
+m121:                  ; update entry-count:
+     rl. w0     h0.    ;
+     sn  w0     0      ;    if entry-count change = 0 then
+     jl.        n0.    ;      next instruction;
+
+     rl. w2     d4.    ;
+     bz  w2  x2+f69    ;    segment := curkey.curdoc;
+     jl. w3     e5.    ;    get catalog segment;
+
+; w2 = start of catalog buffer
+     rl. w0     h0.    ;    change entry count and prepare update;
+     jl. w3     e8.    ;
+
+     jl.        n0.    ;    next instruction;
+
+h0 = d13               ; entry-count change
+h1 = d14               ; entry
+
+e.                     ;
+
+
+
+; check entry on document
+;
+;   tests whether the current entry belongs to curdoc
+;
+; call: w2 = entry
+;       m122, <not on doc addr>
+; error return: goto-action 1, if entry does not belong to curdoc
+
+b. g10 w.
+
+m122:                  ; check entry on document:
+     rl. w3     d4.    ;    w3 := curdoc;
+     rl  w0  x2+f7     ;
+     sh  w0    -1      ;    if size.entry < 0 then
+     jl.        g2.    ;      goto file-descriptor;
+
+     dl  w1  x2+f11+2  ;
+     sn  w0 (x3+f61+0) ;    if docname.entry <> docname.curdoc then
+     se  w1 (x3+f61+2) ;
+     jl.        n5.    ;      goto <not on document>;
+     dl  w1  x2+f11+6  ;
+     sn  w0 (x3+f61+4) ;
+     se  w1 (x3+f61+6) ;
+     jl.        n5.    ;
+
+     jl.        n1.    ;    skip;
+
+g2:                    ; file-descriptor:
+     bz  w1  x2+f4     ;    w1 := first slice.entry;
+     sn  w1     0      ;    if either maincat-entry
+     jl.        n5.    ;
+     am        (b22)   ;    or docnumber.entry <> docnumber.curdoc then
+     se  w3 (x1-2048)  ;
+     jl.        n5.    ;      goto <not on document>;
+
+     jl.        n1.    ;    skip;
+
+e.                     ;
+
+
+
+; for all existing chaintables do
+;
+;   all chaintables, including maincat-pseudochain, are scanned.
+;   when all tables are tested, then goto <no more>, else continue
+;
+; call: m123, <no more addr>
+;       work = chainhead
+;       w2 = work
+;       ...
+;       <actions for chaintable>
+;       ...
+;       m119
+;
+; error return: goto-action 1, when no more chaintables
+
+b. g10, h10 w.
+
+m123:                  ; for all existing chaintables do:
+     rl  w1     b22    ;
+     al  w1  x1-2      ;    cur chain entry := base of chains in name table;
+
+     rl. w2     d5.    ;    chain := maincat pseudo chain;
+
+g1:                    ; exit with chain:
+     rs. w1     h0.    ;    save (cur chain entry);
+     al  w2  x2-f0     ;
+     al. w1     d1.    ;    move chainhead.chain to work;
+     jl. w3     e33.   ;
+
+     al. w2     d1.    ;    w2 := work;
+     jl. w3     n25.   ;    call (second instruction);
+
+; when action m119 has been executed, then proceed here:
+
+     rl. w1     h0.    ;    restore (cur chain entry);
+g2:                    ; next chain:
+     al  w1  x1+2      ;    increase (cur chain entry);
+     sn  w1    (b24)   ;    if all chain are tested then
+     jl.        n5.    ;      goto <no more>;
+
+     rl  w2  x1        ;    chain := name table (cur chain entry);
+     rl  w3  x2+f61    ;
+     se  w3     0      ;    if docname(0).chain <> 0 then
+     jl.        g1.    ;      goto exit with chain;  i.e. chain exists
+     jl.        g2.    ;    goto next chain;  i.e. chain was idle;
+
+h0 = d13               ; cur chain entry
+
+e.                     ;
+
+
+
+; goto
+;
+; call: m125, <next address>
+
+m125:                  ; goto:
+     jl.        n5.    ;    goto <next address>;
+
+
+
+; return
+;
+; call: m126
+
+m126:                  ; return:
+     am         n30-n31;    return;
+
+
+
+; skip-return
+;
+; call: m127
+
+m127:                  ; skip-return:
+     am         n31-n33;    skip-return;
+
+
+
+; goto-return
+;
+; call: m128
+
+m128:                  ; goto-return:
+     am        -2048   ;
+     jl.        n33.+2048;    goto-return;
+
+
+
+; test devicenumber, user and reserver
+;
+;   it is tested that the device number is legal, and that sender
+;     is user of the device, and that no other processes are
+;     reserver
+;
+; call: m149
+; error return: result 2, if sender is not user of the device
+;               result 4, if illegal device number
+;               result 5, if device reserved by another process
+
+m149:                  ; test device,user,reserver:
+     rl. w1     d2.    ;    w1 := sender;
+     rl  w2  x1+a29    ;    devno := save w1.sender;
+
+     ls  w2     1      ;    entry := 2 * devno
+     wa  w2     b4     ;           + first device in name table;
+     sl  w2    (b4)    ;
+     sl  w2    (b5)    ;    if entry is outside device-part of nametable then
+     jl.        j4.    ;      result 4;  (illegal device number);
+
+     rs. w2     d11.   ;    cur proc name table addr := entry;
+
+     rl  w2  x2+0      ;    proc := nametable(entry);
+
+     rl  w0  x2+a53    ;    w0 := users.proc;
+     so  w0 (x1+a14)   ;    if sender is not user then
+     jl.        j2.    ;      result 2;
+j2 = k-2               ; (stepping stone)
+
+     rl  w0  x1+a14    ;    w0 := idbit.sender;
+     so  w0 (x2+a52)   ;    if reserver.proc contains bits except idbit then
+     jl.        j5.    ;      result 5;
+
+     jl.        n0.    ;    next instruction;
+
+
+
+; set name and interval
+;
+;   the curproc is initialized from base.work and name.work
+;
+;   in case of magtape stations, the state.proc is set too, indicating
+;     that the process is named
+;
+; call: m150
+
+m150:                  ; set name and interval:
+     rl. w3    (d11.)  ;    w3 := proc;
+     al. w2     d1.+f5 ;    w2 := name.work;
+     jd.        2      ;****** disable:
+
+     rl  w1  x3+a10    ;    w1 := kind.proc;
+     se  w1     84     ;    if kind = rcnet subprocess then
+     sn  w1     85     ;
+     bz  w1  x3+a63    ;      kind := subkind.proc;
+     al  w0     0      ;
+     sn  w1     60     ;    if magtape station then
+     rs  w0  x3+a70    ;      state.proc := named;
+     se  w1     18     ;
+     sn  w1     34     ;
+     rs  w0  x3+a70    ;
+
+     dl  w1  x2+f2-f5  ;    base.proc := base.work;
+     ds  w1  x3+a49    ;
+
+     al  w1  x3+a11    ;    w1 := name.proc;
+     jl. w3     e32.   ;    move name.work to name.proc;
+
+     je.        n0.    ;****** enable
+                       ;    next instruction;
+
+
+
+
+
+; create internal process
+; call: w1 = parameter address
+;       w3 = name address
+; return: w0 = 0  ok
+;              1  storage,protection or claim trouble
+;              3  name overlap
+;              6  name illegal
+; parameters:  0    first core
+;              2    last core
+;              4    buf claim, area claim
+;              6    intern claim, func mask
+;              8    prot reg, prot key
+;             10-12 max interval
+;             14-16 stand interval
+
+b.g8
+w.
+m151:                ; create internal process:
+     rl. w1  d2.     ; w1 := sender;
+     bz  w0  x1+a21  ; if internal claim.sender = 0
+     sn  w0  0       ;
+     jl.     j1.     ; then goto error 1
+     jl. w3     e76.   ;    move internal-params to work;
+     jl. w3     e44.   ;    find idle process;
+       b6              ;+2:   (from internal processes)
+     al  w1  x2+a27  ; index:= addr(ir addr.proc)
+g1:  rs  w0  x1      ; proc descr(index):= 0
+     al  w1  x1+2    ; index:= index+2
+     se  w1  x2+a4-4 ; end until index = proc descr end
+     jl.     g1.     ;
+     al. w1     d1.+f6 ;
+     dl  w0  x1+2    ;
+     la. w3  g6.     ;
+     la. w0  g6.     ;
+     ds  w0  x2+a18  ; move first and last core
+     dl  w0  x1+6    ;
+     ds  w0  x2+a21  ; move claims and function mask
+     rl  w3  x1+8    ; move protection reg and mask
+     rl. w0  c5.     ; 
+     ds  w0  x2+a26  ; move interrupt mask
+     dl  w0  x1+12   ;
+     ds  w0  x2+a44  ; move max interval
+     dl  w0  x1+16   ;
+     ds  w0  x2+a45  ; move stand interval
+     ds  w0  x2+a43  ; set catalog base
+     rl. w1  d2.     ; w1 := sender
+     dl  w0  x2+a44  ; test max base:
+     sh  w0  x3-1    ; if lower.max.proc > upper.max.proc
+     jl.     j1.     ; then goto error 1
+     bs. w0  1       ;
+     sl  w3 (x1+a44-2; if lower.max.proc < lower.max.sender
+     sl  w0 (x1+a44) ; or upper.max.proc > upper.max.sender
+     jl.     j1.     ; then goto error 1
+     dl  w0  x2+a45  ; test standard base:
+     sh  w0  x3-1    ;
+     jl.     j1.     ;
+     bs. w0  1       ;
+     sl  w3 (x1+a45-2;
+     sl  w0 (x1+a45) ;
+     jl.     j1.     ;
+     rl  w3  x1+a22  ; 
+     bz  w0  x2+a22  ; if function mask.proc
+     so  w3 (0)      ;    is not subset of mask.sender
+     jl.     j1.     ; then goto error 1
+     rl  w0  x2+a24  ;
+     sz. w0 (g5.)    ; if pk.proc > 7 or pr.proc > 255
+     jl.     j1.     ; then goto error 1
+     bz  w3  x1+a25  ;
+     sn  w3  0       ; if pk.sender <> 0
+     jl.     g2.     ; then begin
+     bz  w3  1       ;
+     ls  w0  x3+4    ;
+     al  w3  2.111   ;
+     lo  w3  x2+a24  ;
+     sl  w0  0       ; if bit(pk.proc)in:(pr.proc)<> 0
+     so  w3 (x1+a24) ; or pr.proc not subset pr.sender
+     jl.     j1.     ; then goto error 1 end
+g2:  dl  w0  x2+a18  ;
+     sl  w3 (x1+a17) ; if first core.proc < first core.sender
+     sh  w0  x3      ; or last core.proc <= first core.proc
+     jl.     j1.     ; then goto error 1
+     sh  w0 (x1+a18) ; if last core.proc > last core.sender
+     jd.     g3.     ;
+     jl.     j1.     ; then goto error 1
+g3:  rs  w3  x2+a33  ; ic.proc:=first core.proc
+     rl  w3  x2+a19  ;
+     sz. w3 (c4.)    ;
+     je.     j1.,j1=k-2;
+     bl  w3  x2+a21  ;
+     sh  w3  -1      ;
+     je.     j1.     ;
+     rl  w0  x1+a19  ; if buf claim > buf claim.sender
+     ws  w0  x2+a19  ; or area claim.proc > area claim.sender
+     ac  w3  x3+1    ; or int claim proc > int claim.sender-1
+     ba  w3  x1+a21  ; then goto error 1
+     sl  w3  0       ; 
+     sz. w0 (c4.)    ;
+     je.     j1.     ;
+     hs  w3  x1+a21  ; set internal claim.sender
+     rs  w0  x1+a19  ; set buf and area claim.sender
+     rs  w1  x2+a34  ; parent.proc:= sender
+     dl  w0  b13+2   ;
+     ds  w0  x2+a38+2; start run.proc:= time
+     al  w0  f47     ; stop count.proc:= 0
+     rs  w0  x2+a13  ; state.proc:= wait start parent
+     jl.     n0.     ; goto next instruction
+g5:  8.7400 7770     ;
+g6:  8.7777 7776     ;
+e.                   ;
+
+
+; start internal process(name);
+;   follows the process tree starting with the process given by name.work
+;   which must be a child of the sender (otherwise: error 3); if the state
+;   of the child is not waiting for start by parent nothing will be done at all.
+;   if ok then the child and all the decendants with state = waiting for
+;   for start by ancestor found by following the tree are treated as follows:
+;      the protection key is set on the whole process area, the description
+;   address of the processes are chained together via wait address with end
+;   chain holding the address of the last process.
+;   when the tree is exhausted then the chain is followed in disabled mode
+;   and each process is entered in the timer queue, its state is set to run-
+;   ning and stop count for its parent is increased by one.
+
+b.   g5                     ; begin
+w.                          ; start internal process:
+
+m152:                 ;
+     jl. w3   e17.          ;   first proc (proc addr, new state);
+
+g0:  bz  w0  x3+a13         ; treat next:  disable;
+     se  w0  x2+f41         ;   if state.proc addr = new state + no stop bit
+     jl.      g1.           ;   then begin enable;
+c.-(:a128>2a.1:)
+     bz  w0  x3+a25         ;   set pk (proc addr, pk.proc addr);
+     je. w2   e22. ; w2 link;   chain and add children;
+z.     jl. w3   e18.          ;   end;
+
+g1:  je. w3   e20.          ; next process;
+     jd.      g0.           ;   if more then goto treat next;
+; tree exhausted. now start all the processes:
+
+     rl. w3   d13.+4        ;   proc:= end chain;
+     jd       1<11+58       ;   start the whole chain; (special instruction);
+     jl.     (2), j0        ;   enabled goto ex ok;
+j0 = k-4  ; stepping stone
+
+e.                          ; end start internal process;
+
+; stop internal process (name,buf,result);
+;   follows the process tree, starting with the process given by name.
+;   work, of those processes which are not waiting for stop or already
+;   stopped.
+;      each of these processes is treated, in disabled mode, as follows:
+;   if it is in a queue then it is removed from that queue,
+;   if it is in a waiting state then the instruction counter is decreased
+;   by 2 so that the original monitor call will be repeated when it is
+;   restarted.
+;   if stop count is zero then the state is set to:  if the process is
+;   the direct child of the sender, i.e. the first process treated, then
+;   wait start by parent, else wait start by ancestor; and stop count
+;   for the parent is decreased by one, possibly stopping the parent.
+;   if stop count is not zero then state is set to wait stop by parent
+;   or wait stop by ancestor as above.
+;     when the states of all the processess involved are set, the stop count
+;   of the process given by name.work is inspected. if the count is zero, thus
+;   indicating that the processes are effectively stopped, then a normal answer
+;   (result = 1) is send to the calling process.
+
+b.   g5                   ; begin
+w.                        ; stop internal process:
+
+m153:                 ;
+     jl. w3   e17.        ;   first proc (proc addr, new state);
+     ds. w3  d16.+2        ;   save(new state,proc);
+
+; prepare the message buffer for returning the answer
+     bz  w0  x1+a19        ;   decrease(bufclaim(sender));
+     bs. w0  1             ;   (it has already been tested that
+     hs  w0  x1+a19        ;    the claim is present).
+
+     rl  w2  b8            ;   buf:= next(mess buf pool);
+     jl  w3  b35           ;   remove(buf);
+
+     ac  w0 (b1)           ;   receiver(buf):= -procfunc; i.e. let procfunc claim it.
+     ds  w1  x2+6          ;   sender(buf):= sender;
+
+     rs  w2  x1+a30        ;   save w2(sender):= buf;
+
+     rl. w3  d16.+2        ;   w3:= proc;
+     rs  w2  x3+a40        ;
+     rl. w2  d16.          ;   w2:= new state;
+
+g0:  bz  w0  x3+a13       ; treat next:  disable;
+     sz  w0   f43         ;   state.w0:= state.proc;
+     jl.      g3.         ;   if -, stopped bit (state.w0) then
+
+     hs  w2  x3+a13       ;   begin
+     rl  w2  x3+a33       ;   state.proc:= new state;
+     al  w2  x2-2         ;   if repeat bit (state.w0) then
+     sz  w0   f40         ;   ic.proc:= ic.proc - 2;
+     rs  w2  x3+a33       ;
+
+     al  w2  x3+a16       ; 
+     sz  w0   f44         ;   if out of queue bit (state.w0)
+     jd  w3   b35         ;   then remove (proc);
+     al  w3  x2-a16       ;
+
+g1:  rl  w2  x3+a12       ; loop stop:
+     sz. w2  (c7.)        ;   if stop count.proc = 0 and
+     jl.      g2.         ;   -, no stop bit (state.proc) then
+
+     al  w2  x2+f41       ;   begin
+     hs  w2  x3+a13       ;   state.proc:= state.proc + no stop bit;
+     rl  w3  x3+a34       ;   proc:= parent.proc;
+     bz  w2  x3+a12       ;   stop count.proc:=
+     al  w2  x2-1         ;   stop count.proc - 1;
+     hs  w2  x3+a12       ;   goto loop stop;
+     jl.      g1.         ;   end;
+
+g2:  jl. w3   e19.        ;   add children;
+     sn  w0   0           ;   if children bits=0
+     jl.      g4.         ;   then goto no more;
+                          ;  end;
+
+g3:  je. w3   e20.        ;   enable;  next proc (proc, newstate);
+     jd.      g0.         ;   if more then goto treat next;
+g4:  rl. w3   d16.+2      ; no more:unsave proc;
+c.-(:a128>2a.1:)
+     rl. w2   d2.         ;
+     bz  w0  x2+a25       ;
+     je. w2   e22. ; w2 link ;   set pk (proc,pk.parent);
+z.     jd.      2           ;
+     al. w1   d16.        ;   if stop count.proc = 0 then
+     rl  w2  x3+a40       ;   send answer (answ addr,
+     bz  w0  x3+a12       ;   wait addr.proc,1);
+     ac  w3  (b1)         ;
+     sn  w0    0          ; if stopcount <> 0
+     se  w3  (x2+4)       ;   or procfunc not receiver anymore
+                      ;     i.e. a driver may have used ...decrease stopcount...
+     je.      j0.         ; then goto exit ok
+     ac  w3  x3+0         ;
+     bz  w0  x3+a19       ; bufclaim.procfunc
+     bs. w0    1          ; - 1
+     hs  w0  x3+a19       ; =: bufclaim.procfunc
+     al  w0    1          ;
+     jd     1<11+22       ; send answer
+     je.      j0.         ; goto exit ok
+
+e.                        ; end stop internal process;
+
+; modify internal process (name,registers);
+;   finds the process given by name.work and checks that it is a child of
+;   the sender.  if the process is waiting for start by parent then the
+;   given values of the registers and the instruction counter are set in
+;   the process description.
+
+b.   g5                        ; begin
+w.                             ; modify internal process:
+
+m154:                 ;
+     jl. w3   e17.             ;   first proc (proc addr,new state);
+     bz  w0  x3+a13            ;   disable;
+     se  w0   f47              ;   if state.proc <> waiting for start by parent
+     je.      j2.,j2=k-2       ;   then goto enabled error2;
+
+g0:                    ;
+     je. w3     e74.   ;    ** enable and **  move registers to tail.work;
+     rl. w1     d14.   ;    w1 := child;
+     al. w2     v6.    ;    w2 := register area;
+
+     al  w0    -1<1    ;
+     la  w0  x2-a28+a33;    make child ic even;
+     rs  w0  x2-a28+a33;
+
+     sl  w0 (x1+a17)   ;    if child ic outside
+     sl  w0 (x1+a18)   ;      child process then
+     jl.        j2.    ;      goto result 2;
+
+     al  w0     12     ;
+     al  w1  x1+a28    ;
+     jl. w3     e31.   ;    move registers to child description;
+
+     jl.        j0.    ;   return ok;
+e.                             ; end modify internal process;
+
+; procedure remove area (intproc,areaproc);
+;   intproc is removed as user and as reserver of area proc.
+; call:   w1= intproc,   w3=area proc
+;         disabled call with link in w2
+
+b.   g24                      ; begin
+w.                            ; remove area:
+e25: rl  w0  x3+a53           ;   if intproc not user
+     so  w0 (x1+a14)          ;   of area proc
+     je      x2+0             ;   then enabled return;
+     ws  w0  x1+a14           ;   users.area:=users.area
+     rs  w0  x3+a53           ;   - id bit.intproc;
+     se  w0   0               ;   if users.area = 0
+     jl.     g0.              ;   then
+     rs  w0  x3+a11           ;   name(0).area:=
+     rs  w0  x3+a50           ;   docname.area:=0;
+g0:  la  w0  x3+a52           ;   if intproc is reserver
+     rs  w0  x3+a52           ;   then reservers.area:=0;
+     al  w0    1              ;   area claim.intproc:=
+     ba  w0  x1+a20           ;   area claim.intproc + 1;
+     hs  w0  x1+a20           ;   enabled return;
+     je      x2+0             ;
+e.                            ; end remove area;
+
+; remove process (name);
+;   area process: the sender is removed as user and reserver of the
+;   process, possibly removing the area process (see procedure clear
+;   area proc).
+;   peripheral process: if the sender is allowed to call the function
+;   the peripheral process is removed if it is not reserved by another 
+;   process.
+;   internal process: if the process is a child of the sender and is
+;   waiting for start by parent then
+;   1*   the protection key is reset in the process area,
+;   2*   the process is removed,
+;   3*   the process is removed from all external processes,
+;   4*   all message buffers involving the removed process are cleaned
+;        up, so that the buffers may return to the pool,
+;   5*   all console buffers involving the removed process are released.
+;   2* to 5*  is applied to all descendants of the child in  a recursive
+;   way.
+
+b.   g24                       ; begin
+w.                             ; remove process:
+
+m155:jl. w3     e47.   ;    search best process in name table;
+       b3              ; (first in name table)
+       b7              ; (top   of name table)
+     jl.        e26.   ;+6:   not found:  goto test found;
+     al  w3  x2        ;    proc := proc found;
+     al. w2   j0.              ;   return to ex ok;
+
+     rl  w0  x3+a10            ; get and examine kind:
+     rl. w1     d2.    ;    w1 := sender;
+     sn  w0   f38              ;   if kind.proc = area kind then
+     jd. w0   e25. ; w2 link   ;   remove area (sender,proc);
+     sn  w0   f37              ;   if kind.proc = internal kind then
+     je.      g1.              ;   enabled goto internal;
+     sn  w0     64     ;    if kind.proc = pseudo kind then
+     jl.        g0.    ;      goto pseudo process;
+                       ; peripheral process:
+     bl  w0  x1+a22    ;    w0 := function mask.sender;
+     so  w0     f75    ;    if function not allowed then
+     je.        j1.    ;      enabled result 1;
+     rl  w0  x1+a14            ;   if sender not user of process
+     sz  w0 (x3+a53)           ;   then enabled goto error 2;
+     jl.      4                ;
+     je.      j2.              ;
+     lo  w0  x3+a52            ;   if reserved by other then
+     se  w0 (x1+a14)           ;   enabled goto error5;
+     je.      j5.,j5=k-2       ;
+     al  w0    0               ;   name(0).proc:= 0;
+     rs  w0  x3+a11            ;   comment: now removed;
+     rs  w0  x3+a52            ;   reserved.proc:= 0;
+      jl. w2  g7.       ;   release process;
+     je.      j0.              ;   enabled goto ex ok;
+
+g0:                    ; pseudo process:
+     se  w1 (x3+a50)   ;    if sender <> mainproc.pseudo process then
+     je.        j3.    ;      goto result 3;
+
+     rs. w3     g24.   ;    save (pseudo process);
+g21:                   ; scan all:
+     rl  w1     b8+4   ;    w1 := first message buffer;
+     rl. w3     g24.   ;    w3 := pseudo process;
+     ac  w2  x3        ;    (w2 := claimed buffer)
+     jd.        g23.   ;    goto examine buffer;
+
+g22:                   ; buffer in queue:
+     rl. w2     d2.    ;    w2 := sender;
+     jl. w3     g12.   ;    clean to (buffer, sender);
+     je.        g21.   ;    goto scan all;
+
+g23:                   ; examine buffer:
+     sn  w3 (x1+4   )  ;    if receiver.buf = proc then
+     jl.        g22.   ;      goto buffer in queue;
+     sn  w2 (x1+4   )  ;    if buffer claimed by proc then
+     je.        j2.    ;      goto result 2;
+     wa  w1     b8+8   ;    buffer := next buffer in pool;
+     sh  w1    (b8+6)  ;    if not all buffers tested then
+     jl.        g23.   ;      goto examine buffer;
+
+     rl. w1     d2.    ;
+     al  w0     0      ;
+     rs  w0  x3+a11    ;    name(0).proc := 0;
+     rs  w0  x3+a50    ;    mainproc.proc := 0;
+     bz  w2  x1+a23    ;
+     al  w2  x2+1      ;    increase (pseudo claim.sender);
+     hs  w2  x1+a23    ;
+
+     je.        j0.    ;    goto result ok;
+
+g24: 0                 ; saved pseudo process  ,  work
+
+g1:                            ; internal:
+     jl. w3   e17.             ;   first proc (proc addr,--);
+     bz  w0  x3+a13            ;   if not child then goto error 3;
+     se  w0   f47              ;   if state.proc <> wait start by parent
+     je.      j2.,j2=k-2       ;   then goto error 2;
+
+g5:  jd. w3   e18.             ; link: chain and add children;
+     je. w3   e20.             ;   next proc (proc addr,--);
+     jd.      g5.              ;   if more then disabled goto link;
+
+     rl. w3   d15.             ; tree exhausted: proc:= end chain;
+
+g6:  al  w0    0  ; used       ; remove one process:
+     rs  w0  x3+a11            ;   name(0).proc:= 0;
+     ac  w2  x3+0              ;   childrenbits:= -proc;
+     ds. w3   d14.             ;   proc addr:= proc;
+
+     rl  w3   b4               ;   extproc:= first device in name table;
+g2:  rs. w3   g24.             ; examine extproc:
+     rl. w1   d14.             ;
+     rl  w3  x3+0              ;   if kind.extproc = area kind
+     rl  w0  x3+a10            ;   then disable:
+     sn  w0   64               ;   if kind.extproc = pseudoproc
+     se  w1 (x3+a50)           ;   and mainproc.extproc = proc
+     jl.      g15.             ;   then begin
+     al  w0   0                ;
+     rs  w0  x3+a11            ;   name.extproc:= 0
+     je.      g4.              ;
+g15: sn  w0   f38              ;   remove area (proc,extproc);
+     jd. w2   e25. ; w2 link   ;   enable:
+     rl  w2  x1+a14            ;   users(id bit.proc).extproc:= 0;
+     ac  w0  x2+1              ;   res(id bit,proc).extproc:= 0;
+     la  w0  x3+a53            ;
+     rs  w0  x3+a53            ;   comment: proc is removed as
+     la  w0  x3+a52            ;   user and as reserver of
+     rs  w0  x3+a52            ;   extproc;
+      rl  w0  x3+a53    ;
+      sn  w0  0         ;   if users=0 then
+      jl. w2  g7.       ;     release process;
+
+g4:  rl. w3   g24.             ;   extproc:= next proc in name table;
+     al  w3  x3+2              ;   if extproc <> first intproc
+     se  w3  (b6)              ;   then goto
+     je.      g2.              ;   examine extproc;
+
+     rl  w1   b8+4             ; examine message buffers:
+g10: jd.      2
+     dl  w3  x1+6              ;   for buf:= first mess buf
+     sh  w2   0                ;   
+     ac  w2  x2                ;
+     rl  w0  x2+a10            ;
+     sn  w0   64               ;   if receiver = pseudoproc
+     rl  w2  x2+a50            ;   then receiver:= mainproc.reciever
+                               ;   step buf size
+     sn. w2  (d13.+2)          ;   until last mess buf do
+     jl. w3   g12.             ;   begin
+                               ;   if proc = abs (receiver.buf)
+     sn. w3  (d13.+2)          ;   then clean to (buf);
+     jd.      g13.             ;   if proc = abs (sender.buf)
+g11: wa  w1   b8+8             ;   then clean from (buf);
+     sh  w1  (b8+6)            ;   end;
+     je.      g10.             ;
+     al  w0  0                 ;
+     rl. w3  d14.              ;
+     rl  w1  b5                ;   for pseudoproc:=first pseudoproc in name table
+g19: jd.     2                 ;   step 2 until
+     rl  w2  x1+0              ;   first internal in name table do
+     se  w3 (x2+a50)           ;   begin
+     jl.     g20.              ;   if proc=mainproc.proc
+     rs  w0  x2+a50            ;   then
+     bz  w2  x3+a23            ;   begin
+     al  w2  x2+1              ;   mainproc.proc:=0;
+     hs  w2  x3+a23            ;   pseudoclaims.proc:=
+g20: al  w1  x1+2              ;   pseudoclaims.proc+1;
+     se  w1 (b6)               ;   end
+     je.     g19.              ;   end
+g16: jd.      2                ; add claims: disable
+     al  w2   0                ;
+     rl. w3   d14.             ;
+     dl  w1  x3+a21            ;
+     rx  w2  x3+a34            ;   claims.parent.proc:=
+     hl. w1   g6.+1 ; note     ;   claims.parent.proc + claim.proc;
+     aa  w1  x2+a21            ;   add one to int claim.parent.proc;
+     wa. w1   c8.              ;   parent.proc:= 0;
+     ds  w1  x2+a21            ;   proc:= wait addr.proc;
+     dl  w1  x3+a36+2         ;   runtime(parent):=
+     aa  w1  x2+a36+2         ;     runtime(parent) +
+     ds  w1  x2+a36+2         ;     runtime(child);
+     al  w1  x3+a46            ; claims child
+     al  w2  x2+a46            ; claims parent
+g17: rl  w0  x2                ; claims parant(i)
+     wa  w0  x1                ; + claims child(i)
+     rs  w0  x2                ; =:claims parent(i)
+     al  w1  x1+2              ;
+     al  w2  x2+2              ; i:= i+1
+     se  w1  x3+a4-4           ; if i<procdescr end
+     jl.      g17.             ; then goto repeat
+     rl  w3  x3+f26            ;   if proc <> 0 then enabled
+     se  w3    0               ;   goto remove one process else
+     je.      g6.              ;   enabled goto ex ok;
+     je.      j0.              ;  
+                               ; end remove process;
+
+c4:  3<22 + 3<10              ; used to test claims
+c5:  a89                      ; initial interrupt mask
+c7:  -1<12 + f41              ; used by stop internal
+c8:  1<12 + 0                 ;
+
+; release process.
+; this procedure releases an external process if it is of
+; type remote subprocess (monitor kind=85).
+;        call:         return:
+; w0                   destroyed
+; w1                   destroyed
+; w2     link          destroyed
+; w3     proc          destroyed
+b.i10 w.
+g7:  rl  w0  x3+a10    ; release process:
+     se  w0  85        ;   if kind<>85 then
+     jl      x2        ;     return;
+     ds. w3  i2.       ;
+     al. w1  i0.       ;   message:=release;
+     al. w3  i3.       ;   name:=<:host:>;
+     jd      1<11+16   ;   send message;
+     al. w1  i4.       ;
+     jd      1<11+18   ;   wait answer;
+     jl.    (i1.)      ; exit: return;
+
+i0:  2<12+1            ; message: operation:=release, mode:=indirect addr;
+     0                 ;   dummy
+i1:  0                 ;   dummy (saved return addr)
+i2:  0       ; i0+6    ;   proc
+
+i3:  <:host:>,0,0      ;   name-constant (name table addr in answer area)
+
+i4:  0,r.8             ;   answer area
+
+e.
+
+; the following three procedures (used by remove process) are called in
+;   disabled mode but returns enabled
+
+; procedure clean to (buf);
+;   delivers a dummy answer <receiver does not exist> in the queue of
+;   the sending process (the buffer administration takes care if the 
+;   sender is removed).
+g12: rs. w3   g14.            ; save (return);
+     rl  w3   b1               ;
+     bz  w0  x3+a19            ; bufclaim.procfunc
+     bs. w0   1                ; -1
+     hs  w0  x3+a19            ; =: bufclaim.procfunc
+     ac  w3  x3                ;
+     rx  w3  x1+4              ; sender.buf:= -procfunc
+     bz  w0  x2+a19            ; bufclaim.sender
+     sh  w3   0                ; + if buffer received
+     ba. w0   1                ;   then 1 else 0
+     hs  w0  x2+a19            ; =: bufclaim.semder
+     al  w2  x1                ;
+     jl  w3   b44              ; remove(buf)
+     al. w1  0 ; here           ;
+     al  w0   5                ;
+     jd  1<11+22               ; send answer(5,answer addr,buf)
+     al  w1  x2                ;
+     dl  w3  x1+6              ;
+     jd.    (g14.)             ;
+
+g14: 0                        ; saved return
+
+; procedure clean from (buf);
+;   releases pending buffers and prepares the return of buffer claims to
+;   the parents of removed processes.
+g13: al  w2  x1                ;
+     jd  w3   b43              ;   regretted message (buf);
+     je.      g11.             ;
+e.
+
+
+
+; copy message
+;
+; call: m156
+; error return: result 2, if sender.buf is stopped
+;               result 3, if message regretted
+;               result 3, if addresses.buffer illegal
+;               result 3, if operation.buffer neither input nor output
+
+b. g10, h10 w.
+
+m156:                  ; copy message:
+     rl. w1     d2.    ;    w1 := sender;
+     rl  w3  x1+a30    ;    w3 := buf := save w2.sender;
+     rl  w2  x3+6      ;    w2 := sender.buf;
+     sh  w2    -1      ;    if sender.buf < 0 then
+     jl.        j3.    ;      result 3;  i.e. message regretted;
+
+     bz  w0  x2+a13    ;    if state(sender.buf) = stopped then
+     sz  w0     a105   ;
+     jl.        j2.    ;      goto result 2;
+
+     dl  w0  x3+12     ;    w3 := first addr.buf;  w0 := last addr.buf;
+     sl  w3 (x2+a17)   ;    if addresses outside sender-process then
+     sl  w0 (x2+a18)   ;
+     jl.        j3.    ;      goto result 3;
+     la. w3     h0.    ;
+     la. w0     h0.    ;    (make addresses even)
+     sh  w0  x3-1      ;    if last address < first address then
+     jl.        j3.    ;      goto result 3;
+
+     ws  w0     6      ;    w0 := size of area(buf);    (less two bytes)
+c.-8000 ; if rc8000 then
+     wa  w3  x2+a182   ;    w3 := abs first of area(buf);
+z.
+     ds. w0     h3.    ;    save (first addr, size);
+
+     dl. w0     h1.    ;
+     la  w3  x1+a29    ;    w3 := first of area.sender;  (even)
+     la  w0  x1+a31    ;    w0 := last  of area.sender;  (even)
+     ws  w0     6      ;    w0 := size of area.sender;  (less two bytes)
+c.-8000 ; if rc8000 then
+     wa  w3  x1+a182   ;    w3 := abs first of area.sender;
+z.
+
+     al  w2  x3        ;    w2 := from := abs first of area.sender;
+     rl  w3  x1+a30    ;
+     bz  w3  x3+8      ;    w3 := operation.buf.sender;
+     rl. w1     h2.    ;    w1 := to   := abs first of area(buf);
+
+     sn  w3     3      ;    if operation.buf = input then
+     jl.        g5.    ;      goto prepare move;
+     se  w3     5      ;    if operation.buf <> output then
+     jl.        j3.    ;      goto result 3;
+h4:  rx  w2     2 ;used;    exchange (from, to);
+
+g5:                    ; prepare move:
+
+; w0 = size of area.sender (less two)
+; w1 = to-address
+; w2 = from-address
+
+     sl. w0    (h3.)   ;    bytes to move :=
+     rl. w0     h3.    ;      minimum (size.sender, size.buf)
+     ba. w0     h4.+1  ;      + 2;
+     rs. w0     h3.    ;    save (bytes to move);
+
+     jl. w3     e31.   ;    move;
+
+; now the data has been moved between sender-process and buffer-area
+; compute the number of bytes and characters transferred and deliver to
+;   sender-process
+
+     rl. w2     h3.    ;    w2 := bytes moved;
+     al  w3  x2        ;
+     ls  w3    -1      ;
+     wa  w3     4      ;    w3 := chars moved;  ( = bytes * 3 / 2 )
+
+     rl. w1    (d20.)  ;
+     rs  w2  x1+a29    ;    save w1.sender := bytes moved;
+     rs  w3  x1+a31    ;    save w3.sender := chars moved;
+
+     jl.        j0.    ;    goto result 0;
+
+h0:  -1 < 1            ; mask for making even
+h1:  -1 < 1            ; double-mask for making two words even
+h2:  0                 ; abs first of area(buf)
+h3:  0                 ; size of area(buf)
+                       ; (later:  bytes to move)
+
+e.                     ;
+
+
+; general copy
+;
+; call: m157
+; error return: result 2, if sender.buf is stopped
+;               result 3, if message regretted
+;               result 3, if addresses.buffer illegal
+
+b. g10, h10 w.
+
+m157:                  ; general copy    93-06-20 02:04 HJ :
+     rl. w1     d2.    ;    w1 := sender;
+     rl  w3  x1+a30    ;    w3 := buf := save w2.sender;
+     rl  w2  x3+6      ;    w2 := sender.buf;
+     sh  w2    -1      ;    if sender.buf < 0 then
+     jl.        j3.    ;      result 3;  i.e. message regretted;
+
+     bz  w0  x2+a13    ;    if state(sender.buf) = stopped then
+     sz  w0     a105   ;
+     jl.        j2.    ;      goto result 2;
+
+     rl  w3 (x1+a29)   ;    w1:=core(saved w1); comment function word;
+     la. w3  h1.       ;    mask relpos
+     ls  w3  -1
+     am     (x1+a30)
+     dl  w0  x3+10     ;    w3 := first addr.buf;  w0 := last addr.buf;
+     am     (x1+a29)
+     wa  w3  6         ;    first:=first+start relative
+     sl  w3 (x2+a17)   ;    if addresses outside sender-process then
+     sl  w0 (x2+a18)   ;
+     jl.        j3.    ;      goto result 3;
+     la. w3     h0.    ;
+     la. w0     h0.    ;    (make addresses even)
+     sh  w0  x3-1      ;    if last address < first address then
+     jl.        j3.    ;      goto result 3;
+
+     ws  w0     6      ;    w0 := size of area(buf);    (less two bytes)
+c.-8000 ; if rc8000 then
+     wa  w3  x2+a182   ;    w3 := abs first of area(buf);
+z.
+     ds. w0     h3.    ;    save (first addr, size);
+
+     am     (x1+a29)
+     dl  w0  4         ;    w3:=first of area.sender; w0:=last of area.sender;
+     la. w3  h0.       ;    w3 := first of area.sender;  (even)
+     la. w0  h0.       ;    w0 := last  of area.sender;  (even)
+     ws  w0     6      ;    w0 := size of area.sender;  (less two bytes)
+c.-8000 ; if rc8000 then
+     wa  w3  x1+a182   ;    w3 := abs first of area.sender;
+z.
+
+     al  w2  x3        ;    w2 := from := abs first of area.sender;
+     rl  w3 (x1+a29)
+     rl. w1     h2.    ;    w1 := to   := abs first of area(buf);
+
+     sz  w3     1      ;    if operation.func = input then
+     jl.        g5.    ;      goto prepare move;
+h4:  rx  w2     2 ;used;    exchange (from, to);
+
+g5:                    ; prepare move:
+
+; w0 = size of area.sender (less two)
+; w1 = to-address
+; w2 = from-address
+
+     sl. w0    (h3.)   ;    bytes to move :=
+     rl. w0     h3.    ;      minimum (size.sender, size.buf)
+     ba. w0     h4.+1  ;      + 2;
+     rs. w0     h3.    ;    save (bytes to move);
+
+     jl. w3     e31.   ;    move;
+
+; now the data has been moved between sender-process and buffer-area
+; compute the number of bytes and characters transferred and deliver to
+;   sender-process
+
+     rl. w2     h3.    ;    w2 := bytes moved;
+     al  w3  x2        ;
+     ls  w3    -1      ;
+     wa  w3     4      ;    w3 := chars moved;  ( = bytes * 3 / 2 )
+
+     rl. w1    (d20.)  ;
+     rs  w2  x1+a29    ;    save w1.sender := bytes moved;
+     rs  w3  x1+a31    ;    save w3.sender := chars moved;
+
+     jl.        j0.    ;    goto result 0;
+
+h0:  -1 < 1            ; mask for making even
+h1:  2.1110            ; mask for relpos in function word
+h2:  0                 ; abs first of area(buf)
+h3:  0                 ; size of area(buf)
+                       ; (later:  bytes to move)
+
+e.                     ;
+
+
+; setup pseudo process
+;
+;   the pseudo-process claim is decreased and an empty pseudo-process
+;     is initialized according to entry.work
+;
+; call: m158
+; error return: result 1, if pseudo process claims exceeded
+
+m158:                  ; setup pseudo process:
+     rl. w1    (d20.)  ;
+     bz  w3  x1+a23    ;    if pseudo-process claims.sender exceeded then
+     sn  w3     0      ;
+     jl.        j1.    ;      goto result 1;
+
+     al  w3  x3-1      ;    decrease(pseudo-process claims.sender);
+     hs  w3  x1+a23    ;
+
+     jl. w3     e44.   ;    find idle pseudo process;
+       b26             ;
+
+; w2 = pseudo process
+
+     rs  w1  x2+a50    ;    mainproc.pseudo := sender;
+     al  w0     64     ;
+     rs  w0  x2+a10    ;    kind.pseudo := pseudo process;
+
+     jl.        n0.    ;    next instruction;
+
+
+
+m00=m00-n50,m01=m01-n50,m02=m02-n50,m03=m03-n50,m04=m04-n50,
+m05=m05-n50,m06=m06-n50,           ,m08=m08-n50,m09=m09-n50,
+m10=m10-n50,m11=m11-n50,           ,m13=m13-n50,m14=m14-n50,
+m15=m15-n50,m16=m16-n50,m17=m17-n50,m18=m18-n50,m19=m19-n50,
+m20=m20-n50,m21=m21-n50,m22=m22-n50,m23=m23-n50,m24=m24-n50,
+m25=m25-n50,m26=m26-n50,m27=m27-n50,m28=m28-n50,m29=m29-n50,
+m30=m30-n50,m31=m31-n50,m32=m32-n50,           ,m34=m34-n50,
+m35=m35-n50,m36=m36-n50,m37=m37-n50,m38=m38-n50,m39=m39-n50,
+m40=m40-n50,m41=m41-n50,m42=m42-n50,m43=m43-n50,           ,
+m45=m45-n50,m46=m46-n50,m47=m47-n50,m48=m48-n50,m49=m49-n50,
+m50=m50-n50,           ,           ,           ,           ,
+m55=m55-n50,m56=m56-n50,m57=m57-n50,m58=m58-n50,m59=m59-n50,
+m65=m65-n50,m66=m66-n50,m67=m67-n50,m68=m68-n50,           ,
+m70=m70-n50,m71=m71-n50,m72=m72-n50,m73=m73-n50,m74=m74-n50,
+m75=m75-n50,m76=m76-n50,m77=m77-n50,m78=m78-n50,m79=m79-n50,
+m80=m80-n50,           ,           ,m83=m83-n50,m84=m84-n50,
+m85=m85-n50,m86=m86-n50,m87=m87-n50,m88=m88-n50,m89=m89-n50,
+m90=m90-n50,m91=m91-n50,           ,           ,           ,
+m100=m100-n50,m101=m101-n50,m102=m102-n50,m103=m103-n50,m104=m104-n50,
+m105=m105-n50,m106=m106-n50,m107=m107-n50,m108=m108-n50,m109=m109-n50,
+m115=m115-n50,m116=m116-n50,m117=m117-n50,m118=m118-n50,m119=m119-n50,
+m120=m120-n50,m121=m121-n50,m122=m122-n50,m123=m123-n50,             ,
+m125=m125-n50,m126=m126-n50,m127=m127-n50,m128=m128-n50,             ,
+             ,             ,             ,             ,m149=m149-n50,
+m150=m150-n50,m151=m151-n50,m152=m152-n50,m153=m153-n50,m154=m154-n50,
+m155=m155-n50,m156=m156-n50,m157=m157-n50,m158=m158-n50,             ,
+
+j0=j0-n50,j1=j1-n50,j2=j2-n50,j3=j3-n50,j4=j4-n50,
+j5=j5-n50,j6=j6-n50,j7=j7-n50
+
+; the following few instructions all perform an exit:
+h.                 ; (the whole table is in halfword mode)
+r0:  j0            ; goto result ok;
+r1:  j1            ; goto result 1;
+r2:  j2            ; goto result 2;
+r3:  j3            ; goto result 3;
+r4:  j4            ; goto result 4;
+r5:  j5            ; goto result 5;
+r6:  j6            ; goto result 6;
+r7:  j7            ; goto result 7;
+
+
+
+; procedure set aux entry
+b. g10 h.
+
+p0:              ;
+     m77 , g5.   ;    if key.work < min aux key then goto skip-return;
+     m4          ;    set aux cat;
+     m18         ;    test new catalog name:
+           g1.   ;      overlap:  goto error-return
+           g2.   ;      exact  :  goto modify
+; no entry was found: create one now
+     m55         ;    find empty entry:
+           g1.   ;      overlap or no room:  goto error-return;
+g2:              ; modify:
+     m56         ;    modify cur entry;
+     m5          ;    set main cat
+g5:              ; skip-return:
+     m127        ;    skip-return;
+
+g1:              ; error-return:
+     m5          ;    set main cat;
+     m128        ;    error-return;
+e.               ;
+
+
+
+; procedure delete aux entry
+b. g10 h.
+p1:              ;
+     m4          ;    set aux cat;
+     m18         ;    test new catalog name:
+           g5.   ;      overlap:  goto set maincat;
+           g0.   ;      exact  :  goto delete;
+; no entry was found, i.e. don't delete anything
+     m125, g5.   ;    goto return;
+
+g0:              ; delete:
+     m57         ;    delete cur entry;
+g5:              ; return:
+     m5          ;    set main cat;
+     m126        ;    return;
+e.               ;
+
+
+
+; create entry
+;
+; call:
+;    w1.sender :  tail address
+;    w3.sender :  name address
+; return:
+;    w0.sender : result = 0 : entry created
+;                result = 2 : catalog io-error
+;                result = 2 : document not present
+;                result = 2 : document not ready
+;                result = 3 : name overlap or name already exists
+;                result = 4 : claims exceeded
+;                result = 5 : catbase.sender outside stdbase.sender
+;                result = 6 : nameformat (of entry-name) illegal
+;                result = 6 : nameformat (of document name) illegal
+;                result = 7 : maincat not present
+
+p20:             ; create entry:
+     m0  , r7.   ;    if no maincat then result 7;
+     m65         ;    move catbase,name to work;
+     m90         ;    clear first slice.work;
+     m80         ;    clear key.work;
+     m75         ;    test base,key.work:
+           r5.   ;      illegal:  result 5;
+     m15         ;    test new system name (maybe wrk-name);
+           r3.   ;      overlap:  result 3;
+           r3.   ;      exact  :  result 3;
+     m105        ;    move tail to work;
+     m35 , t3    ;    search any chains (state = ready);
+     m22 , 2.10  ;    compute slices to claim  (compute new slices);
+     m30         ;    test claims (create):
+           r4.   ;      claims exceeded:  result 4;
+     m23         ;    adjust chain to size;
+     m55         ;    find empty entry:
+           r4.   ;      no room:  result 4;  (not possible)
+     m56         ;    modify cur entry;
+     m101        ;    move name.work to name.sender;  (in case of wrk-name)
+     j0          ;    result ok;
+
+
+
+; lookup entry
+;
+; call:
+;   w1.sender :  tail address
+;   w3.sender :  name address
+;
+; return:
+;   w0.sender :  result = 0 : entry looked up
+;                result = 2 : catalog io-error
+;                result = 3 : entry does not exist
+;                result = 6 : nameformat illegal
+;                result = 7 : maincat not present
+
+p21:             ; lookup entry:
+     m0  , r7.   ;    if no maincat then result 7;
+     m65         ;    move catbase,name to work;
+     m10         ;    search best catalog entry:
+           r3.   ;      not found:  result 3;
+     m106        ;    move tail.work to tail.sender;
+     j0          ;    result ok;
+
+
+
+; lookup entry head and tail:
+;
+; call:
+;   w1.sender : entry address
+;   w3.sender : name address
+;
+; return:
+;   w0.sender : result  (as lookup entry)
+
+p38:             ; lookup entry head and tail:
+     m0 ,  r7.   ;    if no maincat then result 7;
+     m65         ;    move catbase,name to work;
+     m10         ;    search best catalog entry:
+           r3.   ;      not found:  result 3;
+     m108        ;    move entry.work to entry.sender;
+     j0          ;    result ok;
+
+
+
+; change entry
+;
+; call:
+;   w1.sender :  tail address
+;   w3.sender :  name address
+;
+; return:
+;   w0.sender :  result = 0 : entry changed
+;                result = 2 : catalog io-error
+;                result = 2 : document not ready
+;                result = 3 : entry does not exist
+;                result = 4 : entry protected against calling process
+;                               (i.e. base.entry outside maxbase.sender)
+;                result = 5 : entry reserved by another process
+;                result = 6 : nameformat illegal
+;                result = 6 : new size illegal
+;                result = 6 : claims exceeded
+;                result = 7 : maincat not present
+
+b. g10 h.
+
+p22:             ; change entry:
+     m0  , r7.   ;    if no maincat then result 7;
+     m65         ;    move catbase,name to work;
+     m11 , a52   ;    search best entry and test modif allowed (no reserver);
+     m36 , t3    ;    search chain (state = ready);
+     m89         ;    move tail to work and test new size;
+     m22 , 2.11  ;    compute slices to claim  (compute new slices and count old slices);
+     m29         ;    test claims (change):
+           r6.   ;      exceeded:  result 6;
+     m23         ;    adjust chain;
+     m88         ;    if size.work >= 0 then
+           g0.   ;      begin
+     m66         ;      move docname.curdoc to docname.entry;
+     m77 , g0.   ;      if key.work >= min aux key
+     m24         ;      and area extended then
+           m6    ;        dump chaintable;
+g0:              ;      end;
+     m48         ;    if area process then reinit area process;
+     m56         ;    modify cur entry;
+     m58         ;    set aux entry:
+           g1.   ;      overlap or no room:  does'nt matter
+g1:              ;
+     j0          ;    result ok;
+
+e.               ;
+
+
+
+; rename entry
+;
+; call:
+;   w1.sender :  new name address
+;   w3.sender :  name address
+;
+; return:
+;   w0.sender :  result = 0 : entry renamed
+;                result = 2 : catalog io-error
+;                result = 2 : document not ready
+;                result = 3 : entry not found
+;                result = 3 : name overlap (new name)
+;                result = 3 : new name exists
+;                result = 4 : entry protected against calling process
+;                               (i.e. base.entry outside maxbase.sender)
+;                result = 5 : entry used by another process
+;                result = 6 : old or new name format illegal
+;                result = 7 : maincat not present
+
+b. g10 h.
+
+p23:             ; rename entry:
+     m0  , r7.   ;    if no maincat then result 7;
+     m103        ;    move newname.sender to name.work;
+     m13         ;    test name format (newname);
+     m65         ;    move catbase,name to work;
+     m11 , a53   ;    search best entry and test modif allowed (no users);
+     m36 , t3    ;    search chain (state = ready);
+     m57         ;    delete cur entry;
+     m103        ;    move newname.sender to name.work;
+     m17         ;    test new system name (no wrk-name):
+           g10.  ;      overlap:  goto repair maincat;
+           g10.  ;      already:  goto repair maincat;
+     m55         ;    find empty entry:
+           r7.   ;      no room:  (result 7: not possible)
+     m56         ;    modify cur entry;
+     m77         ;    if key.work >= min aux key then
+           g2.   ;      begin
+     m100        ;      name.work := name.sender;
+     m59         ;      delete aux entry (old name);
+     m103        ;      restore new name;
+g2:              ;      end;
+     m58         ;    set aux entry (new name);
+           g5.   ;      overlap or no room:  goto repair auxcat;
+     m48         ;    if area process then reinit area process;
+     j0          ;    result ok;
+
+g5:              ; repair auxcat:
+     m100        ;    restore old name;
+     m58         ;    set aux entry:
+           g6.   ;      overlap or no room:  does'nt matter
+g6:              ;
+     m103        ;    restore new name;
+     m18         ;    test new catalog name (new name):
+           r7.   ;      overlap:  result 7;  (not possible)
+           g7.   ;      exact  :  goto remove new name;
+     j7          ;    not found:  result 7;  (not possible)
+g7:              ; remove new name:
+     m57         ;    delete cur entry;
+
+g10:             ; repair maincat:
+     m100        ;    restore old name;
+     m14         ;    compute name key;
+     m55         ;    find empty entry:
+           r7.   ;      no room:  result 7;  (not possible)
+     m56         ;    modify cur entry;
+     j3          ;    result 3;
+
+e.               ;
+
+
+
+; remove entry
+;
+; call:
+;   w3.sender :  name address
+;
+; return:
+;   w0.sender :  result = 0 : entry removed
+;                result = 2 : catalog io-error
+;                result = 2 : document not ready
+;                result = 3 : entry not found
+;                result = 4 : entry protected against calling process
+;                               (i.e. base.entry outside maxbase.sender)
+;                result = 5 : entry used by another process
+;                result = 6 : nameformat illegal
+;                result = 7 : maincat not present
+
+b. g10 h.
+
+p24:             ; remove entry:
+     m0  , r7.   ;    if no maincat then result 7;
+     m65         ;    move catbase,name to work;
+     m11 , a53   ;    search best entry and test modif allowed (no users);
+     m36 , t3    ;    search chain (state = ready);
+     m22 , 2.01  ;    compute slices to claim  (count old slices);
+     m28         ;    test claims (remove);
+           r7.   ;      claims exceeded:  result 7;  (not possible)
+     m23         ;    adjust chain to size;
+     m50         ;    if areaprocess then delete areaprocess;
+     m57         ;    delete cur entry;
+     m77 , g5.   ;    if key.work >= min aux key then
+     m59         ;      delete aux entry;
+g5:              ;
+     j0          ;    result ok;
+
+e.               ;
+
+
+
+; permanent entry
+;
+; call:
+;   w1.sender :  permanens key
+;   w3.sender :  name address
+;
+; return:
+;   w0.sender :  result = 0 : entry-permanens changed
+;                result = 2 : catalog io-error
+;                result = 2 : document not ready
+;                result = 3 : entry does not exist
+;                result = 3 : overlap (or no room) in auxcat
+;                result = 4 : entry protected against calling process
+;                               (i.e. base.entry outside maxbase.sender)
+;                result = 4 : key illegal
+;                result = 5 : entry reserved by another process
+;                result = 6 : nameformat illegal
+;                result = 6 : claims exceeded
+;                result = 7 : maincat not present
+
+b. g20 h.
+
+p25:             ; permanent entry:
+     m0  , r7.   ;    if maincat not present then result 7;
+g0:              ;
+     m65         ;    move catbase,name to work;
+     m11 , a52   ;    search best entry and test modif allowed (no reserver);
+g1:              ; entry found:
+     m36 , t3    ;    search chain (state = ready)
+g2:              ; chain found:
+     m78         ;    save oldkey, key.work := param, test key legal;
+     m75         ;    test base,key:
+           r4.   ;      key < minaux and base outside stdbase: result 4;
+     m22 , 2.01  ;    compute slices to claim  (count old slices);
+     m27         ;    test claims (permanent):
+           r6.   ;      exceeded:  result 6;
+     m88 , g8.   ;    if size < 0 then goto file-descriptor;
+g4:              ; modify maincat:
+     m56         ;    modify cur entry;
+     m77         ;    if key.work >= min aux key then
+           g5.   ;      begin
+     m6          ;      dump chaintable;
+     m58         ;      set aux entry:
+           g10.  ;        overlap or no room:  goto repair maincat;
+     j0          ;      result ok;
+g5:              ;      end;
+     m79         ;    restore old key;
+     m77 , g6.   ;    if key.work >= min aux key then
+     m59         ;      delete aux entry;
+g6:              ;
+     j0          ;    result ok;
+
+g8:              ; file-descriptor:
+     m77 , g9.   ;    if key.work >= min aux key then
+     m91         ;      slice.work := docnumber;  (result 5 not possible)
+     m125, g4.   ;
+g9:              ;    else
+     m90         ;      first slice.work := 0;
+     m125, g4.   ;    goto modify maincat;
+
+g10:             ; repair maincat:
+     m79         ;    restore old key;
+     m18         ;    test new catalog name:
+           r7.   ;      overlap:  result 7;  (not possible)
+           g11.  ;      exact  :  goto modify maincat entry;
+     j7          ;    not found:  result 7;  (not possible)
+g11:             ; modify maincat entry:
+     m56         ;    modify cur entry;
+     j3          ;    result 3;
+
+
+
+
+; permanent entry in auxcat
+;
+; call:
+;   w1.sender :  permanens key
+;   w2.sender :  docname address
+;   w3.sender :  name address
+;
+; return:
+;   w0.sender :  result  (as permanent entry)
+;                result = 2 : document not found
+;                result = 5 : entry already permanent in another auxcat
+;                result = 6 : docname format illegal
+
+p45:             ; permanent entry in auxcat:
+     m0  , r7.   ;    if no maincat then result 7;
+     m65         ;    move catbase,name to work;
+     m78         ;    (save oldkey), key.work := param, test key;
+     m77         ;    if key.work < min aux key then
+           g0.   ;      goto permanent entry;
+     m104        ;    move docname.sender to docname.work;
+     m84         ;    (size.work := 0)
+     m36 , t3    ;    search chain (state = ready)
+     m11 , a52   ;    search best entry and test modif allowed (no reserver);
+     m88 , g20.  ;    if size.work >= 0 then
+     m125, g1.   ;      goto entry found;  (new docname irrellevant)
+g20:             ; file-descriptor:
+     m91         ;    slice.work := docnumber;  (maybe result 5)
+     m125, g2.   ;    goto chain found;
+
+e.               ;
+
+
+
+; create area process
+;
+; call:
+;   w3.sender :  name address
+;
+; return:
+;   w0.sender :  result = 0 : area process created
+;                result = 1 : area claims exceeded
+;                result = 2 : catalog io-error
+;                result = 2 : state of document does not permit this call
+;                result = 3 : entry not found
+;                result = 4 : entry does not describe an area
+;                               (i.e. size.entry < 0)
+;                result = 6 : nameformat illegal
+
+b. g10 h.
+
+p26:             ; create area process:
+     m0   , g5.  ;    if no maincat then goto test areaprocs;
+     m65         ;    move catbase,name to work;
+     m10         ;    search best catalog entry:
+            g5.  ;      not found:  goto test areaprocs;
+     m88  , r4.  ;    if size.work < 0 then result 4;
+; notice: if the document is being dismounted etc. it is not allowed
+; to create area processes:
+     m36  , t30  ;    search chains (state = allowed for create area process);
+     m46  , 2    ;    setup area process (sender);
+     j0          ;    result ok;
+
+g5:              ; test areaprocs:
+; remember: none of the catalogs are described in maincatalog yet,
+; therefor special care must be taken, when a process wants to
+; have an areaprocess to one of the catalogs:
+     m45         ;    search best area process:
+            r3.  ;      not found:  result 3;
+     m47 , 2     ;    include in areaprocess (sender);
+     j0          ;    result ok;
+
+e.               ;
+
+
+
+; create entry lock process
+;
+; call:
+;   w3.sender :  name address ( with room for name table address )
+;
+; return:
+;   w0.sender :  result = 0 : process created
+;                result = 1 : area claims exceeded
+;                result = 2 : catalog io-error
+;                result = 2 : state of document does not permit this call
+;                result = 3 : entry not found
+;                result = 6 : nameformat illegal
+;                result = 7 : maincat not present
+
+p46:             ; create entry lock process:
+     m0   , r7.  ;    if no maincat then result 7;
+     m65         ;    move catbase,name to work;
+     m10         ;    search best catalog entry:
+            r3.  ;      not found:  result 3;
+; (see comment at create area process)
+     m36  , t30  ;    search chain (state = allowed for create area process);
+     m46  , 2    ;    setup area process (sender);
+     m83         ;    prepare for moving nametable address to sender;
+     m102        ;    move (name and) nametable address to sender;
+     j0          ;    result ok;
+
+
+
+; create peripheral process
+;
+; call:
+;   w1.sender :  device number
+;   w3.sender :  name address
+;
+; return:
+;   w0.sender :  result = 0 : peripheral process created
+;                result = 1 : function forbidden in calling process
+;                result = 2 : calling process is not a user
+;                result = 2 : catalog io-error
+;                result = 3 : name overlap
+;                result = 3 : name already exists
+;                result = 3 : not same disc name
+;                result = 4 : device number does not exist
+;                result = 5 : device is reserved by another user
+;                result = 6 : nameformat illegal
+
+b. g10 h.
+
+p27:             ; create peripheral process:
+     m8   , f74  ;    check function mask (create peripheral process);
+     m149        ;    test device, user, reserver;
+     m65         ;    move catbase,name to work;
+     m34         ;    if not bs-device then
+            g5.  ;      goto not bs;
+
+; all bs-devices will have catalog-interval, with no regard on a future
+;   catalog-system or not.
+; this ensures that all bs-devices have distinct names, and that
+;   that bs-documents (i.e. bs-devices included in catalog-system) may
+;   loose its connection to the device (e.g. the device-name is cleared
+;   at intervention at the disc), and later resume the connection,
+;   without any risk that the device-name has been occupied by another
+;   device.
+
+     m70         ;    base.work := catalog interval;
+     m43         ;    compare name.work and docname.chain.proc:
+                 ;      (if connection between proc and a chain then
+                 ;      the names must agree)
+            g5.  ; no chain:  goto not bs;
+     m66         ;    docname.work := docname.chain;
+     m40         ;    reinit rest of chainhead;
+                 ;    (i.e. insert procfunc as user and reserver of disc)
+     m125 , g10. ;    goto set name and interval;
+
+g5:              ; not bs:
+     m15         ;    test new system name (maybe wrk-name):
+            r3.  ;      overlap:  result 3;
+            r3.  ;      exact  :  result 3;
+     m101        ;    move name.work to name.sender;  (in case of wrk-name)
+
+g10:             ; set name and interval:
+     m150        ;    set name and interval;
+     j0          ;    result ok;
+e.               ;
+
+
+
+; create internal process
+;
+; call:
+;   w1.sender :  parameter address
+;   w3.sender :  name address
+;
+; return:
+;   w0.sender :  result = 0 : internal process created
+;                result = 1 : storage area outside calling process
+;                result = 1 : internal claims exceeded
+;                result = 1 : illegal protection
+;                result = 1 : maxbase or stdbase not contained in
+;                               corresponding base of calling process
+;                result = 2 : catalog io-error
+;                result = 3 : name overlap
+;                result = 3 : name already exists
+;                result = 6 : nameformat illegal
+
+p28:             ; create internal process:
+     m65         ;    move catbase,name to work;
+     m15         ;    test new system name (maybe wrk-name):
+            r3.  ;      overlap:  result 3;
+            r3.  ;      exact  :  result 3;
+     m101        ;    move name.work to name.sender (in case of wrk-name);
+     m151        ;    create internal process;
+     m150        ;    set name and interval;
+     j0          ;    result ok;
+
+
+
+; start internal process
+;
+; call:
+;   w3.sender :  name address
+;
+; return:
+;   w0.sender :  result = 0 : internal process started
+;              ( result = 2 : state of process does not permit start )
+;                result = 3 : process does not exist
+;                result = 3 : process is not an internal process
+;                result = 3 : process is not a child of calling process
+;                result = 6 : nameformat illegal
+
+p29:             ; start internal process:
+     m65         ;    move catbase,name to work;
+     m152        ;    start internal process;
+
+
+
+; stop internal process
+;
+; call:
+;   w3.sender :  name address
+;
+; return:
+;   w0.sender :  result = 0 : stop initiated
+;                result = 3 : process does not exist
+;                result = 3 : process is not an internal process
+;                result = 3 : process is not a child of calling process
+;                result = 6 : nameformat illegal
+;   w2.sender :  buffer address (in case result=0)
+
+p30:             ; stop internal process:
+     m65         ;    move catbase,name to work;
+     m153        ;    stop internal process;
+
+
+
+; modify internal process
+;
+; call:
+;   w1.sender :  register address
+;   w3.sender :  name address
+;
+; return:
+;   w0.sender :  result = 0 : internal process modified
+;              ( result = 2 : state of process does not permit modification )
+;               result = 2 : child ic outside child process
+;                result = 3 : process does not exist
+;                result = 3 : process in not an internal process
+;                result = 3 : process is not a child of calling process
+;                result = 6 : nameformat illegal
+
+p31:             ; modify internal process:
+     m65         ;    move catbase,name to work;
+     m154        ;    modify internal process;
+
+
+
+; remove process
+;
+; call:
+;   w3.sender :  name address
+;
+; return:
+;   w0.sender :  result = 0 : process removed
+;                result = 1 : function forbidden in calling process
+;                result = 2 : state of process does not permit removal
+;                result = 2 : calling process is not a user of process
+;                result = 2 : claimed message to pseudo process
+;                result = 3 : process does not exist
+;                result = 3 : process is not a child of calling process
+;                result = 5 : peripheral process reserved by another user
+;                result = 6 : nameformat illegal
+
+p32:             ; remove process:
+     m65         ;    move catbase,name to work;
+     m155        ;    remove process;
+
+
+
+; generate name
+;
+; call:
+;   w3.sender :  name address
+;
+; return:
+;   w0.sender :  result = 0 : wrk-name generated
+;                result = 2 : catalog io-error
+
+p34:             ; generate name:
+     m16         ;    generate wrk-name:
+           r7.   ;      (irrell)
+           r7.   ;      (irrell)
+     m101        ;    move name.work to name.sender;
+     j0          ;    result ok;
+
+
+
+; copy
+;
+; call:
+;   w1.sender :  first address
+;   w2.sender :  buffer address
+;   w3.sender :  last address
+;
+; return:
+;   w0.sender :  result = 0 : area copied
+;                result = 2 : sender of buffer is stopped
+;                result = 3 : buffer describes input or output
+;                               outside senders area
+;                result = 3 : message regretted
+;                result = 3 : operation in buffer is neither input not output
+;   w1.sender :  bytes moved (if result=0)
+;   w3.sender :  characters moved (if result=0)
+
+p35:             ; copy:
+     m156        ;    copy message;
+
+
+
+; set catalog base
+;
+; call:
+;   w0.sender :  lower base
+;   w1.sender :  upper base
+;   w3.sender :  name address
+;
+; return:
+;   w0.sender :  result = 0 : catalog base set
+;              ( result = 2 : state of process does not permit modification )
+;                result = 3 : process does not exist
+;                result = 3 : process is not an internal process
+;                result = 3 : process is not a child of calling process
+;                result = 4 : newbase illegal
+;                result = 6 : nameformat illegal
+
+p36:             ; set catalog base:
+     m100        ;    move name.sender to name.work;
+     m71         ;    test new base;
+     m74         ;    set catbase of internal;
+     j0          ;    result ok;
+
+
+
+; set entry base
+;
+; call:
+;   w0.sender :  lower base
+;   w1.sender :  upper base
+;   w3.sender :  name address
+;
+; return:
+;   w0.sender :  result = 0 : entry interval set
+;                result = 2 : catalog io-error
+;                result = 2 : document not ready
+;                result = 3 : entry not found
+;                result = 3 : name overlap (at new base)
+;                result = 3 : name already exists (at new base)
+;                result = 4 : entry protected against calling process
+;                               (i.e. oldbase.entry outside maxbase.sender)
+;                result = 4 : key,newbase combination illegal
+;                result = 5 : entry used by another process
+;                result = 6 : nameformat illegal
+;                result = 7 : maincat not present
+
+b. g10 h.
+
+p37:             ; set entry base:
+     m0  , r7.   ;    if no maincat then result 7;
+     m65         ;    move catbase,name to work;
+     m11 , a53   ;    search best entry and test modif allowed (no users)
+     m36 , t3    ;    search chain (state = ready);
+     m71         ;    test new base;
+     m72         ;    save oldbase, base.work := newbase;
+           r0.   ;      same base:  result ok;
+     m75         ;    test base.work,key.work combination;
+           r4.   ;      error:  result 4;
+     m17         ;    test new system name (wrk-name not allowed):
+           r3.   ;      overlap:  result 3;
+           r3.   ;      exact  :  result 3;
+     m56         ;    modify cur entry;
+     m48         ;    if areaprocess then reinit area process;
+     m77 , r0.   ;    if key.work < min aux key then result ok;
+
+     m4          ;    set aux cat;
+     m18         ;    test new catalog name:
+           g6.   ;      overlap:  goto repair maincat;
+           g8.   ;      exact  :  goto remove superfluous entry;
+g1:              ; find old entry in auxcat:
+     m73         ;    restore oldbase;
+     m18         ;    test new catalog name:
+           g2.   ;      overlap:  goto create new;  (does'nt matter)
+           g3.   ;      exact  :  goto modify;
+; the entry did not exist in the auxcat
+g2:              ; create new:
+     m55         ;    find empty entry;
+           g5.   ;      no room:  goto repair maincat;
+g3:              ; modify:
+     m71         ;    (test and) get new base;
+     m72         ;    save oldbase, set newbase;
+           r7.   ;      (same base:  not possible)
+     m56         ;    modify cur entry;
+     m5          ;    set maincat;
+     j0          ;    result ok;
+
+g5:              ; repair maincat:
+     m71         ;    (test and) get new base;
+     m72         ;    save oldbase, set newbase;
+           r7.   ;      (same base:  not possible)
+g6:              ; (newbase set):
+     m5          ;    set maincat;
+     m18         ;    test new catalog name:
+           r7.   ;      overlap:  result 7;  (not possible)
+           g7.   ;      exact  :  goto change main entry;
+     j7          ;    result 7;  (not possible)
+
+g7:              ; change main entry:
+     m73         ;    restore oldbase;
+     m56         ;    modify cur entry;
+     j3          ;    result 3;
+
+g8:              ; remove superfluous entry:
+     m57         ;    delete cur entry;
+     m125, g1.   ;    goto find old entry in auxcat;
+
+e.               ;
+
+
+
+; set backing storage claims
+;
+; call:
+;   w1.sender :  claim list address
+;   w2.sender :  docname address
+;   w3.sender :  name address
+;
+; result:
+;   w0.sender :  result = 0 : backing starage claims set
+;                result = 1 : claims exceeded (at calling process)
+;                result = 1 : claims exceeded (at child)
+;                result = 2 : document not found
+;                result = 3 : process does not exist
+;                result = 3 : process is not an internal process
+;                result = 3 : process is not a child of calling process
+;                result = 6 : nameformat (of docname) illegal
+;                result = 6 : nameformat (of childname) illegal
+
+p39:             ; set bs claims:
+     m104        ;    move docname.sender to docname.work;
+     m84         ;    (size.work := 0);
+     m36 , t29   ;    search chain (state = allowed for set bs claims);
+     m65         ;    move catbase,name to work;
+     m32         ;    set bs claims;
+
+
+
+; create pseudo process
+;
+; call:
+;   w3.sender :  name address
+;
+; return:
+;   w0.sender :  result = 0 : pseudo process created
+;                result = 1 : (area) claims exceeded
+;                result = 2 : catalog io-error
+;                result = 3 : name overlap
+;                result = 3 : name already exists
+;                result = 6 : nameformat illegal
+
+p40:             ; create pseudo process:
+     m65         ;    move catbase,name to work;
+     m15         ;    test new system name (maybe wrk-name):
+           r3.   ;      overlap:  result 3;
+           r3.   ;      exact  :  result 3;
+     m101        ;    move name.work to name.sender (in case of wrk-name);
+     m158        ;    create pseudo process;
+     m150        ;    set name and interval;
+     j0          ;    result ok;
+
+
+; general copy    93-06-20 02:29 HJ 
+p42:
+    m157
+
+
+
+
+; prepare backing storage
+;
+; call:
+;   w3.sender :  chainhead address
+;
+; return:
+;   w0.sender :  result = 0 : chaintable allocated
+;                result = 1 : function forbidden in calling process
+;                result = 1 : area claims exceeded
+;                result = 2 : catalog io-error
+;                result = 3 : auxcat name overlap
+;                result = 3 : auxcat name already exists
+;                result = 4 : document-device does not exist
+;                result = 4 : device is not a bs-device
+;                result = 4 : device not reserved by calling process
+;                result = 5 : auxcat size <= 0  or  auxcat size too large
+;                result = 5 : chainhead chain inconsistent
+;                result = 5 : auxcat    chain inconsistent
+;                result = 5 : illegal kind of chaintable
+;                result = 5 : key illegal
+;                result = 5 : too many slices
+;                result = 5 : claims exceeded (too few slices for chaintable)
+;                result = 5 : claims exceeded (auxcat too large)
+;                result = 5 : claims exceeded (no room in maincat)
+;                result = 6 : auxcat nameformat illegal
+;                result = 6 : docname nameformat illegal
+;                result = 7 : no chains idle
+b. g10 h.
+
+p51:             ; prepare bs:
+     m8  , f71   ;    check function mask (aux catalog handling);
+     m86         ;    move chainhead.sender to work and test auxcat size > 0;
+           r5.   ;      auxcat size <= 0:  result 5;
+; test the auxcat name:
+     m70         ;    base.work := catalog interval;
+     m17         ;    test new system name (wrk-name not allowed):
+           r3.   ;      overlap:  result 3;
+           r3.   ;      exact  :  result 3;
+; test the document name:
+; notice: the reservation ensures that the document does not exist
+;         already in the bs-system
+     m85         ;    search bs-process and check reserved by sender:
+           r4.   ;      not found  or  not bs  or  not reserved:  result 4;
+     m70         ;    base.work := catalog interval;  (because moved again...)
+     m76         ;    test auxkey (and interval);
+; give all claims to sender:
+     m38         ;    find empty chain and prepare;
+     m20         ;    copy chaintable chain;
+; claim the slices used for chaintable:
+     m25         ;    test claims (prepare bs);
+           r5.   ;      claims exceeded:  result 5;
+     m19         ;    test chain errors;
+     m21         ;    copy chain and cut down (auxcat);
+; claim the slices used for auxcat:
+; (notice: the auxcat itself is not described in any catalog entry)
+     m25         ;    test claims (prepare bs);
+           r5.   ;      claims exceeded:  result 5;
+     m19         ;    test chain errors;
+; insert in maincat a description of the aux catalog
+; (if maincat does not exist yet, it will take place when
+;  the main catalog is connected)
+     m0  , g5.   ;    if no maincat yet then goto no maincat;
+     m31         ;    prepare maincat entry;
+     m30         ;    test claims (create):
+           r5.   ;      claims exceeded:  result 5;
+     m14         ;    compute namekey;
+     m55         ;    find empty entry;
+           r5.   ;      no room:  result 5;
+     m56         ;    modify cur entry;
+g5:              ; no maincat:
+     m40         ;    terminate update of new chainhead;
+; notice: now the chain is included is the bs-system
+;         (still not ready for normal use)
+     m37 , t1    ;    state.chain := after prepare;
+     m46 , 0     ;    setup area process (procfunc) for auxcat;
+     m47 , 2     ;    include (sender) as user of auxcat area process;
+     m49         ;    let sender be reserver of auxcat area process;
+                 ;      (i.e. sender may now make any modifications
+                 ;      in the auxcat)
+                 ;       (hint: he could have done any damage before he
+                 ;       called ..prepare bs.. so why not let him have the
+                 ;       advantage of the area-process concept)
+     j0          ;    result ok;
+
+e.               ;
+
+
+
+; insert entry
+;
+; call:
+;   w1.sender :  entry address
+;   w3.sender :  chainhead address
+;
+; return:
+;   w0.sender :  result = 0 : entry inserted in main catalog
+;                result = 1 : function forbidden in calling process
+;                result = 2 : catalog io-error
+;                result = 2 : document not found
+;                result = 2 : state of document does not permit this call
+;                result = 3 : name overlap
+;                result = 3 : name already exists
+;                result = 4 : calling process is not user of the device
+;                result = 5 : key illegal
+;                result = 5 : interval illegal
+;                result = 5 : chain overlap
+;                result = 5 : chain outside limits
+;                result = 6 : nameformat illegal
+;                result = 6 : docname format illegal
+;                result = 6 : claims exceeded
+;                result = 7 : maincat not present
+;
+; notice: the claims of the process are ok, when result = 0,3,(5),7
+
+b. g20 h.
+
+p52:             ; insert entry:
+     m8  , f71   ;    check function mask (aux catalog handling)
+     m109        ;    move chainhead.sender to work;
+     m84         ;    (size.work := 0;)
+     m36 , t21   ;    search chain (state = allowed for insert entry);
+     m9          ;    check privileges;
+     m37 , t2    ;    state.chain := during insert;
+     m107        ;    move entry.sender to work;
+     m76         ;    test auxkey, interval;
+
+; notice: if the main catalog has been connected from this
+;         document, the chain has already been copied, and
+;         entry and slices claimed
+     m3          ;    if main-catalog entry then
+           r0.   ;      goto result ok;
+
+     m21         ;    copy chain (entry) and cut down;
+     m0  , g20.  ;    if no maincat then goto claim slices only;
+     m30         ;    test claims (create entry):
+           r6.   ;      claims exceeded:  result 6;
+     m19         ;    test chain errors;
+     m17         ;    test new system name (wrk-name not allowed):
+           r3.   ;      overlap:  result 3;
+           r3.   ;      exact  :  result 3;
+; make it easy for changing the name of the document:
+     m88 , g5.   ;    if size.work >= 0 then
+     m66         ;      docname.work := docname.chain;
+     m125, g10.  ;    else
+g5:              ;      begin
+     m90         ;      (prepare compute docnumber: prevent alarms)
+     m91         ;      first slice.work := compute docnumber;
+g10:             ;      end;
+     m55         ;    find empty entry:
+           r6.   ;      no room:  result 6;
+     m56         ;    modify cur entry;
+     j0          ;    result ok;
+
+g20:             ; claim slices only:
+; main catalog not present, therefor don't claim a maincat entry
+     m26         ;    test claims (create aux entry);
+           r6.   ;      claims exceeded:  result 6;
+     m19         ;    test chain errors;
+     j7          ;    result 7;
+
+e.               ;
+
+
+
+; insert backing storage
+;
+; call:
+;   w2.sender :  docname address
+;
+; return:
+;   w0.sender :  result = 0 : document included is bs-system
+;                result = 1 : function forbidden in calling process
+;                result = 2 : document not found
+;                result = 2 : state of document does not permit this call
+;                result = 4 : calling process is not user of device
+;                result = 6 : docname format illegal
+
+p53:             ; insert bs:
+     m8  , f71   ;    check function mask (aux catalog handling);
+     m104        ;    move docname.sender to docname.work;
+     m84         ;    (size.work := 0;)
+     m36 , t21   ;    search chain (state = allowed for insert bs);
+     m9          ;    check privileges;
+     m37 , t3    ;    state.chain := ready;
+     j0          ;    result ok;
+
+
+
+; delete backing storage
+;
+; call:
+;   w2.sender :  docname address
+;
+; return:
+;   w0.sender :  result = 0 : document removed from bs-system
+;                result = 1 : function forbidden in calling process
+;                result = 2 : catalog io-error
+;                result = 2 : document not found
+;                result = 4 : calling process is not user of device
+;                result = 5 : areaprocesses exists for the document
+;                result = 6 : main catalog on the document
+;                result = 6 : docname format illegal
+
+p54:             ; delete bs:
+     m8  , f71   ;    check function mask (aux catalog handling);
+     m104        ;    move docname.sender to docname.work;
+     m84         ;    (size.work := 0);
+     m36 , t23   ;    search chain (state = allowed for delete bs);
+     m9          ;    check privileges;
+     m115        ;    check any area processes on document;
+     m1          ;    test main catalog not on document;
+     m116        ;    prepare catalog scan;
+     m37 , t4    ;    state.chain := during delete;
+
+; the following assumes that the disc-driver handles messages:
+;       last come => last served
+; a (dummy) message is sent to the aux catalog (in this case an input
+;   message, because such a procedure exists), and when the answer
+;   arrives, all other area-transfers must have been terminated too.
+; the chaintable may now (soon) be used by another disc, if wanted.
+
+     m4          ;    set auxcat;
+     m118        ;    (get first auxcat segment);
+          r0.    ;      (no entries with namekey = 0, does'nt matter)
+
+     j0          ;    result ok;
+
+
+
+; delete entries
+;
+; call:
+;   w2.sender :  docname address
+;
+; return:
+;   w0.sender :  result = 0 : all entries deleted (from main catalog)
+;                                 and chain released
+;                result = 1 : function forbidden in calling process
+;                result = 2 : catalog io-error
+;                result = 2 : document not found
+;                result = 2 : state of document does not permit this call
+;                result = 3 : not all entries deleted yet
+;                result = 4 : calling process is not user of device
+;                result = 6 : docname format illegal
+
+b. g10 h.
+
+p55:             ; delete entries:
+     m8  , f71   ;    check function mask (aux catalog handling);
+     m104        ;    move docname.sender to docname.work;
+     m84         ;    (size.work := 0;)
+     m36 , t4    ;    search chain (state = during delete);
+     m9          ;    check privileges;
+     m0          ;    if no maincat then
+           g10.  ;      goto clear up;
+
+; clear a portion of the main catalog for entries belonging to curdoc
+     m118        ;    for all curkey entries in main catalog do
+           g5.   ;      begin
+     m122, g1.   ;      if entry on document then
+     m31         ;        prepare maincat entry;
+     m28         ;        test claims (remove):
+           r7.   ;          claims exceeded:  result 7;  (not possible)
+     m120        ;        delete entry;
+g1:              ;
+     m119        ;      end for all entries;
+g5:              ;
+     m121        ;    update entry count, if any deleted;
+     m117        ;    test more catalog segments to clean:
+           r3.   ;      more segments:  result 3;
+
+; all entries, belonging to curdoc, has been removed from main catalog:
+g10:             ; clear up:
+     m70         ;    base.work := catalog interval;
+     m67         ;    move auxcat name from chain to name.work;
+     m45         ;    search best area process:
+           r7.   ;      not found:  result 7;  (not possible)
+     m50         ;    (if area process then) delete area process;
+     m41         ;    terminate use of chain and disc;
+     m37 , t0    ;    state.chain := idle;
+     j0          ;    result ok;
+
+e.               ;
+
+
+
+; connect main catalog
+;
+; call:
+;   w1.sender :  main catalog name address
+;   w3.sender :  chainhead address
+;
+; return:
+;   w0.sender :  result = 0 : main catalog connected
+;                result = 1 : function forbidden in calling process
+;                result = 1 : area claims exceeded
+;                result = 2 : catalog io-error
+;                result = 2 : document not found
+;                result = 2 : state of document does not permit this call
+;                result = 3 : name does not exist in auxcat
+;                result = 3 : name overlap
+;                result = 3 : name already exists
+;                result = 4 : calling process is not user of device
+;                result = 5 : maincat size <= 0  or  maincat size too large
+;                result = 5 : key illegal
+;                result = 5 : interval illegal
+;                result = 5 : chain overlap
+;                result = 5 : chain outside limits
+;                result = 6 : claims exceeded
+;                result = 6 : docname format illegal
+;                result = 7 : main catalog already present
+
+b. g10 h.
+
+p56:             ; connect main catalog:
+     m8  , f72   ;    check function mask (main catalog handling);
+     m0  , g1.   ;    if maincat already exists then
+     j7          ;      result 7;
+g1:              ;
+     m109        ;    move chainhead.sender to work;
+     m84         ;    (size.work := 0;)
+     m36 , t21   ;    search chain (state = allowed for connect catalog);
+     m9          ;    check privileges;
+; prepare a search in auxcat for a main catalog:
+     m103        ;    move catalog name.sender to name.work;
+     m70         ;    base.work := catalog interval;
+     m17         ;    test new system name (wrk-name not allowed):
+           r3.   ;      overlap:  result 3;
+           r3.   ;      exact  :  result 3;
+     m4          ;    set auxcat;
+     m10         ;    search best entry (in aux catalog):
+           r3.   ;      not found:  result 3;
+     m87         ;    if size.work <= 0 then
+           r5.   ;      result 5;
+     m76         ;    test auxkey  (and interval);
+     m37 , t2    ;    state.chain := during insert;
+     m21         ;    copy chain and cut down;
+; claim an auxcat entry and the slices used for main catalog
+     m26         ;    set claims (create aux entry):
+           r6.   ;      claims exceeded :  result 6;
+     m19         ;    test chain errors;
+     m66         ;    docname.work := docname.curdoc;
+     m46 , 0     ;    setup area process (procfunc) for main catalog area;
+     m39         ;    set maincat and prepare claims;
+     m5          ;    set maincat;
+     m42         ;    clean main catalog;
+     m67         ;    move auxcat name from chain to name.work;
+     m70         ;    base.work := catalog interval;
+     m45         ;    search best area process:
+           r7.   ;      not found:  result 7;  (not possible)
+     m47 , 2     ;    include (sender) as user of auxcat area process;
+     m49         ;    let sender be reserver of auxcat area process;
+                 ;      (see the hint in ..prepare backing storage..)
+
+; insert all existing chainheads in main catalog
+     m123        ;    for all existing chaintables do
+           r0.   ;      begin
+     m31         ;      prepare maincat entry;
+     m30         ;      test claims (create);
+           r6.   ;        claims exceeded:  result 6;
+     m70         ;      base.work := catalog interval;
+     m14         ;      compute namekey;
+     m55         ;      find empty entry:
+           r6.   ;        no room:  result 6;
+     m56         ;      modify cur entry;
+     m119        ;      end for;
+                 ;    result ok;
+
+e.               ;
+
+
+
+; remove main catalog
+;
+; return:
+;   w0.sender :  result = 0 : main catalog removed
+;                result = 7 : main catalog not present
+
+p57:             ; remove main catalog:
+     m8  , f72+f71;   check function mask (main catalog handling);
+     m0  , r7.   ;    if no maincat then result 7;
+     m68         ;    move maincat name from pseudo chainhead to name.work;
+     m70         ;    base.work := catalog interval;
+     m45         ;    search best area process:
+           r7.   ;      not found:  result 7;  (not possible)
+     m50         ;    (if area process then) delete area process;
+     m4          ;    set auxcat;  (i.e. prevent further use of main catalog)
+     m2          ;    clear maincat;
+     j0          ;    result ok;
+
+
+
+; create aux entry and area process
+;
+; call:
+;   w1.sender :  entry address
+;   w2.sender :  docname address
+;   w3.sender :  procname address
+;
+; return:
+;   w0.sender :  result = 0 : entry and areaprocess created
+;                result = 1 : function forbidden in calling process
+;                result = 1 : area claims exceeded
+;                result = 2 : catalog io-error
+;                result = 2 : document not found
+;                result = 2 : state of document does not permit this call
+;                result = 3 : procname overlap
+;                result = 3 : procname already exists
+;                result = 3 : entryname overlap (in auxcat)
+;                result = 3 : entryname already exists (in auxcat)
+;                result = 4 : calling process is not user of device
+;                result = 4 : claims exceeded
+;                result = 5 : key illegal
+;                result = 5 : interval illegal
+;                result = 6 : entryname format illegal
+;                result = 6 : procname  format illegal
+;                result = 6 : docname format illegal
+
+b. g10 h.
+
+p60:             ; create aux entry and area process:
+     m8  , f76   ;    check function mask (create aux entry);
+     m104        ;    move docname.sender to docname.work;
+     m84         ;    (size.work := 0;)
+     m36 , t28   ;    search chain (state = allowed for create aux);
+     m9          ;    check privileges;
+     m107        ;    move entry.sender to work;
+     m90         ;    first slice.work := 0;
+     m88 , g1.   ;    if size.work >= 0 then
+     m66         ;      docname.work := docname.chain;
+g1:              ;
+     m76         ;    test auxkey and interval;
+; scan the auxcat to see if the new entry may be created:
+     m4          ;    set auxcat;
+     m18         ;    test new catalog name (in auxcat):
+           r3.   ;      overlap:  result 3;
+           r3.   ;      exact  :  result 3;
+     m37 , t6    ;    state.chain := during aux entry manipulation;
+     m22 , 2.10  ;    compute slices to claim  (compute new slices);
+     m26         ;    test claims (create aux entry):
+           r4.   ;      claims exceeded:  result 4;
+     m23         ;    adjust chain to size;
+     m55         ;    find empty entry:
+           r4.   ;      no room:  result 4;
+     m6          ;    dump chaintable;
+     m56         ;    modify cur entry;
+; prepare for testing of the area-process name:
+     m5          ;    set maincat;
+     m100        ;    move name.sender to name.work;  (i.e. get procname)
+     m15         ;    test new system name (wrk-name allowed):
+           r3.   ;      overlap:  result 3;
+           r3.   ;      exact  :  result 3;
+     m46 , 2     ;    setup area process (sender);
+     m49         ;    let sender be reserver of the area-process;
+     m101        ;    move name.work back to name.sender (if wrk-name);
+     j0          ;    result ok;
+
+e.               ;
+
+
+
+; remove aux entry
+;
+; call:
+;   w1.sender :  entry address
+;   w2.sender :  docname address
+;
+; return:
+;   w0.sender :  result = 0 : aux entry removed
+;                result = 1 : function forbidden in calling process
+;                result = 2 : catalog io-error
+;                result = 2 : document not found
+;                result = 2 : state of document does not permit this call
+;                result = 3 : entry does not exist (in auxcat)
+;                result = 6 : entry nameformat illegal
+;                result = 6 : docname format illegal
+
+p61:             ; remove aux entry:
+     m8  , f76   ;    check function mask (create aux);
+     m104        ;    move docname.sender to docname.work;
+     m84         ;    (size.work := 0;)
+     m36 , t28   ;    search chain (state = allowed for aux entry manipulation
+     m9          ;    test privileges;
+     m4          ;    set auxcat;
+     m107        ;    move entry.sender to work;
+; notice: there is no check upon legality of interval
+     m10         ;    search best entry (in auxcat):
+           r3.   ;      not found:  result 3;
+; notice: it is not checked that it was the rigth entry (i.e. same base)
+     m37 , t4    ;    state.chain := during aux entry manipulation;
+     m57         ;    delete cur entry;
+; notice: the entry- and slice-claims are not released, nor is the slice-chain
+     j0          ;    result ok;
+
+
+
+n49:             ; start of monitor call-table:
+     p20., p21., p22., p23., p24., p25., p26., p27., p28., p29.,
+     p30., p31., p32., r7. , p34., p35., p36., p37., p38., p39.,
+     p40., r7. , p42., r7. , r7. , p45., p46., r7. , r7. , r7. ,
+     r7. , p51., p52., p53., p54., p55., p56., p57., r7. , r7. ,
+     p60., p61.,
+w.
+
+m. *** start of procfunc testbuffer
+d49:             ; start of test buffer
+     0, r.100    ;
+d50:             ; top   of test buffer
+m. *** top of test buffer
+
+j0 = j0+n50 , j1 = j1+n50 , j2 = j2+n50 , j3 = j3+n50 , j4 = j4+n50 ,
+j5 = j5+n50 , j6 = j6+n50 , j7 = j7+n50
+
+
+
+
+; record cat buf:
+;   this record holds the current catalog segment.  if its content is
+;   changed, then the segment is rewritten onto the backing store at
+;   the very end of all process function actions.
+
+d0: -1, r.f9>1                  ; cat buf (0:size-2);
+d18: 0                          ;   last word of cat buf.
+d19 = d0 - 2 + f10*f0           ;   abs addr of last word of last entry
+                                ;      in cat buf.
+
+; interrupt address (used during debugging):
+;   proc func is entered here after programming errors.
+
+c.  (:a92>21a.1:) -1
+e30: 0, r.7                     ; ia: save for registers;
+     al. w1   e30.              ;   if included print then
+     rl  w0   x1+0              ;   begin
+     jd     1<11+28             ;     for i:=ia step 2 until ia+12 do
+     al  w1   x1+2              ;      print w (word(i));
+     sh. w1   e30.+12           ;     wait forever in disabled mode;
+     jl.      -8                ;
+     jl.      (2)
+     j7
+z.c. -(:a92>21a.1:)             ;   else
+e30 = 0,z.                      ;   ia:= 0;
+
+; code for printing of proc func variables during debugging:
+e28: c.(:a92>19a.1:) -1         ; if test call included 
+b.   g24                        ; then begin
+w.   jl.     x1+g0.             ;   goto case print param of (
+g0:  jl.     (g17.)             ;      0:  error 7,
+     jl.      g1.               ;      2:  print cur entry,
+     jl.      (g17.)            ;      4:  print pf variables);
+
+g1:  rl. w3  (g13.)             ; print cur entry:
+     al  w2  x3+f0              ;   for addr:= cur entry addr
+g3:  rl  w1  x3                 ;   step 2 until cur entry addr+entry size
+     jd     1<11+30             ;   do  print x (word(addr));
+     al  w3  x3+2               ;
+     sh  w3  x2                 ;
+     jl.      g3.               ;
+     jl.     (g11.)             ;   goto error 1;
+
+g11: j1, g17: j7,  g13: d3, 
+e.z.                            ; end;
+
+; define the last b-names:
+
+b61 = k         ;   top address.proc func
+b62 = e30       ;   interrupt address.proc func
+b63 = j10+2     ;   waiting point
+b65 = e8        ;   procedure move words  (used during debugging)
+i.              ; id list of process functions
+
+; after loading:
+b.   g0                         ; begin
+w.g0:al. w2   g0.               ; define last:
+     jl      x3                 ;   autoload(next segment,top proc func);
+
+     jd.      g0.               ; after loading: goto define last;
+e.                              ; end.  the load code is removed;
+  j21=k - b127 + 2
+
+k = b61         ; top proc func
+e.              ; end proc func segment
+
+; segment 7:  Initialize  process  functions
+;   this segment initializes the process descriptions for the first internal
+;   process (proc func). it is executed and then removed
+;   immediately after loading.
+
+s.   g6                      ; begin  init proc func:
+w.b127=k, g6, k=k-2
+
+; process description for process functions:
+
+w.                           ;
+g0:  a107,a108               ;   interval
+     0,0,<:proc func:>       ;   kind and pseudo name;
+h.   0,     a102             ;   stop count, state = waiting for message;
+w.   1<23                    ;   ident bit
+     b29+a15, r.2            ;   next, last event
+     b29+a16, r.2            ;   next, last process
+     b60    , b61            ;   first, top address
+h.   1,a112+1,0,-1           ;   claims and function mask;
+w.   -1                      ;   catalog mask
+h.   2.1000 0000, 0          ;   pr, pk
+w.   a89 , b62               ;   im, ia
+     0, r.5                  ;   w0-w3, ex
+     b63                     ;   IC = waiting point
+     0,r.9                   ;   rest of process description cleared
+     a107,a108               ;   catalog base
+     a107,a108               ;   max interval
+     a107,a108               ;   standard interval
+h.   0, r.(:a4+g0.+1:)       ;   fill
+w.
+
+; init code:
+
+g4:  al. w2   g0.            ; init:  w2:= descr(proc func);
+     rl  w1   b6             ;        w1:= descr(first internal);
+     rl  w1 x1+0             ;
+
+g2:  rl  w0 x2               ; proc func process:
+     rs  w0 x1-4             ;
+     al  w1 x1+2             ;   move(descr(proc func) to:
+     al  w2 x2+2             ;       (descr(first internal)));
+     se. w2   g4.            ;
+     jl.      g2.            ;
+
+g5:  al. w2   g0.            ; autoloader(load addr defined);
+     jl     x3               ; comment: remove init code;
+
+     jl.      g4.            ; after loading: goto init;
+g6= k - b127 + 2
+
+k = b61                      ; k= first after proc func;
+e.                           ; end init proc func
+
+m.                monitor text 10 included

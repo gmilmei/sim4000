@@ -1,0 +1,4 @@
+First line.
+Keep this line.
+Remove this line.
+Last line.

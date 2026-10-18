@@ -1,0 +1,70 @@
+MIT License
+
+Copyright (c) 2026 SIM4000 contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+of the Software, and to permit persons to whom the Software is furnished to
+do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+
+---------------------------------------------------------------------------
+Scope and third-party caveats (not amendments to the MIT terms above)
+---------------------------------------------------------------------------
+
+The MIT grant above covers the new native-project contributions only to the
+extent that their contributors hold the necessary rights. It is not a blanket
+license for everything found in this repository or a binary archive. Existing
+third-party notices and permissions retain their own scope and conditions.
+
+1. Original emulator and source-guided adaptations
+
+The original emulator was designed and programmed by Henrik A. Jacobsen
+(Henrik Ascanius Jacobsen). He has permitted use of his own work with credit;
+this does not transfer his rights or make him the author of the new emulator.
+The pinned V_1.2_DB reference has its own MIT notice, retained in
+doc/impl/V_1.2_DB_LICENSE.txt in the source tree and licenses/ in binary archives.
+That notice is applicable reference evidence, not a license assignment for all
+upstream versions or all historical software. Preserve applicable attribution.
+
+2. Historical monitors, disk images and guest software
+
+MONITOR, STDMON, UNIT0, UNIT0.original, monsrc/, historical listings and guest
+programs include material originating with Regnecentralen, RC/ICL and other
+parties. Adapted guest utilities may likewise contain historical material.
+These materials are excluded from the new-contribution MIT grant. Their
+copyrights, notices and any existing permissions remain with the relevant
+rights holders. Public availability in an archive does not by itself grant
+redistribution permission. Unresolved rights must be reviewed before public
+distribution; merely building a binary archive does not resolve them.
+
+3. Third-party libraries and combined binaries
+
+GNU Readline is a separate dependency licensed under GNU GPL version 3 or
+later, not under this MIT grant. System libraries are not bundled by the
+binary-distribution target. Linking a system-provided library does not by
+itself settle the applicable conditions for distributing a combined executable.
+The Readline license text is retained in licenses/GPL-3.0.txt. Review the
+applicable GPL terms, including source-related obligations, before publishing
+binaries. This MIT grant for new contributions does not override them.
+
+Other third-party software, documentation and historical source quotations
+retain their own rights and terms; inclusion is not permission to relicense
+them. The packaged manual is a compiled document, not a bundle of its fonts
+or of the TeX tools used to build it.
+
+The source tree's doc/impl/PROVENANCE_REVIEW.md records the engineering
+provenance and open permission questions. These caveats identify scope;
+they are not a new permission from a third-party rights holder.

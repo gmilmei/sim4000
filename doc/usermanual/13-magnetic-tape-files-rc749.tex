@@ -1,0 +1,48 @@
+\chapter{Magnetic-tape files (RC749)}\label{magnetic-tape-files-rc749}
+\index{Magnetic tape}
+\index{RC749}
+
+\section{Enable and mount an RC749 device}\label{enable-and-mount-an-rc749-device}
+\index{RC749!operator-controlled mounting}
+
+RC749 is an optional read-only magnetic-tape device based on the additional protocol in Henrik Jacobsen's \passthrough{\lstinline!V\_1.2\_DB!} emulator. It is distinct from the paper-tape reader. Enable it with a free device number and interrupt level; the following are free in the default configuration:
+
+\begin{commandexample}{RC4000.cfg contents: declare an operator-controlled RC749 device}
+DEFINE RC749 DEVNO=16 INTNO=11
+\end{commandexample}
+
+Restart with that device declaration before using it. At the suspended simulator prompt (not guest FP), these are media-control examples; they do not read or install the software themselves:
+
+\begin{commandexample}{Simulator prompt: RC749 media controls}
+attach 16 software.tap
+show media
+rewind 16
+detach 16
+\end{commandexample}
+
+\passthrough{\lstinline!show media!} reports the file, logical record position, record count, status and transfer counters. Position zero is the beginning of tape. Tape marks count as records; erase-gap markers do not. Detach before replacing a tape. RC749 does not accept writable or overlay modes. The host file is always opened read-only, and guest write/erase commands report intervention rather than pretending to succeed.
+
+\section{Recognize the supported tape format}\label{recognize-the-supported-tape-format}
+\index{RC749!TAP format}
+\index{RC749!record position}
+
+For a startup tape, add \passthrough{\lstinline!FILE=tapes/software.tap!}. Configuration paths are relative to the configuration file; operator \passthrough{\lstinline!attach!} paths are relative to the current working directory. The accepted format is tagged TAP: 32-bit little-endian lengths surrounding each data record, a padding byte after odd-length payloads, zero-length tape marks, erase-gap and end-of-medium markers, and record-error flags. It is not a raw byte stream or a guarantee of support for every extended TAP variant. Mount rejects truncated or mismatched records. Record transfers are limited to 7,680 bytes; larger records are skipped with block-length status.
+
+\begin{operationnote}{A mounted tape is not an installed guest program}
+The extension \passthrough{\lstinline!.tap!} alone does not establish the record format or guest compatibility. Keep archived originals unchanged, inspect the format before mounting, and do not rewrite a magnetic-tape container as raw paper-tape bytes. Rewind changes tape position, not the CPU or guest process state.
+\end{operationnote}
+
+Guest software can read records, sense status and byte counts, space forward or backward by record/file, rewind and unload. This does not automatically install software or change the bundled monitor's device definitions. Using an archived tape requires compatible guest software and monitor definitions; no historical software tape is bundled or verified yet.
+
+\section{Opt in to guest-requested tape mounting}\label{opt-in-to-guest-requested-tape-mounting}
+\index{RC749!guest-requested mounting}
+
+The DB emulator also repurposes output-even as a guest-requested mount. This extension is disabled unless an explicit \passthrough{\lstinline!ROOT!} is configured:
+
+\begin{commandexample}{RC4000.cfg contents: opt in to guest-requested mounting}
+DEFINE RC749 DEVNO=16 INTNO=11 ROOT=tapes
+\end{commandexample}
+
+This is an alternative device declaration, not a second device with the same number. The root directory must already exist; a relative \passthrough{\lstinline!ROOT!} is resolved against the selected configuration file. It authorizes compatible guest software to request tapes beneath that directory without an operator \passthrough{\lstinline!attach!} command, but provides no guest installer or automatic mount dialog.
+
+Guest filenames must be relative Unix paths beneath that directory. Absolute paths, \passthrough{\lstinline!.!}/\passthrough{\lstinline!..!} components, symlinks and non-regular files are rejected. A failed replacement leaves the previously mounted tape intact and reports an error. Omit \passthrough{\lstinline!ROOT!} if only operator-controlled mounts are wanted. No host environment variables or historical drive-letter paths are used.

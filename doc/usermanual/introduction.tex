@@ -1,0 +1,67 @@
+This manual explains how to build and use the native emulator. You do not need to know its C implementation, historical Pascal source, or CPU internals to run the supplied RC4000 system.
+
+Development and testing use Linux on x86-64. The runtime uses C17, POSIX interfaces and GNU Readline. Other hosts, including macOS, have not been validated; platform-specific setup and testing are left to interested contributors.
+
+For supported-system boundaries and known differences from hardware and the DOS emulator, see \textit{Compatibility and Limitations} (\path{doc/COMPATIBILITY.md}).
+
+The local terminal can address three command interpreters: the simulator, the RC system process \passthrough{\lstinline!s!}, and FP inside a user process. Commands for one must not be entered at another.
+
+For the separate automatic TEM/PRIMO/SOS environment, read
+\manualref{mips-ts}{MIPS/TS: a terminal session}. It has its own disk pair,
+demonstration login and resource limits. The default-profile process-creation
+and host-import exercises are not additional steps in a MIPS/TS login.
+
+\section*{Reading commands and responses}
+
+Examples throughout the manual have context titles: host shell,
+simulator prompt, guest system process \texttt{s}, guest FP, a tool's own
+input, or configuration/file contents. These titles
+are not text to enter. Output examples are labelled separately; do not type
+the monitor's messages or prompts. Return submits each command line unless
+the accompanying instructions say otherwise.
+
+Angle-bracketed key names such as \texttt{<Control-E>} describe a key press,
+not literal input. Likewise, \texttt{local:} and \texttt{remote:} in
+two-terminal transcripts identify the terminal; omit these prefixes when
+typing. Ellipses in displayed results stand for session-dependent fields,
+not text to enter. Monospaced names in prose identify commands, files or
+configuration settings; their context still determines where to use them.
+
+Local emulator-escape examples use Control-E, the shipped default. Substitute
+your configured \texttt{OPERATOR ESCAPE} key if you change it; Control-E at
+Readline's operator prompt is instead a line-editing binding. Remote Telnet
+attention uses its endpoint's own setting, not the local emulator escape key.
+See \manualref{keyboard-and-date-settings}{keyboard settings} and
+\manualref{request-guest-attention-not-emulator-suspension}{remote attention}.
+
+Syntax-reference blocks are not scripts: brackets indicate optional arguments,
+vertical bars indicate alternatives, and uppercase placeholders name values
+you must supply. Fresh-session examples are independent unless their text
+explicitly continues an earlier procedure. A command returning without an
+error is evidence for that example, not every function of the historical tool.
+
+Cross-references within this manual include a page number for use with a printed
+manual. References to \path{doc/} files are repository-relative paths, not
+runtime files or files inside the guest disk image.
+
+\section*{Terms used in this manual}
+\begin{description}
+\item[Simulator] The emulator program running on the host. Its \texttt{sim4000>} prompt controls
+execution, media and debugging; it is outside the guest operating system.
+\item[System process \texttt{s}] The guest supervisor's command interface for
+creating and controlling processes.
+\item[FP] The file processor: a guest command interpreter inside an ordinary
+user process. It starts utilities, compilers and other programs.
+\item[Catalog entry and scope] A guest name and its metadata. Temporary scope
+belongs to a process's work; retained user scope can survive process removal.
+Neither scope by itself determines whether host disk writes survive exit.
+\item[Segment and RC byte] Guest allocation and addressing units.
+A backing-store segment holds 256 24-bit words (768 host bytes).
+An RC byte is a 12-bit halfword, not an eight-bit host byte.
+\item[Overlay] Changes kept separately from the base disk image.
+A volatile overlay disappears on emulator exit; a persistent overlay is
+saved in its own host file and must stay with the matching base image.
+\item[Attention and suspension] Guest attention selects which process receives
+terminal input. Emulator suspension stops CPU execution and opens the
+simulator prompt. They are not interchangeable.
+\end{description}

@@ -1,0 +1,1547 @@
+
+
+
+m.                monitor text 1
+
+; segment 1
+; rc 05.08.70  bj|rn |-thomsen
+;
+; start segment 10 in its last word
+
+
+s. i2
+w.
+
+i0:             i2.     ;   length of segment 1
+                 0      ;   init cat switch: writetext
+i1:              0      ;   init cat switch: medium
+
+; entry from autoloader:
+     al. w3     i0.     ;   calculate top address of
+     wa  w3  x3+0,r.10  ;   segment 10;
+     al. w2     i2.     ;   insert start address of segment 2;
+     dl. w1     i1.     ;   get init cat switches
+     jd      x3-2       ;   jump to segment 10
+i2:                     ;   first word of segment 2
+
+; exit with:
+;   w0, w1 = init cat switches
+;   w2     = start address of segment 2
+
+e.   ;  end segment 1
+
+
+b. f20, e65, d120, c60
+
+; segment 2: monitor
+
+s. k = 8, j29
+w.b127=k, j29, k=k-2
+; segment structure:
+;     monitor table          (b names)
+;     interrupt response     (c names)
+;     utility procedures     (d names)
+;     monitor procedures     (e names)
+;     name table             (f names)
+;     process descriptions   (f names)
+;     buffers                (f names)
+;
+;     (g and h and i names are used locally)
+
+; monitor table:
+
+w.     0     ; <interrupt number>
+       0     ; <system start address>
+       0     ; <interrupt response>
+       0     ; <start key response>
+   b0:       ; <interrupt 0-24>
+       0, r.25
+   b1: 0     ; <current process>
+   b2: 0     ; <next running process>
+       0     ; <last running process>
+   b3: 0     ; <name table start>
+   b4: 0     ; <first device in name table>
+   b5: 0     ; <first area in name table>
+   b6: 0     ; <first internal in name table>
+   b7: 0     ; <name table end>
+   b8: 0     ; <next message buffer>
+       0     ; <last message buffer>
+       0     ; <message pool start>
+       0     ; <message pool end>
+       0     ; <message buffer size>
+   b22: 0    ; <first drum chain>
+   b23: 0    ; <first disc chain>
+   b24: 0    ; <chain end>
+   b25: 0    ; <main cat chain table>
+   b28: 0    ; <max key>, <last byte in internal process descr>
+   b10: 0    ; <maximum time slice>
+   b11: 0    ; <time slice>
+   b12: 0    ; <microseconds>
+   b13: 0    ; <time>
+        0    ;
+   b14: 0    ; <clock value>
+   b15: 0    ; <clock device no * 64>
+        0    ; <no of storage bytes>
+        0    ; <min global key>,<min aux cat key>
+   b16 = k   ; <first monitor procedure>
+        0, r.63
+   b17 = k-2 ; <last monitor procedure>
+   b18: 0    ; <current buffer address>
+   b19: 0    ; <current receiver>
+   b20: 0    ; <interrupt return address>
+   b21: 0    ; <process link in dummy internal process>
+   b99: 0    ; <start of local subprocess descriptions>
+   b100: 0   ; <start of remote subprocess desc>
+   b110: 0   ; <error log process>
+   b111: 0   ; <error log entry>
+   b114: 0   ; <name of monitor>
+         0   ;    -   -    -
+         0   ;    -   -    -
+   b115: 0   ;    -   -    - 
+b101:  0  ; return addr from subprocs
+b102:  0  ; start of table(subproc-drivers)
+b103:  0  ; address of entry for send message for link-driver areas
+   b26 = b5  ; use areaprocesses as pseudoprocesses
+
+b. g24
+
+; comment: after loading and initialization, the system is
+; started by: jl (10) which enters the monitor here:
+
+w.c25:io  w2 (b15)      ; system start:
+      rs  w2  b14       ;   clock:= sense(timer);
+      ic      -1        ;   ir(0:23):= 0;
+      al  w1  256       ;
+      ls  w1  6         ;   for device no:= 255
+      al  w1  x1-64     ;   step -1 until 0 do
+      io      x1+0      ;   sense(device no);
+      sl  w1  1
+      jl.     -6
+      jl  w3  j8        ;   select internal;
+      jl      g0        ;   goto interrupt return;
+
+  c26:jd.     0         ; start key response: wait forever in disabled mode;
+
+                        ; interrupt response:
+  c27:am (b1)           ;   save w0(cur):= w0;
+      ds  w1  a29       ;   save w1(cur):= w1;
+      rl  w1  b1        ;   save w2(cur):= w2;
+      ds  w3  x1+a31    ;   save w3(cur):= w3;
+      xs      x1+a32+1  ;   save ex(cur):= ex;
+      dl  w3  10        ;   save ic(cur):= word(10);
+      rs  w3  x1+a33    ;
+      jl     (x2+b0)    ;   goto case word (8) of
+                        ;   (0: interrupt 0
+                        ;        - - -
+                        ;   48: interrupt 24);
+; w1 = cur, w2 = interrupt no, w3 = save ic
+
+  c24:                  ; interrupt 24:
+b.h24
+w.g0: rl  w1  b1        ; interrupt return:
+      rl  w3  x1+a33    ;   word(10) := save ic(cur);
+      rs  w3  10        ;   if protected (word(10))
+      sp      x3+0      ;   and protection key(cur) <> 0
+      jl      h1        ;   then goto program error;
+  h0: xl      x1+a32+1  ;   ex:= save ex(cur);
+      dl  w3  x1+a31    ;   w3:= save w3(cur);
+      dl  w1  x1+a29    ;   w2:= save w2(cur);
+      ic     (h2)       ;   w1:= save w1(cur);
+      je     (10)       ;   w0:= save w0(cur);
+  h1: bz  w0  x1+a25    ;   ir(1:2):= 0;
+      sn  w0  0         ;   enabled goto word(word(10));
+      jl      h0        ;
+
+  g1: al  w0  a96       ; program error:
+      jl  w3  j9        ;   remove internal(running after error, irrelevant);
+      jl      g0        ;   goto interrupt return;
+  h2: 2.11<21           ;
+e.
+
+b.h24
+w.c0:                   ; interrupt 0:
+      rl  w2  x3-2      ;   function:= word(save ic(cur) - 2)
+      ws  w2  h0        ;              -jd 1<11;
+      sl  w2  0         ;   if function < 0
+      sl  w2  b17-b16+2 ;   or function > max function
+      jl      j28       ;   then goto internal 0;
+      al  w3  g0        ;
+      rs  w3  b20       ;   return:= interrupt return;
+      so  w2  2.1       ;   if even function then
+      jl     (x2+b16)   ;   goto monitor call(function);
+;     w1 = cur, w2 = function
+      se  w2  5         ; 93-11-21 19:01 HJ **** 
+      jl      c28       ; monitor(5): own process description
+      rs  w1  x1+a29    ;   saved w1(cur):=cur;
+      jl      g0        ;   goto return;
+
+  c28:am (b6)           ; internal 0:
+      se  w1  (0)       ;   if cur = name table(first internal)
+      jl       h2       ;
+      sn  w2  (h1)      ;   and function = aw  w3
+      jl       g2       ;   then goto from process functions;
+  h2: am       -2       ;   cause:= 0
+  c1: am      -2        ; interrupt 1: or 2
+  c2: am      -2        ; interrupt 2: or 4
+  c29:al  w0  6         ; internal 3:  or 6;
+      rl  w1  b1        ;
+      al  w3  k+7       ;   link:= k+7;
+      se  w0  0         ;   if cause <> 0 then
+      jl     (b111)     ;     error log entry(link);
+      rl  w2  x1+a27    ;   ia:= interrupt address(cur);
+      sn  w2  0         ;   if ia = 0
+      jl      g1        ;   then goto program error;
+      rl  w3  x1+a33    ;   word(ia+12):= cause;
+      ds  w0  x2+12     ;   word(ia+10):= save ic(cur);
+      rl  w0  x1+a32    ;
+      rs  w0  x2+8      ;   word(ia+8):= save ex(cur);
+      dl  w0  x1+a31    ;   word(ia+6):= save w3(cur);
+      ds  w0  x2+6      ;   word(ia+4):= save w2(cur);
+      dl  w0  x1+a29    ;   word(ia+2):= save w1(cur);
+      ds  w0  x2+2      ;   word(ia):= save w0(cur);
+      al  w2  x2+14     ;
+      rs  w2  x1+a33    ;   save ic(cur):= ia + 14;
+      jl      g0        ;   goto interrupt return;
+  h0: jd 1<11
+  h1: aw w3
+e.
+
+; external single interrupt:
+; comment: a single interrupt source connected to one interrupt bit.
+; the interrupt response causes a jump to a single instruction
+; placed on top of a process description, for example:
+;          c5: jl  w1  c30
+;        c5+2: <process description>
+
+  c30:
+c.(:a92>20a.1:)-1       ;   if testoutput then
+      ds  w3  j0        ;   begin save 2:= w2; save 3:= w3;
+      jl  w3  j3        ;         print w1(proc);
+z.    al  w1  x1+4      ; x1 = current process
+      rs  w1  b19       ;   end;
+      rl  w2  x1+a54    ;   proc:=link;
+      rs  w2  b18       ;   buf:=next mess(proc);
+      al  w3  g0        ;
+      rs  w3  b20       ;   return:=interrupt return;
+      jl     (x1+a56)   ;   goto interrupt addr(proc);
+;     w1 = proc  w2 = buf
+
+; external multiple interrupt:
+; comment: multiple interrupt sources connected to one interrupt bit.
+; the interrupt response cause a jump to a single instruction
+; placed on top of a table defining the digital register and
+; the interrupt sources, for example:
+;          c9: jl  w1  c31
+;        c9+2: <device number * 64>
+;        c9+4: <process description address>
+;        c9+6: <process description address>
+;        etc.
+
+b.h24
+w.c31:al  w3  h2        ;   return:= multi return;
+      rs  w3  b20       ;   table:= link;
+      io  w2 (x1+0)     ;   digital:= sense(word(table));
+      al  w3  0         ;   digital:= (digital con 0) shift -2;
+      ld  w3  -2        ; continue:
+  h1: nd  w3  0         ;   normalize(digital,exp);
+      so  w0 (h5)       ;   if exp(1)=0 then
+      jl      g0        ;     goto interrupt return;
+      bs  w1  0         ;   table:= table-exp;
+      bs  w1  0         ;   table:= table-exp;
+      ws  w2  h5        ;   digital(1):= 0;
+      ds  w2  h3
+      rs  w3  h4
+      rl  w1  x1+0
+      rs  w1  b19       ;   proc:= word(table);
+      rl  w2  x1+a54
+      rs  w2  b18       ;   buf:= next mess(proc);
+c.(:a92>20a.1:)-1       ;   if testoutput then
+      ds  w3  j0        ;   begin save2:= w2; save3:= w3;
+      jl  w3  j3        ;     print w1(proc)
+z.                      ;   end;
+      jl     (x1+a56)   ;   goto interrupt addr(proc);
+;     w1=proc  w2=buf
+  h2: dl  w2  h3        ; multi return:
+      rl  w3  h4
+      jl      h1        ;   goto continue;
+      0                 ;
+  h3: 0                 ;
+  h4: 0
+  h5: 1<22              ; bit 1
+e.
+
+; wait interrupt:
+; wait interrupt(proc):
+; comment: saves an interrupt address for an external process.
+;     call:
+; w0
+; w1
+; w2
+; w3  interrupt address
+;     call:
+; w0
+; w1  proc
+; w2
+; w3  interrupt address
+  c42:rl  w1  b19      ;
+  c32:al  w3  x3+2     ;  
+      rs  w3  x1+a56   ;   interrupt addr(proc):=link;
+      jl     (b20)     ;   goto return;
+
+; dummy interrupt:
+  c33:jl  w3  c32      ;   wait interrupt(proc);
+      jl      c33      ;  
+      jl      c33      ;   goto dummy interrupt;
+
+; from process functions:
+; comment: process functions call the monitor by executing
+; the instruction  jd  w3  1<11+0 ;
+
+b.h24
+w.g2: al  w0  a102     ;
+      rl  w2  x1+a15   ;   proc:=next(event q(cur));
+      sn  w2 (x1+a15+2);   if proc=last(event q(cur))
+      jl  w3  j9       ;   then remove internal(wait mess,x);
+      jl  w3  j5       ;   remove(proc);
+      al  w1  x2-a16   ;
+      jl  w3  j10      ;   link internal(proc);
+      jl      g0       ;   goto return;
+e.
+e.   ; end of interrupt response
+
+; monitor utility procedures
+
+; procedure print w0
+; procedure print w1
+; procedure print w2
+; procedure print w3
+; comment: prints the contents of a working register as a signed
+; integer on typewriter 2 in disabled mode. only used for testoutput.
+; before the call w2 and w3 must be saved in double-word d0.
+; after return all registers are restored.
+;       call:    return
+; w0             unchanged
+; w1             unchanged
+; w2    saved    restored
+; w3    link     restored
+
+b.g24                   ; begin
+w.g0: 0, r.4, 10<12     ; comment: textstring,
+  g1:  10               ; ten,
+  g2: 0                 ; return,
+      0, g3: 0, 0       ; save 0, save 1, save 2,
+  d0: 0                 ; save 3;
+  d1: am  2             ; print w3: number:= save 3
+  d2: am  d0-4          ; print w2:       or save 2
+  d3: am  2             ; print w1:       or w1
+  d4: rl  w2  0         ; print w0:       or w0;
+      ds  w1  g3        ;   save 1:= w1;
+      rs  w3  g2        ;   save 0:= w0;
+c.(:a92>21a.1:)-1       ;
+      al  w3  g0+7      ;   addr:= textstring + 7;
+      sl  w2  0         ;   if number < 0 then
+      jl      g5        ;   begin
+      al  w1  45        ;     write(device, <:-:>);
+      io  w1 (g9)       ;
+  g4: io  w1 (g10)      ;   wait: sense(device);
+      sx      2.11      ;     if ex then goto wait;
+      jl      g4        ;     number:= -number
+      ac  w2  x2+0      ;   end;
+  g5: al  w1  0         ; convert:
+      wd  w2  g1        ;   number:= number/10;
+      al  w1  x1+48     ;   byte(addr):=
+      hs  w1  x3+0      ;   number mod 10 + 48;
+      al  w3  x3-1      ;   addr:= addr - 1;
+      se  w2  0         ;   if number <> 0
+      jl      g5        ;   then goto convert;
+      jl      g8        ;   goto next;
+  g6: io  w1 (g9)       ; print:
+  g7: io  w1 (g10)      ;   write(device, char);
+      sx      2.11      ; wait: sense(device);
+      jl      g7        ;   if busy then goto wait;
+  g8: al  w3  x3+1      ; next: addr:= addr + 1;
+      bz  w1  x3+0      ;   char := byte(addr);
+      se  w1  0         ;   if char <> 0
+      jl  g6            ;   then goto print;
+z.
+      ic     (g11)      ;   ir(interrupt no):= 0;
+      dl  w1  g3        ;   w0:= save 0; w1:= save 1;
+      dl  w3  d0        ;   w2:= save 2; w3:= save 3;
+      jl     (g2)       ;
+  g9: 2<6+3             ; comment: device write,
+  g10:2<6               ; device sense,
+  g11:1<16              ; interrupt bit;
+e.                      ; end
+
+; procedure remove(elem)
+; comment: removes a given element from a queue.
+;      call:    return:
+; w0            unchanged
+; w1            unchanged
+; w2   elem     elem
+; w3   link     next(elem)
+
+b.g24                   ; begin
+w.d5: rs  w3  g0        ;
+c.(:a92>20a.1:)-1       ;   if testoutput then
+      ds  w3  d0        ;   begin save 2:= w2; save 3:= w3
+      jl  w3  d2        ;         print w2(elem);
+z.                      ;   end;
+      rl  w3  x2+2      ;
+      am     (x2+0)     ;
+      rs  w3  2         ;   last(next(elem)):= last(elem);
+      rl  w3  x2+0      ;
+      rs  w3 (x2+2)     ;   next(last(elem)):= next(elem);
+      rs  w2  x2+0      ;
+      rs  w2  x2+2      ;   next(elem):= last(elem):= elem;
+      jl     (g0)       ;
+  g0: 0                 ; comment: link,
+e.                      ; end
+
+; procedure link(head, elem)
+; comment: links a given element to the end of a queue
+;     call:   return:
+; w0          unchanged
+; w1  head    head
+; w2  elem    elem
+; w3  link    old last(head)
+
+b.g24                   ; begin
+w.d6: rs  w3  g0        ;
+c.(:a92>20a.1:)-1       ;   if testoutput then
+      ds  w3  d0        ;   begin save 2:= w2; save 3:= w3
+      jl  w3  d3        ;         print w1(head);
+      jl  w3  d2        ;         print w2(elem);
+z.                      ;   end;
+      rl  w3  x1+2      ;   old last:= last(head);
+      rs  w2  x1+2      ;   last(head):= elem;
+      rs  w2  x3+0      ;   next(old last):= elem;
+      rs  w1  x2+0      ;   next(elem):= head;
+      rs  w3  x2+2      ;   last(elem):= old last;
+      jl     (g0)       ;
+  g0: 0                 ; comment: link;
+e.                      ; end
+
+; procedure time(slice, usec)
+; comment: senses the timer and updates the programmed timers
+; microseconds and current time slice.
+;     call:    return:
+; w0           unchanged
+; w1           unchanged
+; w2           slice
+; w3  link     usec
+
+b.g24                   ; begin
+w.d7: rs  w3  g0        ;
+      io  w2 (b15)      ;   new value:= sense(timer);
+      al  w3  x2+0      ;
+      ws  w3  b14       ;   increase:= new value - clock;
+      sh  w3  -1        ;   if increase < 0 then
+      wa  w3  g1        ;   increase:= increase + 16384;
+      rs  w2  b14       ;   clock:= new value;
+      al  w2  x3+0      ;
+      wa  w2  b11       ;   slice:= slice + increase;
+      wa  w3  b12       ;   usec:= usec + increase;
+      ds  w3  b12       ;
+      jl     (g0)       ;
+  g0: 0, g1: 16384      ;
+e.                      ; end
+
+; procedure select internal
+; comment: selects a new current internal process from the
+; timer queue.
+;     call:    return:
+; w0           unchanged
+; w1           unchanged
+; w2           unchanged
+; w3  link     unchanged
+
+b.g24                   ; begin
+w.d8: ds  w1  g1        ;
+      rl  w1  b2        ;
+      sn  w1  b2        ;
+      rl  w1  b21       ;   cur:= (if next(timer q) <> timer q
+      al  w1  x1-a16    ;          then next(timer q)
+      rs  w1  b1        ;          else dummy proc) - a16;
+      rl  w0  x1+a35    ;
+      rs  w0  b11       ;   slice:= quantum(cur);
+      pl      x1+a24    ;   pr:= save pr(cur);
+      ml      x1+a26    ;   im:= save im(cur);
+      bz  w0  x1+a25    ;
+      ks  w0  0         ;   protection key(0):=
+      ks  w0  2         ;   protection key(2):=
+      ks  w0  4         ;   protection key(4):=
+      ks  w0  6         ;   protection key(6):= save pk(cur);
+c.(:a92>20a.1:)-1       ;   if testoutput then
+      ds  w3  d0        ;   begin save 2:= w2; save 3:= w3;
+      jl  w3  d3        ;         print w1(cur);
+z.                      ;   end;
+      dl  w1  g1        ;
+      jl      x3+0      ;
+      0, g1: 0          ;
+e.                      ; end
+
+; procedure remove internal(proc state, proc addr)
+; comment: removes current internal process from the timer queue
+; and sets its state and wait address. after this, a new current
+; process is selected.
+;     call:      return:
+; w0  proc state proc state
+; w1             unchanged
+; w2  proc addr  proc addr
+; w3  link       link
+
+b.g24                   ; begin
+w.d9: ds  w3  g0        ;
+      rl  w3  b1        ;
+      hs  w0  x3+a13    ;   state(cur):= proc state;
+      rs  w2  x3+a40    ;   wait addr(cur):= proc addr;
+      jl  w3  d7        ;   time(slice, usec);
+      rl  w3  b1        ;
+      rs  w2  x3+a35    ;   quantum(cur):=slice;
+      dl  w3  b13+2     ;
+      am     (b1)       ;
+      ds  w3  a39+2     ;   start wait(cur):=time;
+      rl  w3  b1        ;
+      al  w2  x3+a16    ;
+      jl  w3  d5        ;   remove(cur + a16);
+      jl  w3  d8        ;   select internal;
+      dl  w3  g0        ;
+      jl      x3+0      ;
+      0, g0: 0          ;     
+e.                      ; end
+
+; procedure link internal (proc)
+; comment: links an internal process to the timer queue.
+; it is linked as the first proces, if its time quantum is
+; less than the maximum time slize; otherwise it is linked
+; as the last process.
+;     call:    return:
+; w0           unchanged
+; w1  proc     proc
+; w2           unchanged
+; w3  link     link
+
+b.g24
+w.d10:ds  w1  g5        ; begin
+      ds  w3  g6        ;
+      jl  w3  d7        ;   time(slice,usec);
+      rl  w3  b1        ;
+      rs  w2  x3+a35    ;   quantum(cur):= slice;
+      al  w0  a95       ;
+      hs  w0  x1+a13    ;   state(proc):= running;
+      rl  w0  x1+a35    ;
+      al  w2  x1+a16    ;
+      sl  w0 (b10)      ;   if quantum(proc) < max slice then
+      jl      g1        ;
+      rl  w1  b2        ;   begin
+g0:                     ;
+c.(:a128>2a.1:)-1       ; if rc6000 monitor then include:
+      am      -1        ; first: -1+
+g0=k, al  w0  0         ; last:  0+
+      ba  w0  x2-a16+a25;        priority(proc):=priority;
+      al  w1  b2        ;  checkproc:=head(timer queue);
+  g3: rl  w1  x1        ; next: checkproc:=next(checkproc);
+      sn  w1  b2        ;  if checkproc=head(timer queue) then
+      jl      g4        ;     goto insert;
+      bl  w3  x1-a16+a25;
+      sl  w0  x3        ;  if priority>=priority(checkproc) then
+      jl      g3        ;     goto next;
+  g4:                   ;
+z.                      ;
+      jl  w3  d6        ;   link(next(timer q), proc + a16);
+      jl  w3  d8        ;   select internal;
+      dl  w1  g5        ;   end
+      dl  w3  g6        ;
+      jl      x3+0      ;   else
+  g1: al  w3  0         ;   begin
+      wd  w0  b10       ;   new quantum:=
+      rx  w3  x1+a35    ;   quantum(proc) mod max slice;
+      ws  w3  x1+a35    ;
+      ad  w0  -24       ;   run time(proc):=run time(proc)+
+      aa  w0  x1+a36+2  ;   quantum(proc)-new quantum;
+      ds  w0  x1+a36+2  ;   quantum(proc):=new quantum;
+      al  w1  b2        ;   link(timer q, proc);
+                        ;   select internal;
+      jl      g0        ;   end;
+      0                 ;
+  g5: 0                 ;
+      0                 ;
+  g6: 0                 ;
+  g7: 10000             ;
+e.                      ; end
+
+; procedure search name(name, entry)
+; procedure search name(name, entry, base)
+; comment: searches the name table for a given name and delivers its
+; entry in the name table. if the name is undefined the entry
+; is name table end.
+;     call:    return:
+; w0           unchanged
+; w1           unchanged
+; w2  name     name
+; w3  link     entry
+;     call:    return:
+; w0  lower    destroyed
+; w1  upper    destroyed
+; w2  name     name
+; w3  link     entry
+      a107              ;
+d72:  a108              ; max base
+      a107-1            ;
+d73:  a108+1            ; max base + (-1,1)
+
+
+b.g24
+w.d11:ds  w1  g5        ; search name(name, entry)
+      am     (b1)       ; 
+      dl  w1  a43       ; base:= base(current)
+  d71:rs  w3  g3        ; search name(name, entry, base)
+      ds  w1  g9        ;
+      rl  w1  b7        ;
+      rs  w1  g10       ; cur entry:= name table end
+      al  w1  x2-2      ;
+      rs  w1 (b7)       ; name table(name table end):= name -2;
+      dl  w1  d73       ;
+      ds  w1  g7        ; min base:= max base - (1,1);
+      al  w0  x2+2      ;
+      al  w1  x2+6      ;
+      ds  w1  g12       ;
+      rl  w3  b3        ;
+      al  w3  x3-2      ; entry:= name table start - 2;
+  g0: dl  w1 (g11)      ; next1: name:= doubleword(name(2));
+  g1: al  w3  x3+2      ; next2: entry:= entry + 2;
+      rl  w2  x3+0      ; proc:= word(entry);
+      sn  w0 (x2+2)     ;
+      se  w1 (x2+4)     ; if name <> name(proc)
+      jl      g1        ; then goto next2;
+      dl  w1 (g12)      ; name:= doubleword(name(6));
+      sn  w0 (x2+6)     ;
+      se  w1 (x2+8)     ; if name <> name(proc)
+      jl      g0        ; then goto next1;
+      al  w0  0         ;
+      se  w0 (x2+2)     ; if name = 0
+      sn  w3 (b7)       ; or entry = name table end
+      jl      g2        ; then goto exit;
+      am     (x3)       ;
+      dl  w1  a49       ; w0w1 := interval(entry)
+      sh  w0 (g8)       ; if lower(entry) > lower(base)
+      sh  w0 (g6)       ; or lower(entry) < lower(min)
+      jl      g0        ; then goto next
+      sl  w1 (g9)       ; if upper(entry) < upper(base)
+      sl  w1 (g7)       ; or upper(entry) > upper(min)
+      jl      g0        ; then goto next
+      rs  w3  g10       ; cur entry := entry
+      bs. w0  1         ;
+      al  w1  x1+1      ;
+      ds  w1  g7        ; min base := interval (entry)
+      jl      g0        ; goto next
+  g2: dl  w1  g5        ; restore w0w1
+      rl  w2  g11       ;
+      al  w2  x2-2      ; w2:= name;
+      rl  w3  g10       ; w3:= entry
+      jl     (g3)       ; return
+  g3: 0                 ; save return
+  g4: 0                 ;
+  g5: 0                 ; save w0w1
+  g6: 0                 ;
+  g7: 0                 ; min base
+  g8: 0                 ;
+  g9: 0                 ; base
+  g10:0                 ; cur entry
+  g11:0                 ; addr of name(2);
+  g12:0                 ; addr of name(6);
+e.                      ;
+
+; procedure check message buf(internal)
+; comment: checks whether the save w2 of the internal process
+; is a message buffer address. if not then return via internal 3.
+;     call:    return:
+; w0           destroyed
+; w1  internal destroyed
+; w2           buf address
+; w3  link     link
+
+b.                      ; begin
+w.d12:rl  w2  x1+a30    ;   addr:=save w2(internal);
+      sl  w2 (b8+4)     ;   if addr<mess pool start
+      sl  w2 (b8+6)     ;   or addr>=mess pool end
+      jl      c29       ;
+      al  w1  x2+0      ;
+      ws  w1  b8+4      ;
+      al  w0  0         ;
+      wd  w1  b8+8      ;   or (addr-mess pool start)
+      se  w0  0         ;   mod mess buf size<>0
+      jl      c29       ;   then goto internal 3;
+      jl      x3+0      ;
+e.                      ; end
+
+; procedure decrease buffer claim(internal)
+; comment: if the buffer claim of the internal process
+; is zero the save w2 of the internal process is set to
+; zero and returns to link else
+; the buffer claim of the internal process is decreased
+; by 1 and return to link+2.
+;     call:    return:
+; w0           destroyed
+; w1  internal unchanged
+; w2           unchanged
+; w3  link     destroyed
+
+b.g0                    ; begin
+w.d76:bz  w0  x1+a19    ;
+      sn  w0  0         ;   if bufclaim(internal)=0
+      jl.     g0.       ;   then goto no buffer;
+      bs. w0  1         ;
+      hs  w0  x1+a19    ;   bufclaim(internal):=bufclaim(internal)-1;
+      jl      x3+2      ;   goto link+2;
+  g0: rs  w0  x1+a30    ; no buffer: save w2(internal):=0;
+      jl      x3+0      ;   goto link+0;
+e.                      ; end
+
+; procedure release buf(pool, buf)
+; comment: links a given buffer to a given pool.
+;     call:    return:
+; w0           unchanged
+; w1  pool     pool
+; w2  buf      buf
+; w3  link     link
+
+b.g24                   ; begin
+w.d13:ds  w0  g0        ;
+      ld  w0  -65       ;   receiver(buf):=
+      ds  w0  x2+6      ;   sender(buf):= 0;
+      jl  w3  d6        ;
+      dl  w0  g0        ;   link(pool, buf);
+      jl      x3+0      ;
+      0, g0: 0          ;
+e.                      ; end
+
+; procedure move mess(from, to)
+; comment: moves 8 message or answer words from a
+; given storage address to another.
+;     call:    return:
+; w0           unchanged
+; w1  from     from
+; w2  to       to
+; w3  link     link
+
+b.g24                   ; begin
+w.d14:ds  w0  g0        ;
+      dl  w0  x1+2      ;
+      ds  w0  x2+2      ;
+      dl  w0  x1+6      ;
+      ds  w0  x2+6      ;
+      dl  w0  x1+10     ;   move (8) words
+      ds  w0  x2+10     ;   from (from)
+      dl  w0  x1+14     ;   to (to);
+      ds  w0  x2+14     ;
+      dl  w0  g0        ;
+      jl      x3+0      ;
+      0, g0: 0          ;
+e.                      ; end
+
+; procedure deliver answer(buf)
+; comment: delivers an answer from a receiver and starts
+; the sender if it is waiting for the answer. if the sender
+; has been removed, the buffer is returned to the pool, and
+; the buffer claim of the parent is increased by one.
+;     call:    return:
+; w0           unchanged
+; w1           unchanged
+; w2  buf      destroyed
+; w3  link     destroyed
+
+b.g24                   ; begin
+w.d15:ds  w1  g4        ;
+      rs  w2  b18       ;
+      rs  w3  g5        ;
+      jl  w3  d5        ;   remove(buf);
+      rl  w3  x2+6      ;
+      sh  w3  -1        ;   if internal < 0
+      jl      g3        ;   then goto regretted
+      rl  w0  x3        ;  
+      sn  w0  64        ;   if kind(sender) = pseudoproc   93-11-20 21:06 HJ 
+      rl  w3  x3+a50    ;      then internal := mainproc(sender);
+      rs  w3  g6        ;   internal:= sender(buf);
+      rl  w0  x3
+      se  w0  0         ;   if kind(sender)<>internal
+      jl      g7        ;   then goto typewriter
+      bz  w0  x3+a13    ;   
+      sn  w0  a103      ;   if state(internal) <> wait answer
+      se  w2 (x3+a40)   ;   or wait address(internal) <> buf
+      jl      g2        ;   then goto event;
+      rl  w0  x2+4      ; answer:
+      rs  w0  x3+a28    ;   save w0(internal):= receiver(buf);
+      al  w1  x2+8      ;   from:= buf + 8;
+      rl  w2  x3+a29    ;   answer:= save w1(internal);
+      jl  w3  d14       ;   move mess(from, answer);
+      rl  w1  g6        ;
+      jl  w3  d10       ;   link internal(internal);
+      rl  w1  g6        ;
+      bz  w2  x1+a19    ;
+      al  w2  x2+1      ;   buf claim(internal):=
+      hs  w2  x1+a19    ;   buf claim(internal) + 1;
+  g3: rl  w2  b18       ;  
+      rl  w1  b8        ;  
+      jl  w3  d13       ;   release buf(mess pool, buf)
+  g1: dl  w1  g4        ;
+      jl     (g5)       ;   goto exit;
+  g2: al  w1  x3+a15    ; event:
+      jl  w3  d6        ;   link(event q(internal), buf);
+      se  w0  a104      ;   if state(internal) = wait event
+      jl      g1        ;   then
+      rl  w1  g6        ;   begin
+      al  w0  1         ;  
+      rs  w0  x1+a28    ;   save w0(internal):= 1;
+      rs  w2  x1+a30    ;   save w2(internal):= buf;
+      jl  w3  d10       ;   link internal(internal);
+      jl      g1        ;   end;
+                        ;   goto exit;
+  g7: bz  w1  x3+a71+1  ;   bufclaim(sender)
+      al  w1  x1+1      ;   +1
+      hs  w1  x3+a71+1  ;   =: bufclaim(sender)
+      jl      g3        ;   goto release buf
+      0, g4: 0          ;
+  g5: 0, g6: 0          ;
+e.                      ; end
+
+; procedure deliver message(buf)
+; comment: delivers a message to an internal process and
+; starts it if it is waiting for a message.
+;     call:    return:
+; w0           unchanged
+; w1           unchanged
+; w2  buf      destroyed
+; w3  link     destroyed
+
+b.g24                   ; begin
+w.d16:ds  w1  g3        ;
+      rs  w3  g4        ;
+      rl  w1  x2+4      ;
+      am     (x1+a10)   ;  
+      sn  w1  x1-64     ;   if kind(receiver) = pseudo proc
+      rl  w1  x1+a50    ;   then receiver := main proc
+      rs  w1  g5        ;   internal:= receiver(buf);
+      bz  w0  x1+a13    ;
+      se  w0  a102      ;   if state(internal) <> wait message
+      jl      g2        ;   then goto event;
+      rl  w0  x2+6      ; message:
+      rs  w0  x1+a28    ;   save w0(internal):= sender(buf);
+      rs  w2  x1+a30    ;   save w2(internal):= buf;
+      jl  w3  d76       ;   decrease buffer claim(internal);
+      jl      g0        ;   if no buffers then goto link;
+      ac  w3 (x2+4)     ;
+      rs  w3  x2+4      ;   receiver(buf):= -receiver(buf);
+      al  w1  x2+8      ;   from:= buf + 8;
+      rl  w3  g5        ;
+      rl  w2  x3+a29    ;   message:= save w1(internal);
+      jl  w3  d14       ;   move mess(from, message);
+      rl  w3  g5        ;
+      rl  w2  x3+a28    ;
+      rl  w3  x3+a31    ;   name:= save w3(internal);
+      dl  w1  x2+4      ;
+      ds  w1  x3+2      ;   move(4) words
+      dl  w1  x2+8      ;   from (sender(buf) + 2)
+      ds  w1  x3+6      ;   to(name);
+      rl  w1  g5        ;
+  g0: jl  w3  d10       ; link: link internal(internal);
+  g1: dl  w1  g3        ;
+      jl     (g4)       ;   goto exit;
+  g2: al  w1  x1+a15    ; event:
+      jl  w3  d6        ;   link(event q(internal), buf)
+      se  w0  a104      ;   if state(internal) = wait event
+      jl      g1        ;   then
+      rl  w1  g5        ;   begin
+      al  w0  0         ;
+      rs  w0  x1+a28    ;   save w0(internal):=0;
+      rs  w2  x1+a30    ;   save w2(internal):=buf;
+      jl  w3  d76       ;   decrease buffer claim(internal);
+      jl      g1        ;   if no buffers then goto exit;
+      ac  w3 (x2+4)     ;  
+      rs  w3  x2+4      ;   receiver(buf):=-receiver(buf)
+      jl      g0        ;   link internal (internal);
+      0, g3: 0          ;   end;
+  g4: 0, g5: 0          ; exit:
+e.                      ; end
+
+; procedure regretted message
+; adjusts the claims of the sender and returns the buffer 
+; to the message pool if it is not in state message received
+; called from regret message, typewrite drive and remove
+; internal process
+;     call:    return:
+; w0           unchanged
+; w1           unchanged
+; w2  buf      buf
+; w3  link     destroyed
+
+b.g24                   ;  
+w.d75:rs  w3  g2        ;  
+      ds  w1  g3        ;  
+      rl  w1  x2+6      ;   proc:= sender(buf)
+      sh  w1  0
+      ac  w1  x1
+      rl  w0  x1+a10    ;  
+      sn  w0  64        ;   if kind(sender) = pseudoproc   93-11-20 21:32 HJ ****
+      rl  w1  x1+a50    ;      then proc:=mainproc(proc);
+      rl  w0  x1+a10    ;  
+      se  w0  0         ;  
+      am      a71+1-a19 ;  
+      bz  w3  x1+a19    ;   bufclaim(proc)
+      al  w3  x3+1      ;   +1
+      se  w0  0         ;  
+      am      a71+1-a19 ;  
+      hs  w3  x1+a19    ;   =: bufclaim(proc)
+      rl  w1  x2+6      ; 93-11-20 21:51 HJ ****
+      sl  w1  0
+      ac  w1  x1        ;  
+      rs  w1  x2+6      ;   sender(buf):= -proc
+      rl  w1  x2+4      ;  
+      sh  w1  0         ;   if receiver(buf) < 0
+      jl      g1        ;   then goto return
+      sh  w1  6         ;   if receiver(buf) < 6
+      jl      g0        ;   then goto release
+      rl  w0  x1        ;   if kind(receiver(buf)) = pseudo proc
+      se  w0  64        ;   or kind(receiver(buf)) = internal proc
+      sn  w0  0         ;
+      jl      g0        ;   then goto release
+      se  w0  2         ;   if kind(receiver(buf)) = interval clock
+      jl      g5        ;   then
+      sn  w2 (x1+a55)   ;   begin
+      jl      g0        ;   if buf=last mess in queue
+      rl  w1  x2+0      ;   then goto release
+      dl  w0  x1+12     ;   doubleword(next mess(buf)+12):=
+      aa  w0  x2+12     ;     doubleword(next mess(buf)+12)
+      ds  w0  x1+12     ;     +doubleword(buf+12)
+      jl      g0        ;   goto release
+                        ;   end
+  g5: bz  w3  x2+8      ;
+      se  w0  74        ;   if (kind(receiver(buf))<>74
+      se  w3  0         ;      and operation(buf)=0)
+      se  w2 (x1+a54)   ;      or buf not first in queue
+      jl      g0        ;   then goto release;
+      rl  w3  x1+a56    ;   interrupt addr(receiver(buf))
+      so  w3  1         ;   - (if addr even then 1
+      al  w3  x3-1      ;                   else 0)
+      rs  w3  x1+a56    ;   =: interrupt addr(receiver(buf))
+  g0: jl  w3  d5        ;   remove buf
+      rl  w1  b8        ;   
+      jl  w3  d13       ;   release buf(mess pool, buf)
+  g1: dl  w1  g3        ;  
+      jl     (g2)       ;  
+  g2: 0                 ;  
+      0, g3: 0          ;  
+e.                      ;  
+
+
+; procedure check name area
+; comment: checks whether a name area is within the
+; current internal process.
+;     call:    return:
+; w0           unchanged
+; w1           cur
+; w2           name
+; w3  link     destroyed
+
+b.g24                   ; begin
+w.d111:                 ; check name(save w2) area:
+      am      a30-a31   ;   name:= save w2(cur)
+  d17:al  w2  a31       ; check name(save w3) area:
+      rs  w3  g0        ;     or save w3;
+      rl  w1  b1        ;
+      am      x2+0      ;
+      rl  w2  x1+0      ;
+      al  w3  x2+6      ;
+      sl  w2 (x1+a17)   ;   if name < first addr(cur)
+      sl  w3 (x1+a18)   ;   or name + 6 >= top addr(cur)
+      jl      c29       ;   then goto internal 3;
+      jl     (g0)       ;
+  g0: 0                 ;
+e.                      ; end
+
+; procedure check within(first,last)
+; comment: checks that the SPECIFIED AREA IS WITHIN THE
+; PROCESS.
+; call: w0=last, w1=cur, w2=first, w3=link
+; exit: w0,w1,w2,w3=unchanged
+; return address: link: within process
+;                 c29:  not within process
+;
+b.                    ; begin
+w.d112:               ; check within:
+      sh  w0  0       ;   if overflow or
+      jl      c29     ;
+      sl  w2 (x1+a17) ;     first<first addr(cur) or
+      sl  w0 (x1+a18) ;     last>=top addr(cur) then
+      jl      c29     ;     goto internal 3;
+      jl      x3+0    ;   return;
+e.                    ; end;
+
+; procedure check mess area
+; comment: checks whether a message or answer area is
+; within the current internal process.
+;     call:    return:
+; w0           unchanged
+; w1           cur
+; w2           mess (or answer)
+; w3  link     destroyed
+
+b.g24                   ; begin
+w.d18:rs  w3  g0        ;
+      rl  w1  b1        ;
+      rl  w2  x1+a29    ;   mess:= save w1(cur);
+      al  w3  x2+14     ;
+      sl  w2 (x1+a17)   ;   if mess < first addr(cur)
+      sl  w3 (x1+a18)   ;   or mess + 14 >= top addr(cur)
+      jl      c29       ;   then goto internal 3;
+      jl     (g0)       ;
+  g0: 0                 ;
+e.                      ; end
+
+; procedure check event(proc, addr, sorry)
+; comment: checks whether an address is a buffer address
+; in the event queue of a given internal process.
+;     call:    return:
+; w0           unchanged
+; w1  proc     proc
+; w2  addr     addr
+; w3  link     link
+
+b.g24                   ; begin
+w.d19:rs  w2  g1        ;
+      al  w2  x1+a15    ;   buf:= event q(proc);
+  g0: rl  w2  x2+0      ; next: buf:= next (buf);
+      sn  w2  x1+a15    ;   if buf = event q (proc)
+      jl      x3+0      ;   then goto sorry;
+      se  w2 (g1)       ;   if buf <> addr
+      jl      g0        ;   then goto next;
+      jl      x3+2      ;
+  g1:  0                ;
+e.                      ; end
+
+
+; comment: the following utility procedures are used by external
+; processes during input/output;
+
+b. g69
+
+w.g3: am      1         ; result 5: result:= 5
+  g4: am      1         ; result 4:    or    4
+  g5: am      1         ; result 3:    or    3
+  g6: am      1         ; result 2:    or    2
+  g7: al  w0  1         ; result 1:    or    1;
+      rl  w2  b18       ;
+      rs  w0  x2+4      ;   receiver(buf):= result;
+      jl  w3  d5        ;   remove(buf);
+      rl  w1  b1        ;
+      al  w1  x1+a15    ;
+      jl  w3  d6        ;   link(event q(cur), buf);
+      jl     (b20)      ;   goto return;
+
+
+; procedure check user 
+; comment: checks whether an external process is used
+; by the current internal process. if the external is reserved
+; it is also checked whether it is reserved by the current
+; internal process.
+;     call:    return:
+; w0           destroyed
+; w1  cur      cur
+; w2  buf      buf
+; w3  link     link
+
+b.i24                 ; begin
+w.g14:am     (b19)    ;
+      rl  w0  a52     ;
+      se  w0  0       ;   mask:=if reserved(proc)<>0
+      jl     i0       ;   then reserved(proc)
+      am     (b19)    ;   else user(proc);
+      rl  w0  a53     ;   bit:=identification(cur);
+  i0: so  w0 (x1+a14) ;   if mask(bit)=0
+      jl      g6      ;   then goto result 2;
+      jl      x3+0    ;
+e.                    ; end
+
+; procedure check reservation
+; comment: checks whether an external process is reserved
+; by the current internal process.
+;      call:    return:
+; w0            reserved
+; w1   cur      cur
+; w2   buf      buf
+; w3   link     link
+
+b.i24                 ; begin
+w.g15:am     (b19)    ;
+      rl  w0  a52     ;   mask:=reserved(proc);
+      so  w0 (x1+a14) ;   bit:=identification(cur);
+      jl      g6      ;   if mask(bit)=0
+      jl      x3+0    ;   then goto result 2;
+e.                    ; end
+
+; procedure check operation(oper mask, mode mask)
+; comment: checks whether the operation and mode are
+; within the repertoire of the receiver. the legal values are
+; defined by two bitpatterns in which bit i=1 indicates
+; that operation (or mode) number i is allowed. if the
+; operation is odd, it is checked whether the input/output
+; area is within the internal process.
+;     call:       return:
+; w0  oper mask   destroyed
+; w1  mode mask   destroyed
+; w2  buf         buf
+; w3  link        destroyed
+
+b.i24                 ; begin
+w.g16:rs  w3  i0      ;
+      bz  w3  x2+9    ;
+      ls  w1  x3+0    ;
+      bz  w3  x2+8    ;
+      ls  w0  x3+0    ;
+      sh  w0  -1      ;   if mode mask(mode(buf))=0
+      sl  w1   0      ;   or oper mask (operation(buf))=0
+      jl      g5      ;   then goto result 3;
+      so  w3  1       ;
+      jl     (i0)     ;
+      rl  w1  b1      ;
+      dl  w0  x2+12   ;   if odd(operation(buf))
+      la  w3  g50     ;   make first and
+      la  w0  g50     ;   last address  in buf even;
+      sl  w3 (x1+a17) ;   and (first addr(buf)<first addr(cur)
+      sl  w0 (x1+a18) ;   or last addr(buf)>=top addr(cur)
+      jl      g5      ;
+      sh  w0  x3-2    ;   or first addr(buf)>last addr(buf))
+      jl      g5      ;   then goto result 3;
+      ds  w0  x2+12   ;   message even;
+      jl     (i0)     ;
+  i0: 0               ;
+e.                    ; end
+
+; procedure link operation
+; comment: links a message to the receiver and
+; returns to the receiver if it is the only message in
+; the queue. otherwise it returns to the sender.
+;      call:    return:
+; w0            operation
+; w1            proc
+; w2   buf      buf
+; w3   link     link
+
+b.i24                   ; begin
+w.g17:rs  w3  i0        ;
+      am     (b19)      ;
+      al  w1  a54       ;
+      jl  w3  d6        ;   link(mess q(proc),buf);
+      al  w1  x1-a54    ;
+      rl  w0  x1+a56    ;   interrupt:=interrupt addr(proc);
+      sn  w3  x1+a54    ;   if old last<>mess q(proc)
+      sz  w0  2.1       ;   or old last=mess q(proc) and interrupt(23)=1
+      jl     (b20)      ;   then goto return;
+      bz  w0  x2+8      ;
+      jl     (i0)       ;
+  i0: 0                 ;
+e.                      ; end
+
+; procedure deliver result(result)
+; comment: stores the result and answer of an input/output
+; operation in a buffer, removes the buffer from the
+; message queue and delivers it as an answer to the
+; sender.
+;       call:    return:
+; w0    result   destroyed
+; w1             proc
+; w2             destroyed
+; w3    link     destroyed
+
+b.i24                   ; begin
+w.g18:al  w0  1         ; comment: result=1;
+  g19:rl  w2  b18       ; comment: result=w0;
+      rs  w3  i0        ;
+      rs  w0  x2+4      ;   receiver(buf):=result;
+      rl  w0  g20       ;
+      la  w0  g51       ;
+      rs  w0  x2+8      ;   word(buf+8):=status(0:11);
+      dl  w1  g22       ;   word(buf+10):=bytes;
+      ds  w1  x2+12     ;   word(buf+12):=characters;
+      dl  w1  g24       ;   word(buf+14):=file;
+      ds  w1  x2+16     ;   word(buf+16):=block;
+      jl  w3  d15       ;   deliver answer(buf);
+      rl  w1  b19       ;
+      jl     (i0)       ;
+  i0: 0                 ;
+e.                      ; end
+
+; input/output answer:
+w.g20: 0  ; status
+  g21: 0  ; bytes
+  g22: 0  ; characters
+  g23: 0  ; file count
+  g24: 0  ; block count
+
+; simulated status used during debugging:
+  b27: 0  ; simstatus 0
+       0  ; simstatus 1
+       0  ; simstatus 2
+
+
+; procedure next operation
+; comment: examines the message queue of the receiver and
+; returns to the receiver if there is a message from a
+; not-stopped sender. otherwise it returns to the current
+; internal process.
+;     call:   return:
+; w0          oper
+; w1          proc
+; w2          buf
+; w3  link    sender
+
+b.i24                   ; begin
+w.g25:rs  w3  i2        ;
+      jl  w3  g64       ;   examine queue(
+      jl      c33       ;     dummy interrupt);
+      jl     (i2)       ;
+  i2: 0                 ;
+e.                      ; end
+
+; procedure examine queue(queue empty)
+;     call:   return:
+; w0          operation
+; w1          proc
+; w2          buf
+; w3  link    sender
+
+b.i24                   ; begin
+w.g64:rs  w3  i2        ;
+  i0: rl  w1  b19       ; exam q:proc:=current receiver;
+      rl  w2  x1+a54    ;   buf:=next(mess q(proc));
+      sn  w2  x1+a54    ;   if buf=mess q(proc)
+      jl     (i2)       ;   then goto queue empty;
+      rs  w2  b18       ;
+      rl  w3  x2+6      ;   internal:=sender(buf);
+      xl      x2+8      ;
+      sh  w3  -1        ;
+      ac  w3  x3+0      ;
+      rl  w0  x3+0      ;   93-11-20 22:42 HJ ****
+      sn  w0  64        ;   if kind(internal) = pseudoproc
+      rl  w3  x3+a50    ;      then internal:=mainproc(internal);
+      bz  w0  x3+a13    ;
+      rl  w3  x2+6      ;   if state(internal)=stopped
+      sx      2.1       ;   and operation(buf)(23)=1
+      so  w0  a105      ;   or internal<0
+      sh  w3  -1        ;   then
+      jl      i1        ;   begin
+      bz  w0  x2+8      ;
+      am     (i2)       ;   no operation;
+      jl      2         ;   goto exam q;
+  i1: jl  w3  g26       ;   end;
+      jl      i0        ;   oper:=byte(buf+8);
+  i2: 0                 ;
+e.                      ; end
+
+; procedure no operation
+;     call:   return:
+; w0          destroyed
+; w1          proc
+; w2          destroyed
+; w3  link    destroyed
+
+b.i24                   ; begin
+w.g26:al  w0  1         ;
+  g27:al  w1  0         ;
+      rs  w1  g20       ;   status:=
+  g28:rs  w1  g21       ;   bytes:=
+      rs  w1  g22       ;   character:=0;
+      jl      g19       ;   deliver result(1);
+e.                      ; end
+
+; procedure disconnected device
+;     call:   return:
+; w0          destroyed
+; w1          proc
+; w2          destroyed
+; w3  link    destroyed
+
+b.i24                   ; begin
+w.g29:al  w0  4         ;   status:=bytes:=characters:=0;
+      jl      g27       ;   deliver result(4);
+e.                      ; end
+
+; procedure sense device
+;     call:  return:
+; w0         destroyed
+; w1         proc
+; w2         destroyed
+; w3  link   destroyed
+
+b.i24                   ; begin
+w.g30:am     (b19)      ;
+      io  w0 (a50)      ;   status:=sense(device(proc));
+      sx      2.11      ;   if ex<>0 then
+      jl      g29       ;   disconnected device else
+c.(:a92>18a.1:)-1       ;   begin if teststatus then
+      lo  w0  b27       ;   status:=status or simstatus0;
+z.    rs  w0  g20       ;
+      ld  w2  -65       ;   bytes:=
+      ds  w2  g22       ;   characters:=0;
+      jl      g18       ;   deliver result(1);
+                        ;   end;
+e.                      ; end
+
+; procedure increase stop count
+; comment: increases the stop count of the sender by 1.
+;     call:   return:
+; w0          unchanged
+; w1          unchanged
+; w2  buf     buf
+; w3  link    destroyed
+
+b.i24                   ; begin
+w.g31:rs  w3  i0        ;
+      am     (x2+6)     ;
+      bz  w3  a12       ;
+      al  w3  x3+1      ;   stop count(sender(buf)):=
+      am     (x2+6)     ;   stop count(sender(buf))+1;
+      hs  w3  a12       ;
+      jl     (i0)       ;
+  i0: 0                 ;
+e.                      ; end
+
+; procedure decrease stop count
+; comment: the stop count of the sender is decreased by 1
+; if the operation is odd. if stop count becomes zero and the
+; sender is waiting to be stopped, the sender is stopped
+; and the stop count of its parent is decreased by 1.
+; if the parent has stopped its child, an answer is sent to
+; the parent in the buffer defined by the wait address of
+; the child.
+;     call:   return:
+; w0          destroyed
+; w1          destroyed
+; w2          destroyed
+; w3  link    destroyed
+
+b.i24                   ; begin
+w.g32:rs  w3  i3        ;
+      rl  w2  b18       ;
+      bz  w0  x2+8      ;
+      rl  w3  x2+6      ;   internal:=sender(buf);
+      sz  w0  1         ;   if odd(operation(buf))
+      sh  w3  -1        ;   and internal>=0 then
+      jl     (i3)       ;   begin
+      rs  w2  i2        ;   save buf:=buf;
+      bz  w0  x3+a12    ;
+      bs. w0  1         ;   stop count(internal):=
+      hs  w0  x3+a12    ;   stop count(internal)-1;
+  i0: se  w0  0         ; exam stop:
+      jl      i1        ;   if stop count(internal)=0
+      bz  w1  x3+a13    ;   and state(internal)=wait stop
+      so  w1  a105      ;   then
+      jl      i1        ;   begin
+      al  w1  x1+a106   ;   child state:=
+      hs  w1  x3+a13    ;   state(internal):=wait start;
+      rl  w2  x3+a40    ;   buf:=wait address(internal);
+      rl  w3  x3+a34    ;   internal:=parent(internal);
+      bz  w0  x3+a12    ;
+      bs. w0  1         ;   stop count(internal):=
+      hs  w0  x3+a12    ;   stop count(internal)-1;
+      se  w1  a99       ;   if child state<>wait start parent
+      jl      i0        ;   then goto exam stop;
+      al  w0  1         ; child stopped:
+      rs  w0  x2+4      ;   receiver(buf):=1;
+      jl  w3  d15       ;   deliver answer(buf);
+                        ;   end;
+  i1: rl  w2  i2        ;
+      rs  w2  b18       ;   buf:=save buf;
+      jl     (i3)       ;   end;
+  i2: 0                 ;
+  i3: 0                 ;
+e.                      ; end
+
+; procedure prepare answer(status,count,addr)
+; comment: computes the number of bytes and characters
+; transferred and stores it together with the status bits
+; in the answer. the address points to the last word in
+; which 0,1,2 or 3 characters (as defined by the count)
+; have been transferred.
+;     call:         return:
+; w0  status+count  count
+; w1                bytes
+; w2  addr          characters
+; w3  link          link
+
+b.i24                   ; begin
+w.g33:rl  w1  0
+      la  w1  g51
+      rs  w1  g20       ;   status:=status(0:11);
+      bl  w0  1         ;
+      am     (b18)      ;
+      ws  w2  10        ;   diff:=addr-first addr(buf);
+      al  w1  x2+0      ;
+      ls  w2  -1        ;
+      wa  w2  2         ;   characters:=
+      wa  w2  0         ;   diff/2*3+count;
+      sl  w0  1         ;
+      al  w1  x1+2      ;   bytes:=
+      ds  w2  g22       ;   if count<1 then diff else diff+2;
+      jl      x3+0      ;
+e.                      ; end
+
+; procedure exam sender(sender stopped)
+;     call:   return:
+; w0          unchanged
+; w1          unchanged
+; w2          unchanged
+; w3  link    link
+
+b.i24                   ; begin
+w.g34:rs  w3  i0        ;
+      am     (b18)      ;
+      rl  w3  6         ;   internal:=sender(buf);
+      sh  w3  -1        ;
+      jl     (i0)       ;   if internal<0
+      bz  w3  x3+a13    ;
+      sz  w3  a105      ;   or state(internal)=stopped
+      jl     (i0)       ;   then goto sender stopped;
+      rl  w3  i0        ;
+      jl      x3+2      ;
+  i0: 0                 ;
+e.                      ; end
+
+; procedure init buffered
+; comment: used in connection with lowspeed devices with an
+; external buffer to make device parameters absolutely
+; addressable before the transfer is initiated.
+
+;     call:   return:
+; w0          unchanged
+; w1  proc    unchanged
+; w2  buf     buf
+; w3  link    destroyed
+
+b.i24                   ; begin
+w.g35:rs  w3  i0        ;
+      al  w3  x2+6      ;
+      rs  w3  g41       ;   sender addr:=buf+6;
+      rl  w3  x2+6      ;
+      al  w3  x3+a13    ;
+      rs  w3  g40       ;   state addr:=sender(buf)+a13;
+      rl  w3  x1+a50    ;
+      rs  w3  g42       ;   sense addr:=device(proc);
+      jl     (i0)       ;
+  i0: 0                 ;
+e.                      ; end
+
+; procedure wait buffered
+; comment: used in connection with lowspeed devices with an
+; external buffer to save working registers and device parameters
+; before waiting for an interrupt. the procedure must be
+; called as follows:
+;     am     (b19)
+;     ds  w3  a77
+;     jl  w3  g36
+
+b.i24                   ; begin
+w.g36:rl  w2  b19       ;   param 4(proc):=w0;
+      al  w3  x3+2      ;
+      ds  w1  x2+a75    ;   param 5(proc):=w1;
+      dl  w1  g44       ;   param 0(proc):=device param 0;
+      ds  w1  x2+a71    ;   param 1(proc):=device param 1;
+      dl  w1  g46       ;   param 2(proc):=device param 2;
+      ds  w1  x2+a73    ;   param 3(proc):=device param 3;
+      rs  w3  x2+a56    ;   interrupt addr(proc):=link;
+      jl     (b20)      ;   goto return;
+e.                      ; end
+
+; procedure continue buffered
+; comment: used in connection with lowspeed devices with an
+; external buffer to restore working registers and device
+; parameters after an interrupt.
+;     call:   return:
+; w0          save w0
+; w1  proc    save w1
+; w2  buf     save w2
+; w3  link    save w3
+
+b.i24                   ; begin
+w.g37:rs  w3  i0        ;
+      jl  w3  g35       ;   init buffered(proc,buf);
+      dl  w3  x1+a71    ;   device param 0:=param 0(proc);
+      ds  w3  g44       ;   device param 1:=param 1(proc);
+      dl  w3  x1+a73    ;   device param 2:=param 2(proc);
+      ds  w3  g46       ;   device param 3:=param 3(proc);
+      dl  w3  x1+a77    ;   w3:=param 7(proc);
+      dl  w1  x1+a75    ;   w2:=param 6(proc);
+      jl     (i0)       ;   w1:=param 5(proc);
+  i0: 0                 ;   w0:=param 4(proc);
+e.                      ; end
+
+; procedure follow chain(no. of slices,chain table index, slice)
+; the return value is the chain table index of entry number <no.
+; of slices> in the chain starting at <chain  table index>
+;     call:   return:
+; w0  n.o.s.  destroyed
+; w1          unchanged
+; w2  c.t.i.  slice
+; w3  link    destroyed
+
+b.i8
+w.d74:rs  w3  i3        ; save return
+      ac  w3 (0)        ;
+      as  w3  1         ; count := -2 * no. of slices
+      jl.     i2.       ; goto test; repeat:
+  i0: sl  w3  -30       ; if count >= -30
+      jl.     x3+i1.    ; then goto advance(-count)
+      ba  w2  x2        ;
+      r. 16             ;
+  i1: al  w3  x3+32     ; count := count + 32
+  i2: sh  w3  -2        ; test:  if count < 0
+      jl.     i0.       ; then goto repeat
+      jl     (i3)       ; return
+  i3: 0                 ;
+e.                      ;
+
+; directly addressable parameters for low-speed devices
+; with external buffers :
+
+w.g40:  0  ; address of sender state
+  g41:  0  ; address of sender in buf
+  g42:  0  ; device number*64
+  g43:  0  ; device parameter 0
+  g44:  0  ; device parameter 1
+  g45:  0  ; device parameter 2
+  g46:  0  ; device parameter 3
+
+; bitpatterns:
+
+  g48: 3           ; number of chars per word
+g50: 8.7777 7776 ; first 23 bits
+  g51: 8.7777 0000 ; first 12 bits
+  g52: 8.0000 7777 ; last 12 bits
+  g53: 8.0000 0377 ; last 8 bits
+  g54: 8.0000 0177 ; last 7 bits
+  g55: 8.0000 0077 ; last 6 bits
+  g56: 8.3600 0000 ; bits 1-4
+  g57: 8.3700 0000 ; bits 1-5
+  g49: 1<23        ; bit 0
+  g58: 1<22        ; bit 1
+  g59: 1<21        ; bit 2
+  g60: 1<20        ; bit 3
+  g61: 1<19        ; bit 4
+  g62: 1<18        ; bit 5
+  g63: 1           ; bit 23
+
+d20= g3, d21= g4, d22= g5, d23= g6, d24= g7, d25=g14, d26=g15
+d27=g16, d28=g17, d29=g18, d30=g19, d31=g20, d32=g21, d33=g22
+d34=g23, d35=g24, d36=g25, d37=g26, d38=g27, d39=g28, d40=g29
+d41=g30, d42=g31, d43=g32, d44=g33, d45=g34, d46=g35, d47=g36
+d48=g37, d49=g40, d50=g41, d51=g42, d52=g43, d53=g44, d54=g45
+d55=g46, d56=g50, d57=g51, d58=g52, d59=g53, d60=g54, d61=g55
+d62=g56, d63=g57, d64=g58, d65=g59, d66=g60, d67=g61, d68=g62
+d69=g63, d70=g64, d49=g49, d79=g48
+
+e.
+
+j0=d0, j3=d3, j5=d5, j8=d8, j9=d9, j10=d10, j28=c28
+
+m.                monitor text 1 included

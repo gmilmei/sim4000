@@ -1,0 +1,1040 @@
+head cpu
+mode list.yes
+o mongenout
+head 1
+binmon=set 72 disc
+scope user binmon
+
+rt2=edit montxt2
+l./procedure print w0/,l./g0:/,r/10<12/10<12+13,0/
+f
+
+
+
+rt3=edit montxt3
+l./procedure initialize process/
+l./90: host process/,l1,i/
+      h50 ;  92: ipc 401
+/
+l./h34:; hostproc:/,l1,i/
+  h50:; ipc 402:
+/
+l./procedure send message/
+l./h90; 90:host process/,l1,i/
+      h50               ;  92: ipc 402
+/
+f
+
+
+
+rt4=edit montxt4
+l./; rc 315 typewriter:/
+l./i25:/,r/<:/<:<10>/
+
+l./procedure typeout/,l./j1:/,l./se w3 10/,i/
+      sn  w3  12         ;   if char=12 then char:=10;
+      al  w3  10         ;
+/,l5,p-15
+
+l.-procedure typein-,
+l./jl.j12/,r/j12/j16/
+l2,r/j13/j25/,
+l1,i/
+      sn  w0  25         ;
+      jl.     j25.       ;
+/,
+l1,r/se/sn/,l2,d./jl.j15./,i!
+      se  w0  127
+      jl.     j15.
+      al  w0  8
+      am     (x1+a50)
+      io  w0  3
+      sx      2.11
+      jl.     i8.
+      jl  w3  c32
+      jl.     i5.
+      io  w0  (x1+a50)
+      sx      2.11
+      jl.     i8.
+      al  w0  127
+      rl  w2  x1+a76
+  j14:
+!
+l2,p-50
+l./j40:/,l./jl. j39./,
+r/j39/j5/,r/after read/end line/,i/
+      rl  w2  x1+a76     ;
+/
+f
+
+rt7=edit montxt7
+l./h30:/,l./i51:/,d,i/
+i51:  se  w0  10
+      jl.     i69.
+      al  w0  13
+      jl. w3  i19.
+      al  w0  10
+i69:  jl. w3  i19.
+/,l5,p-15
+l./monitor text 6 included/,i!
+t. m.                special drivers included
+!,f
+
+rt11=edit montxt11
+l./m150:/,l./base.proc:=base.work/
+i/
+
+     se  w1      6     ;    if disc then
+     sn  w1     62     ;
+     sz                ;
+     jl.       +10     ;    begin
+     rs  w0  x3+a73    ;      state.proc:=0;
+     al  w1     -1     ;      if next trans(proc)<>proc then
+     se  w3 (x3+a70)   ;        address buffer(proc) := -1;
+     rs  w1  x3+a78+22 ;    end;
+
+/,l5,p-20
+f
+
+
+(binmon=slang type.yes montxt1 rt2 rt3 rt4 montxt5 montxt6,
+                rt7 montxt8 montxt9 montxt10 rt11 mon8s mon8initcat
+mode list.no
+o c
+head cpu
+end)
+
+
+; PRG - monitor 3
+; RC8000 s + initcat , onn8805
+; ipc 402 , onn8808
+
+ a130= 220290   ; option date
+ a131= 232000   ; option time
+
+a1=95    ; number of areas
+a3=10    ; number of internals
+a5=85    ; number of message buffers
+
+  a81=a81 o. 1<17     ; include ipc402 with private process description
+; a81=a81 o. 1<18     ; include epu401 with private process description
+; den foranst}ende inkludering af epu401 m} IKKE effektueres
+; da enkelte men v{sentlige detaljer i epu'ens process-beskrivelse
+; skal {ndres. ONN 860307
+
+
+
+<:
+t.15 i.9                           ;  0 reader
+t.16 i.12                          ;  1 punch
+t.21 i.3.6                         ;  2 console1 renamed : when useless
+     a.0.1.38.0.0.0.0.0.0.0.0.0.4.37.25.38.3.127.0.0.1
+t.2  i.11                          ;  3 clock
+t.18 i.10 d.5                          ;  5 printer
+t.18 i.8 n.printer1                    ;  6 printer1
+t.11 i.15 d.7                          ;  7 magtape1
+t.11 i.16                              ;  8 magtape2
+t.11 i.14                              ;  9 magtape3
+t.19 i.13 d.11                     ; 11 cardreader
+t.10 i.17 d.12                         ; 12 magtape4 (7 track)
+t.73 i.18 d.13 p.1                     ; 13 plotter , in name table
+t.8  i.22.23 d.15 c.144.36.73080   ; 15 disc
+t.8 n.disc1                        ; disc1
+t.8 n.disc2                        ; disc2
+t.29 i.5.4 d.18                    ; 18(19) tmx
+t.22  a.0.1.38.0.0.0.0.0.0.0.0.0.3.24.25.26.2.127.0.0.1
+       ; 20 , terminal 1 , Sperry PC .
+t.22 r.4 n.terminal2 a.0.1.38.0.0.0.0.0.0.0.0.0.3.37.14.38.2.127.0.0.1
+       ; 21-24 , terminal 2-5 , normal terminals .
+t.22     n.terminal6 a.0.1.38.0.0.0.0.0.0.0.0.0.8.37.14.38.7.127.-1.-1.1
+       ; 25 , terminal 6 , TTY with extra fill chars
+t.22 r.2 n.terminal7 a.0.1.38.0.0.0.0.0.0.0.0.0.3.37.14.38.2.127.0.0.1
+       ; 26-27 , terminal 7-8 , normal terminals . 
+t.22 d.34 r.2 n.terminal15 a.0.1.38.0.0.0.0.0.0.0.0.0.4.37.14.38.3.127.0.0.1
+       ; 34-35 , terminal 15-16 , normal terminals .
+t.26 d.36 n.medium1 
+       ; 36 , medium1 , medium speed 
+t.26 d.37 r.2 n.medium2
+       ; 37 , medium2 + 3 , medium speed
+;t.72  i.? d.? p.1                  ; ?? epu , in name table
+f.  :>
+
+n.
+
+
+
+
+
+; special drivers
+; ***************
+;
+;
+; epu 401 arithmetic unit
+; ***********************
+;
+; instruction set
+; ***************
+; 
+; Operands are denoted by capital letters.
+; Corresponding addresses use the corresp. small letter.
+; Double length operands use two concat. capital letters.
+; The epu result register (accumulator) RR consists of two
+; parts R1,R2 for the most and least signific bits.
+; for details see RCSL 44-RT 990, P. Koch Andersson,
+; Functional Description for RC 4090 External Processor Unit
+;
+
+; hardware instructions
+; *********************
+
+; ADD = 0 shift 12
+; ***
+; ADD + count, a, b ::=  for t := 1 step 1 until count do
+;                           RR := RR + AB(t);
+;  
+; SUB = 1 shift 12
+; ***
+; SUB + count, a, b ::=  for t := 1 step 1 until count do
+;                           RR := RR - AB(t);
+;
+; MLA = 2 shift 12
+; ***
+; MLA + count, a, b ::=  for t := 1 step 1 until count do
+;                          RR := RR + A(t)*B(t);
+;  
+; MLS = 3 shift 12
+; ***
+; MLS + count, a, b ::= for t := 1 step 1 until count do
+;                          RR := RR - A(t)*B(t);
+;
+; STR = 4 shift 12
+; ***
+; STR + count, a, b ::= for t := 1 step 1 until count do
+;                          begin
+;                            B(t) := R2; A(t) := R1;
+;                          end;
+;
+; instruction modification
+;
+; z = 1 shift 23
+; *
+; z + <hardware instruction> := clear RR and exec instr.
+; z + <monitorware instruction> := no clear but execute instr.
+; NB NB z + ADD + 1, a, b ::= RR := AB uncritically, i.e.
+; a one in first bit of B may be troublesome but the op
+; may be used for moving bitpatterns
+;
+
+; monitorware instructions
+; ************************
+; instructions simulated by then monitor
+;
+; STP = 2047 shift 12
+; ***
+; STP + count, a, b ::= stop processor and send answer back
+;                       to calling process;
+;                       addresses a and b are irrelevant;
+;
+; DIV = 5 shift 12
+; ***
+; DIV + 1, a, b     ::= A := RR/B <*=>abs(RR-A*B minimum)*>;
+;                       <*acount value <> 1 makes instr illeg*>
+;
+; SQR = 6 shift 12
+; ***
+; SQR + 1, a, b       ::= A := sqrt(abs RR) <*=> abs(abs RRR-A*A) min*>;
+;                       <*count value <> 1 makes instr illeg*>;
+;                       <*addr b is irrelevant*>
+;
+; DIA = 7 shift 12
+; ***
+; DIA + count, a, b ::=  begin <*count = max permitted loss of
+;                                exp between the op in RR and
+;                                the op A before operation*>
+;                          A := if exploss<=explim and RR<> 0
+;                               then sqrt(abs RR)
+;                               <*=>abs(abs RR -A*A) min*>
+;                               else -'280;
+;                          B := status shift 24 + exploss;
+;                           <* status      result of op
+;                                1          ok, exploss<explim
+;                                2          RR < 0, otherw. ok
+;                                3          exploss>=explim
+;                                4          RR initially zero*>
+;                        end;
+;
+; CHL = 8 shift 12
+; ***
+; CHL + explim, c, d
+; <* preceeding operation = 
+; (MLS or MLA) + count, a, b  (may be z-marked) *>
+;                   ::=  begin
+;                          <* abs_addr(epu_status) = c
+;                          _  tail_displacement = d *>
+;                          if d=0 then A_tail_part := 0.0;
+;                          RR := if count=0 and (zMLS or zMLA)
+;                                then 0.0 else RR;
+;                          RR := RR + A(count)A_tail(count);
+;                          goto  if a = b  
+;                          _ then ( DIA+explim, a+4*count, c )
+;                          _ else ( DIV+1, a+4*count, b+4*count );
+;                        end;
+
+;
+
+; process description;
+; *******************
+
+; a48:           <interval low>
+; a49:           <interval high>
+; a10:           <kind=80>
+; a11:           <name>
+; a50:           <device no*64>
+; a52:           <reservers>  ; not used
+; a53:           <users>      ; not used
+; a54:           <next message>
+; a55:           <last message>
+; a56:           <interrupt address>
+; a70:           <first of instructions>
+; a71:           <last of instructions>
+; a72:           <index low>
+; a73:           <index top>
+; a74:           <continuation address>
+; a75:           <status, count>
+; a76:           <explimit>
+; a77:      t0:   ZADD     1  ; zero_setting;
+; a78:      t1:    r9         ; float zero
+; a78+2:    t2:    r9         ; float zero
+; a78+4:    t3:    ADD     1  ; CHL 
+; a78+6:    t4:    0          ; a + 4 * count
+; a78+8:    t5:    0          ; a + 4 * count + d <*=tail_disp*>
+; a78+10:   t6:    STR     1  ; is calculated.
+; a78+12:   t7:    r1         ; 
+; a78+14:   t8:    r3         ;
+; a78+16:   t9:    STP     1  ;   legal stop
+; a78+18:   t10:
+; a78+20:   t11:   0.0        ;   float zero
+; a78+22:   r0:
+; a78+24:   r1:  <work hi>
+; a78+26:   r2:
+; a78+28:   r3:  <work lo>
+; a78+30:   r4:  <quotient address>     
+; a78+32:   r5:  <divisor address>
+; a78+34:   r6:  <return for save rfloat>
+; a78+36:   r7:  <start addr of EPU save rfloat>
+; a78+38:   v0:  <set upper busy>
+; a78+40:        <set upper discon>
+; a78+42:        <set upper busy and discon>
+; a78+44:   v1:  <set lower busy>
+; a78+46:        <set lower discon>
+; a78+48:        <set lower busy and discon>
+; a78+50:   v2:  <start busy>
+; a78+52:        <start discon>
+; a78+54:        <start busy and discon>
+; a78+56:   v3:  <sense ic busy>
+; a78+58:        <sense ic discon>
+; a78+60:        <sense ic busy and discon>
+; a78+62:   v4:  <sense st busy>
+; a78+64:        <sense st discon>
+; a78+66:        <sense st busy and discon>
+; a78+68:   v5:  <actual lower limit>
+; a78+70:        <cont addr after serv-code>
+; a78+72:   v6:  <status con count after serv-code>
+
+;
+; the following do-statement will list the proc description
+; do x3.ympe process description,
+; write x0.peripheral.116
+c. (:a81>18 a.1:)-1            ; if include epu 401 then
+                               ; begin
+m.          epu 401
+
+b. i33, j20, t11, r7, m2, n6, v6
+w.
+t0=a77,   t1=t0+2,  t2=t1+2,   t3=t2+2,
+t4=t3+2,  t5=t4+2,  t6=t5+2,   t7=t6+2,
+t8=t7+2,  t9=t8+2,  t10=t9+2,  t11=t10+2
+r0=t11+2, r1=r0+2,  r2=r1+2,   r3=r2+2,   r4=r3+2
+r5=r4+2,  r6=r5+2,  r7=r6+2,
+v0=r7+2,  v1=v0+6,  v2=v1+6,  v3=v2+6,
+v4=v3+6,  v5=v4+6,  v6=v5+4,
+
+a0 =1<23
+
+; operation and mode constants
+      a0>5               ;   only operation 5;
+i0:   a0>0+a0>2          ;   only mode 0 and 2;
+
+; epu entry:
+; **********
+
+; check op and mode, link operation
+h35:  dl. w1  i0.        ;   load op and mode
+      jl  w3  g16        ;   check operation(5,0.2);
+      jl  w3  g17        ;   link operation;
+
+; start:
+i1:   jl  w3  g31        ;   increase stopcount
+      dl  w0  x2+12      ;   load first and last storage;
+      ds  w0  x1+a71     ;   first instruction:= first storage;
+                         ;   last  instruction:= last storage;
+      rs  w3  x1+a74     ;   continuation address:=first storage;
+      ws  w0  6          ;   w0:=last - first;
+      al  w3  0          ; 
+      wd. w0  j0.        ;   rem:= (last-first) mod 6;
+      am     (x2+12)     ;
+      rl  w0  -4         ;   if last instruction
+      sn  w0 (x1+t9)     ;     <> legal stop
+      se  w3  4          ;   or rem <> 4
+      jl.     i26.       ;   then goto unintelligible;
+      bz  w0  x2+9       ;
+      se  w0  0          ;   if mode <>  0
+      jl.     m0.        ;   then goto array bounds;
+      rl  w2  x2+6       ;   load sender proc descr. address;
+      dl  w0  x2+a18     ;   load first and last core of sender;
+      jl.     i2.        ;   goto set bound;
+
+; array bounds:
+m0:   dl  w0  x2+16      ;   load index low and high
+      la  w0  g50        ;   remove last bit;  
+      la  w3  g50        ;   remove last bit;
+      rl  w2  x2+6       ;   comment w2:=internal;
+      sl  w3 (x2+a17)    ;   if index low < internal.first
+      sl  w0 (x2+a18)    ;   or index high >= internal.top
+      jl.     i26.       ;   then goto unintelligble;
+      wa. w0  j1.        ;   index top:= index high + 2;
+      sl  w0  x3         ;   if index low >= index high then
+      jl.     i26.       ;  goto unintelligble;                      
+
+; set bound:
+i2:   ds  w0  x1+a73     ;   save index low and top;
+      ws. w0  j1.        ;   index high:=index top - 2;
+      am     (x1+a50)    ;   upper limit (device):=
+      io  w0  +5         ;     index high;
+      sx      2.11       ;   if exception
+      jl.     n0.        ;   then goto malfunction(upper);
+
+; restart:
+i3:   rl  w2  x1+a50     ;   load devi no < 6
+      rl  w3  x1+a74     ;   load continuation address
+      rl  w0  x1+a72     ;   lower limit(device):=
+      rs  w0  x1+v5      ;   actual lower limit :=
+      io  w0  x2+1       ;     index low;
+      sx      2.11       ;   if exception
+      jl.     n1.        ;   then goto malfunction(lower);
+      io  w3  x2+9       ;   start(device):= continuation address;
+      sx      2.11       ;   if exception
+      jl.     n2.        ;   then goto malfunction(start);
+      jl  w3  c32        ;   wait interrupt;
+      am      0          ;   dummy;
+      io  w3 (x1+a50)    ;   sense ic(device);
+      sx      2.11       ;   if exception
+      jl.     n3.        ;   then goto malfunction(sense ic);
+      am     (x1+a50)    ;
+      io  w0  +4         ;   sense status con count;
+      sx      2.11       ;   if exception
+      jl.     n4.        ;   then goto malfunction(sense st);
+      ds  w0  x1+a75     ;   save ic and status con count;
+      al  w3  x3-2       ;   if continuation address - 2
+      sn  w3 (x1+a71)    ;    <> last of instructions
+      so  w0 (g58)       ;   or status <> illegal
+      jl.     i6.        ;   then goto test further;
+
+; legal stop:
+i4:   al  w0  0          ;
+      ci  w0  0          ;
+      rs  w3  x1+a75     ;   status con count := 0;
+      ds  w0  x1+r3      ;   work hi:=
+      ds  w0  x1+r1      ;   work lo:= 0.0;
+
+; set answer:
+i5:   jl  w3  g32        ;
+      rl  w1  b19        ;   decrease stop count;
+      rl  w2  b18        ;
+      rl  w3  x1+a74     ;   bytes:= continuation address -
+      ws  w3  x1+a70     ;           first instructions;
+      al  w0  x3         ;
+      ls  w0  -1         ;
+      wa  w0  6          ;   chars:= bytes + bytes//2;
+      ds  w0  x2+12      ;
+      rl  w0  g51        ;
+      la  w0  x1+a75     ;   status:= (-1 < 12) and status;
+      rs  w0  x2+8       ;
+      dl  w0  x1+r3      ;   answer(6:7):= work lo;
+      ds  w0  x2+22      ;
+      dl  w0  x1+r1      ;   answer(4:5):= work hi;
+      ds  w0  x2+18      ;
+      rl  w0  x1+a76     ;   take explimit;
+      hs  w0  0          ;   shift +12;
+      hl  w0  x1+a75+1   ;   take epucount;
+      rs  w0  x2+14      ;   answer(3) := explimit <12 + count;
+      al  w0  1          ;   result:= 1;
+      rs  w0  x2+4       ;
+      jl  w3  d15        ;   deliver answer;
+
+; next:
+m1:   jl  w3  g25        ;   next operation;
+      jl.     i1.        ;   goto start;
+
+; test further:
+i6:   al  w2  x1+t6;     ;   load start addr of save r_float;
+      rs  w2  x1+r7      ;   store start addr;
+      sz  w0 (g58)       ;   if status <> illegal then
+      jl.     i8.        ;   begin
+
+; illegal:
+i7: ; jl. w3  i24.       ;     goto save rfloat;
+; midlertidig save efter illegal fjernet
+      jl.     i5.        ;     goto set answer;
+                         ;   end;
+
+; check illegal instruction:
+i8:   rl  w2  x3-4       ;   if stopping instruction=
+      sn  w2 (x1+t9)     ;         legal stop
+      jl.     i4.        ;   then goto legal stop;
+      am     (x1+a71)    ;   if last instr - 6 <
+      sl  w3  -4         ;   this instr then
+      jl.     i7.        ;   goto illegal;
+      bl  w0  5          ;   load count;
+      ls  w2  +1         ;   remove clear bit;
+      bl  w2  4          ;   load mw-operation
+      sl  w2  10         ;   if operation < 10
+      sl  w2  17         ;   or operation > 16 then
+      jl.     i7.        ;   goto illegal;
+      sn  w2  16         ;   if operation = chl
+      jl.     i21.       ;   then goto check cholesky;
+      se  w2  14         ;   if operation <> dia
+      jl.     i9.        ;   then goto check count;
+      rs  w0  x1+a76     ;   store explimit
+      jl.     i10.       ;   goto take op addr
+
+; check counter
+i9:   se  w0  1          ;   if count <> 1 
+      jl.     i7.        ;   then goto illegal
+
+; take operand addr:
+i10:  dl  w0  x3         ;   take operand addresses;
+      la  w3  g50        ;   remove last bit
+      la  w0  g50        ;   remove last bit
+      sn  w2  12         ;   if instr = sqr 
+      jl.     i11.       ;   then goto check 1.addr;
+
+; check operand addr:
+i31:  sl  w0 (x1+a72)    ;   if 2.addr < index low
+      sl  w0 (x1+a73)    ;   or 2.addr >= index high
+      jl.     i30.       ;   then goto index error;
+i11:  sl  w3 (x1+a72)    ;   if 1.addr < index low
+      sl  w3 (x1+a73)    ;   or 1.addr >= index high
+      jl.     i30.       ;   the goto index error;
+      ds  w0  x1+r5      ;   save operand addr;
+
+; branch to mw-operation
+      jl.    (x2+j5.)    ;   go to mw-operation;
+
+; division:
+i12:  jl. w3  i24.       ;   save rfloat
+      fd  w0 (x1+r5)     ;   divide;
+      sx      2.010      ;   if ouflow then
+      jl.     i27.       ;   goto ouflow;
+      ds  w0 (x1+r4)     ;   store result;
+      jl.     i28.       ;   goto stoptest;
+
+; dia:
+i13:  jl. w3  i24.       ;   save rfloat;
+      bl  w2  1          ;   take exp for zerotest;
+      sn  w2  -2048      ;   if floatzero then
+      jl.     i15.       ;   goto singular by zero;
+      ds. w0  j3.        ;   store radicand;
+
+      al  w2  1          ;   dia_result:= 1;
+      sl  w3  0          ;   if pos then
+      jl.     i14.       ;   goto test exp loss;
+      al  w0  0          ;   load zero;
+      ci  w0  0          ;   floating zero;
+      fs. w0  j3.        ;   radicand:= - radicand;
+      ds. w0  j3.        ;   store radicand;
+      al  w2  2          ;   dia_result:= 2;
+
+; test exp loss
+i14:  am     (x1+r4)     ;
+      bl  w3  +1         ;   take exp of unreduced;
+      bs  w3  x1+r1+1    ;   - exp of radicand;
+      ds  w3 (x1+r5)     ;   store dia_result and exploss;
+      sl  w3 (x1+a76)    ;   if exploss>=explim then
+      jl.     i16.       ;   goto singular;
+      dl. w0  j3.        ;   load radic as iterand;
+      jl.     i19.       ;   goto start sqrt;
+
+; singular by zero:
+i15:  al  w2  4          ;   dia_result:= 4;
+      al  w3  0          ;   exp_loss:= 0;
+      jl.     i17.       ;   goto store dia result;
+
+; singular:
+i16:  al  w2  3          ;   dia_result:= 3;
+
+; store dia_result:
+i17:  ds  w3 (x1+r5)     ;   store dia_result and exp_loss;
+      dl. w0  j4.        ;   dia:= -'280;
+      jl.     i20.       ;   goto store sqrt;
+
+; sqrt:
+i18:  jl. w3   i24.      ;   save rfloat;
+      bl  w2   1         ;   take exp for zerotest;
+      sn  w2  -2048      ;   if floatzero then
+      jl.      i20.      ;   goto store sqrt;
+      ds. w0   j3.       ;   store radicand;
+      sl  w3   0         ;   if radicand > 0 then
+      jl.      i19.      ;   goto start sqrt;
+      al  w0   0         ;   load zero;
+      ci  w0   0         ;   floating zero;
+      fs. w0   j3.       ;   radicand:= - radicand;
+      ds. w0   j3.       ;   store radicand;
+
+; start sqrt:
+; see prog index 75015; first appr a + b*x, 2**43<=x<2**45
+; given b= 2**(-23) min rel errors
+; for a= 0.929 682 927 462 *(2**21) = 1 949 686
+; max rel errors 0.036 for x =a/b, 2**45;
+i19:  so  w0   1         ;   if even expo  
+      am       -1        ;   then w3:= w3//8
+      ls  w3   -2        ;   else w3:= w3//4;
+      rl  w2   6         ;   store long radicand;
+
+      rl. w1   j2.       ;   w1:= a;
+      wa  w1   6         ;
+      wa  w1   6         ;   w1:= a + x * 2 **(-24);
+
+; newton, integer
+      wd  w0   2         ;   w3:= w3 // w1;
+      wa  w1   0         ;   w1:= w0 + w1;
+      ls  w1   -1        ;   w1:= w1 // 2;
+
+      rl  w3   4         ;   load long radicand;
+      wd  w0   2         ;   w3:= w3 // w1;
+      wa  w1   0         ;   w1:= w0 + w1;
+      sx       2.010     ;   iterand := if -, oflow then
+      ls  w1   -1        ;   w1 else w1/2;
+
+      dl. w0   j3.       ;   load (real) radicand;
+      bl  w2   1         ;   w2:= expo( radicand );
+      al  w2 x2+1        ;   w2:= w2 + 1;
+      as  w2   -1        ;   w2:= ( expo + 1 ) //2;
+      bz  w2   5         ;   expo(w2):= w2 extract6;
+
+; newton, real
+      fd  w0   4         ;   rad/ iterand;
+      fa  w0   4         ;   2*iter:=rad/it+it;
+      bl  w2   1         ;   load exp;
+      al  w2   x2-1      ;   exp := exp - 1;
+      hl  w0   5         ;   iter:= iter/2;
+
+; restore w1
+      rl  w1   b19       ;   take proc descr addr;
+
+; store sqrt
+i20:  ds  w0  (x1+r4)    ;   store result;
+      jl.      i28.      ;   goto stoptest;
+
+; check cholesky:
+i21:
+; register     call        return
+; w0           exp_lim     divisor or col status addr
+; w1           proc descr  proc descr
+; w2           irrel       operation 10=div, 14=dia
+; w3           cont addr-2 quot or dia addr
+;
+
+; test of preceeding operation
+      rs  w0  x1+a76    ;   save exp_lim
+      bz  w0  x3-9      ;   w0:= count of preceed. instr.
+      bl  w2  x3-10     ;   w2:= preceeding instr
+      se  w2  -1<11+3   ;   if -, zmls
+      sn  w2  -1<11+2   ;   or -, zmla then
+      jl.     i33.      ;
+      jl.     i32.      ;   goto test mls
+i33:  sn  w0  0         ;   if count=0 then
+      am      t0-t3     ;   set clear r_float 
+i22:  al  w2  x1+t3     ;   w2:= epu service start
+      rs  w2  x1+r7     ;   store start addr for epu service
+
+; operating addresses :
+      rl  w2  x3        ;   w2 := tail_displacement;
+      as  w0  2         ;   w0 :=
+      rl  w3  0         ;   w3 := 4 * count;
+      am     (x1+a74)   ;   w0 := w0 + b; w0 := divisor addr
+      aa  w0 -8         ;   w3 := w3 + a; w3 := add and quot addr
+      wa  w2  6         ;   w2 := addend tail addr
+      sn  w2  x3        ;   if tail displ = 0 then
+      al  w2  x1+t11    ;   load addr of float zero
+      la  w2  g50       ;   remove last bit
+      la  w0  g50       ;   remove last bit
+      la  w3  g50       ;   remove last bit
+      rs  w3  x1+t4     ;   save add_head
+      rs  w2  x1+t5     ;   save add_tail;
+
+; decide dia or div :
+      sn  w0  x3        ;   if a <> b then 
+      jl.     i23.      ;   begin
+      al  w2  10        ;     w2 := div op;
+      jl.     i31.      ;     goto check operand addr;
+                        ;   end;
+i23:  am     (x1+a74)   ;    <* dia *>
+      rl  w0 -4         ;   w0 := col status addr (=c);
+      la  w0  g50       ;   remove last bit
+      al  w2  14        ;   w2 := dia;
+      jl.     i31.      ;   goto check operand addr;
+
+; test mls or mla
+i32:  se  w2  3         ;   if mls
+      sn  w2  2         ;   or mla then
+      jl.     i22.      ;   goto load serv addr
+      jl.     i7.       ;   else goto illegal
+
+;  save  rfloat:
+i24:  rs  w3  x1+r6      ;   save return jump;
+      rl  w3  x1+a50     ;   lower limit(device):=
+      rs  w1  x1+v5      ;   actual lower limit
+      io  w1  x3+1       ;     process description;
+      sx      2.11       ;   if exception
+      jl.     n1.        ;   then goto malfunction(lower);
+      rl  w0  x1+r7      ;   start addres of epu code;
+      io  w0  x3+9       ;   start store code;
+      sx      2.11       ;   if exception 
+      jl.     n2.        ;   then goto malfunction(start);
+      jl  w3  c32        ;   wait interrupt;
+      am      0          ;   dummy;
+      io  w3 (x1+a50)    ;   sense ic(device)
+      sx      2.11       ;   if exception
+      jl.     n3.        ;   then goto malfunction(sense ic);
+      am     (x1+a50)    ;
+      io  w0  +4         ;   sense(status con count);
+      sx      2.11       ;   if exception 
+      jl.     n4.        ;   then goto malfunction(sense st);
+      ds  w0  x1+v6      ;   store cont addr and st con count
+      sz  w0 (g58)       ;   if status <> illegal
+      se  w3  x1+t9+6    ;   or stopping addr unexpected
+      jl.     i25.       ;   then goto store status
+      xl      g52        ;   select full precision;
+      dl  w0  x1+r1      ;   load work high
+      fa  w0  x1+r3      ;   add work low;
+      sx      2.010      ;   if ouflow then
+      jl.     i27.       ;   goto ouflow;
+      jl     (x1+r6)     ;   return jump
+
+; malfunction:
+n0:   am      v0-v1      ;   addr of malf rep upper
+n1:   am      v1-v2      ;   addr of malf rep lower
+n2:   am      v2-v3      ;   addr of malf rep start
+n3:   am      v3-v4      ;   addr of malf rep sense ic
+n4:   al  w3  x1+v4      ;   addr of malf rep sense sts con cnt
+      sx      2.01       ;   if busy state
+      jl.     n5.        ;   then goto test busy and discon
+      sx      2.10       ;   if discon state
+      al  w3  x3+2       ;   then take discon addr
+      jl.     n6.        ;   goto save report
+n5:   sx      2.10       ;   if busy and discon
+      al  w3  x3+4       ;   then take busy and discon addr
+n6:   am     (x3)        ;   rep field := 
+      al  w0  1          ;   rep field + 1;
+      rs  w0  x3         ;   save report field
+
+; malfunction and clear device:
+      al  w0  4          ;   result:= discon (also when busy)
+      rs  w0  x1+a75     ;
+      am     (x1+a50)    ;
+      io      +2         ;   master clear(device);
+      jl  w3  g32        ;   decrease stopcount
+m2:   am     (b19)       ; clear queue: a master clear may
+      rl  w0  x1+a75     ;   or may not give an interrupt
+      jl  w3  g27        ;   deliver result(result);
+      jl  w3  g25        ;   next operation;
+      jl.     m2.        ;   goto clear queue;
+
+; unintelligible:
+i26:  jl  w3  g32        ; unintelligble:
+      al  w0  3          ;  decrease stopcount;
+      jl  w3  g27        ;  deliver result(3);
+      jl.     m1.        ;  goto next;
+
+
+; ouflow:
+i27:  bl  w0  1          ;   if exponent < 0 then
+      sl  w0  0          ;     status:= overflow else
+      am      1<5-1<6    ;           status:= underflow;
+      al  w0  1<6        ;   count := 0;
+      ls  w0  12         ;   move ouflobits;
+      jl.     i25.       ;   goto store status
+
+; stoptest:
+i28:  jl  w3  g34        ;   examine sender;
+      jl.     i29.       ;   if stopped then goto clear status
+      jl.     i3.        ;   else goto restart;
+i29:  al  w0  0          ;   clear status word
+ 
+; store status:
+i25:  rs  w0  x1+a75     ;   store status word
+      jl.     i5.        ;   goto set answer;
+
+; index error:
+i30:  rl  w0  g61        ;   load  index error;
+      jl.     i25.       ;   goto store status
+
+j0:       6              ;  constant six;
+j1:       2              ;  constant two;
+j2:       1 949 686      ;  const (2**(3/2)+1-2*8**(1/4))*2**22
+                         ;      = 0.929 682 927 462 * (2**21);
+                         ;  see prog. index 75015;
+
+f.
+j3:       0.0            ;  iterand;
+j4:      -'280           ;  constant at singularity;
+
+w.
+j6:   i12                ;   division addres;
+      i18                ;   sqrt address
+      i13                ;   dia address
+      ; i21              ;   chl address ( not used )
+j5=j6-10
+
+i.
+
+e.                       ; end epu 401;
+
+z. h35=g3                ; goto result3
+
+
+
+; ipc 402 incremental plotter controller
+; **************************************
+;
+; process description
+; *******************
+;
+; a48:           <interval low>
+; a49:           <interval high>
+; a10:           <kind = 92>
+; a11:           <name>
+; a50:           <device number * 64>
+; a52:           <reserved>
+; a53:           <users>
+; a54:           <next message>
+; a55:           <last message>
+; a56:           <interrupt address>
+; a70:           <status>
+; a71:           <sensed CSA>
+;
+
+c. (:a81>17 a.1:)-1             ; if include ipc 402 then
+                                ; begin
+
+m.          ipc 402
+b. i5
+w.
+
+a0=1<23
+; operation and mode
+     a0>5                ; operation 5
+i0:  a0>0                ; mode 0
+
+; entry:
+h50:  jl  w3  g15        ;   check reservation;
+      dl. w1  i0.        ;
+      jl  w3  g16        ;   check operation(5,0);
+      jl  w3  g17        ;   link operation;
+
+; start:
+i1:   jl  w3  g31        ;   increase stopcount;
+      dl  w0  x2+12      ;   CSA:=first addr(buf);
+      am     (x1+a50)    ;   LCSA:=last addr(buf);
+      io  w0    +5       ;   control(device,LCSA);
+      sx      2.11       ;   if exception then
+      jl.     i4.        ;    goto disconnected;
+      am     (x1+a50)    ;
+      io  w3   +17       ;   control(device,CSA);
+      sx      2.11       ;   if exception then
+      jl.     i4.        ;    goto disconnected;
+                         ;
+      jl  w3  c32        ;   wait interrupt;
+      am       0         ;     comment not possible;
+      io  w0 (x1+a50)    ;   sense(device,status);
+      sx      2.11       ;   if exception then
+      jl.     i4.        ;    goto disconnected;
+      rs  w0  x1+a70     ;   save status;
+      am     (x1+a50)    ;
+      io  w2    +4       ;   sense(device,CSA);
+      sx      2.11       ;   if exception then
+      jl.     i4.        ;    goto disconnected;
+      rs  w2  x1+a71     ;   save sensed CSA;
+
+; done0:
+i2:   jl  w3  g32        ;   decrease stopcount;
+      am     (b19)       ;
+      dl  w1  +a71       ;
+      al  w2  x1         ;
+      jl  w3  g33        ;   prepare answer;
+      jl  w3  g18        ;   deliver result(1);
+
+; done1:
+i3:   jl  w3  g25        ;   next operation;
+      jl.     i1.        ;   goto start;
+
+; disconnected:
+i4:   jl  w3  g32        ;   decrease stopcount;
+      jl  w3  g29        ;   disconnected device;
+      jl.     i3.        ;   goto done1;
+
+i5:  3   ; count, must be 3 if count is necessary (see above)
+
+e.   ; end of ipc 402
+z. h50=g3 ; goto result5
+
+n.                       ; return to rc monitor text
+c. (: (:a81>18 a.1:) o. (:a81>17 a.1:) :)-1 ;  if include private
+                                            ;   process descriptions then
+                                            ;   begin
+
+
+
+
+
+; process description
+; *******************
+;
+; epu 401 arithmetic unit
+; ***********************
+
+; actual proc descr may be listed by
+; do w0.74 w0.x0.0 w2.x0.16 write x2.peripheral.116
+
+c. (:a81>18 a.1:)-1  ; if include epu401 then
+m.          epu 401 private process description
+                     ; begin
+
+jl  w1    c30        ;  interrupt response instr.
+a107,  a108          ;  process base
+
+;  process description word 0
+
+p72:                 ;  type = 72
+b. t11,  r7, v6
+w.
+80                   ;  kind = 80
+<:ympe:>, 0, 0       ;  name
+8<6                  ;  device no < 6;  
+0                    ;  reservers, not used
+0                    ;  users,     not used
+k                    ;  next message
+k - 2                ;  last message
+c33                  ;  interrupt addres
+0                    ;  first of instruct.
+0                    ;  last  of instruct.
+0                    ;  first of proc. area
+0                    ;  last  of proc. area
+0                    ;  continuation addr.
+0<12 + 0             ;  status<12 + count
+30                   ;  exp limit
+
+; epu-code for mw-instructions
+t0:         1<23 + 0<12 + 1      ; zadd 1
+t1:          t11,    t11         
+t3:         0<23 + 0<12 + 1      ;  add 1
+t4:          0,      0
+t6:         0<23 + 4<12 + 1      ;  str 1
+t7:          r1,     r3
+t9:         4095<12 + 1          ;  stp 1 ; legal stop test
+f.
+t11:        0.0                  ;  floating zero
+w.
+
+; working cells for epu code;
+0,  r1:   0          ;  work high
+0,  r3:   0          ;  work low
+r4:       0          ;  quotient addr
+r5:       0          ;  divisor addr
+r6:       0          ;  return addr for save rfloat
+r7:       0          ;  start  addr for save rfloat
+
+; malfunctions after io-commands;
+;    busy       discon       busy and discon
+v0:   0,          0,          0,    ; upper limit 
+v1:   0,          0,          0,    ; lower limit
+v2:   0,          0,          0,    ; start
+v3:   0,          0,          0,    ; sense ic
+v4:   0,          0,          0,    ; sense st con count
+v5:   0                             ; actual lower lim
+      0,                            ; cont addr for serv-code
+v6:   0,                            ; st con count for s-code
+
+c. (:p72+a78+72-v6:)*(:p72+a78+72-v6:)-1;
+; if p72 + a78 + 72 <> v6 then
+m.  *** option error in ympe
+p72:      0          ;  artificial syntax error to give ok.no
+z.
+
+i.
+e.                              ;  end epu 401 process description
+z.
+
+
+
+; ipc 402 incremental plotter controller
+; **************************************
+;
+; process description
+; *******************
+;
+c. (:a81>17 a.1:)-1 ; if include ipc 402 then
+m.          ipc 402 private process description
+b. w.               ; begin
+   jl  w1  c30        ;  interrupt response instruction
+   a107 , a108        ;  base interval
+p73:                  ;  type=73
+   92                 ;  kind
+   <:plotter:>,0      ;  name
+   13<6               ;  devno * 64
+   0                  ;  reserved
+   1<22               ;  users, initially s
+   k                  ;  next message
+   k-2                ;  last message
+   c33                ;  interrupt address
+   0                  ;  status
+   0                  ;  sensed CSA
+
+c. (:k-p73-26:)*(:k-p73-26:)-1
+m. *** ipc 402 , error in process description
+p73:   0   ;  provoke ok.no
+z.
+
+e. ; end of ipc 402 process description
+z.
+
+
+n.                              ;  return to rc monitor text
+z.  ;  end of private process descriptions
+
+
+
+
+
+; *******************************************************************
+; **                                                               **
+; **                    diverse s options                          **
+; **                                                               **
+; *******************************************************************
+m.   s size options
+
+   c81=2          ; number of standard console descriptions
+n.
+m.   s console table
+
+   k, k-2, 0, 2, 8.1770, 0, r.c1>1-5
+n.
+m.   s device exclusion table
+
+   ; empty
+n.
+m.   startup area name
+    <:autostart:>,0    ; must occupy 4 words, the first word must be
+                       ; zero if automatic startup is not wanted
+n.

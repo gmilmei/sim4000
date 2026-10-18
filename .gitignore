@@ -1,0 +1,10 @@
+# Reproducible CMake build trees and their generated artifacts.
+/build/
+/build-*/
+
+# Generated Python import caches.
+__pycache__/
+
+# Runtime disk state is reproducible from the read-only base image.
+*.overlay
+*.overlay.tmp.*

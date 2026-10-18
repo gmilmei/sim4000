@@ -1,0 +1,3023 @@
+m.                moncatinit - initialisation of catalog, links ...
+
+c.-880504
+
+
+
+b.i30 w.
+i0=81 12 15, i1=12 00 00
+
+; if newtime (i0,i1) > oldtime (a133,a134) then oldtime:=newtime;
+c.i0-a133
+  c.i0-a133-1, a133=i0, a134=i1, z.
+  c.i1-a134-1,          a134=i1, z.
+z.
+
+i10=i0, i20=i1
+
+i15=i10/100000 , i10=i10-i15*100000 , i25=i20/100000 , i20=i20-i25*100000 
+i14=i10/10000  , i10=i10-i14*10000  , i24=i20/10000  , i20=i20-i24*10000 
+i13=i10/1000   , i10=i10-i13*1000   , i23=i20/1000   , i20=i20-i23*1000
+i12=i10/100    , i10=i10-i12*100    , i22=i20/100    , i20=i20-i22*100
+i11=i10/10     , i10=i10-i11*10     , i21=i20/10     , i20=i20-i21*10
+
+i2:  <:                              date  :>
+     (:i15+48:)<16+(:i14+48:)<8+46
+     (:i13+48:)<16+(:i12+48:)<8+46
+     (:i11+48:)<16+(:i10+48:)<8+32
+
+     (:i25+48:)<16+(:i24+48:)<8+46
+     (:i23+48:)<16+(:i22+48:)<8+46
+     (:i21+48:)<16+(:i20+48:)<8+ 0
+
+i3:  al. w0  i2.       ; write date:
+     rs  w0  x2+0      ;   first free:=start(text);
+     al  w2  0         ;
+     jl      x3        ;   return to slang(status ok);
+
+     jl.     i3.       ;
+e.
+j.
+
+z. ; 880504
+
+
+
+; segment 9: initialize catalog on backing store
+s.k=k, m2, h13,g54,f50,e27,d80,c25
+w.b127=k, c25, k=k-2
+
+; segment structure:
+;     definitions            (c names)
+;     variables              (d names)
+;     textstrings            (e names)
+;     utility procedures     (f names)
+;     command actions        (g names)
+;     tables and buffers     (h names)
+;
+;     (i and j names are used locally)
+
+  d0=k-2                ; start s:
+
+w.    jl.   (d40.)      ; first instruction: goto init catalog;
+
+h2:  h3                ; link for initcat command-table
+
+d54=0     , d53=1       ; first slice.cat, keys
+d52=4                   ; interval
+d55=6                   ; name
+d56=14                  ; tail
+d57=d56+0               ; size
+d61=d56+2               ; doc name
+d64=d56+12              ; slicelength
+d66=d56+14, d67=d56+15  ; last slice, first reserved slice
+
+  e5: <:result<0>:>, e6=k-2
+  e7: <:status<0>:>, e8=k-2
+
+; generate  start up header.
+; the text generated below is printed during start up of the monitor.
+
+e19:
+<:<10> monitor release :  :>
+
+b.i1,j1 w.
+
+i0=a135/10,  j0=a136/10
+i1=a135/1 ,  j1=a136/1
+
+(:i0+48:)<16+(:i1-i0*10+48:)<8+46
+(:j0+48:)<16+(:j1-j0*10+48:)<8+32
+
+e.
+
+<:<10> monitor version :  :>
+
+b.i10,j5 w.
+
+i0=a133/100000, j0=a134/100000
+i1=a133/10000 , j1=a134/10000
+i2=a133/1000  , j2=a134/1000
+i3=a133/100   , j3=a134/100
+i4=a133/10    , j4=a134/10
+i5=a133/1     , j5=a134/1
+
+     (:i0      +48:)<16+(:i1-i0*10+48:)<8+46
+     (:i2-i1*10+48:)<16+(:i3-i2*10+48:)<8+46
+     (:i4-i3*10+48:)<16+(:i5-i4*10+48:)<8+32
+     32<16+(:j0      +48:)<8+(:j1-j0*10+48:)
+     46<16+(:j2-j1*10+48:)<8+(:j3-j2*10+48:)
+     46<16+(:j4-j3*10+48:)<8+(:j5-j4*10+48:)
+e.
+
+
+c.a130-1
+b.i5,j5 w.
+i0=a130/100000, j0=a131/100000
+i1=a130/10000 , j1=a131/10000
+i2=a130/1000  , j2=a131/1000
+i3=a130/100   , j3=a131/100
+i4=a130/10    , j4=a131/10
+i5=a130/1     , j5=a131/1
+
+<:<10> date of options :  :>
+     (:i0      +48:)<16+(:i1-i0*10+48:)<8+46
+     (:i2-i1*10+48:)<16+(:i3-i2*10+48:)<8+46
+     (:i4-i3*10+48:)<16+(:i5-i4*10+48:)<8+32
+     32<16+(:j0      +48:)<8+(:j1-j0*10+48:)
+     46<16+(:j2-j1*10+48:)<8+(:j3-j2*10+48:)
+     46<16+(:j4-j3*10+48:)<8+(:j5-j4*10+48:)
+e.z.
+
+<:<10><0> initialize date using the date command <10> :>, e20=k-2
+
+; print out start-up head under assembly.
+; note: the text (e19 until ..initialize date.. must not contain
+; zero characters, because these will terminate the listing.
+b.j0 w.
+j0:  al. w0  e19.      ;   text:=start-up header;
+     al  w2  0         ;   status:=ok;
+     jl      x3        ;   return to slang;
+
+     jl.     j0.       ; entry: goto start;
+e.
+j.
+
+
+
+
+; description of main catalog:
+; (format resembles a normal catalog-entry)
+d8:                    ; start of entry
+     a110              ; (key)
+     a107,a108         ; (interval)
+d9:  <:catalog:>, 0    ; name of main catalog
+d10: -1                ; size of main catalog (initially not defined)
+     0, r.4            ; (document name)
+d11: 0                 ; maincat shortclock
+     0, 0              ; (file and block)
+     -1                ; (contents and en68 56374       -1                ; (contents and entry)
+     0, r.(:a88+d8.+2:)>1; (rest of tail)
+
+
+; procedure type newline
+;   outputs a newline char on the console
+;
+; call: w3 = link
+; exit: w0 = undef, w1,w2,w3 = unch
+
+f3:                    ; type newline:
+     al  w0     10     ;   char := newline;
+                       ;   continue with type char;
+
+
+; procedure type char
+;   outputs the given char on the console
+;   (if the char is <newline>, the buffer is sent)
+;   ***** note: return inf etc are not saved for reentrant use of this code!!!
+;
+; call: w0 = char, w3 = link;
+; exit: all regs unch
+
+f0:                    ; type char:
+b. i24 w.
+     ds. w2     i0.    ;   save regs;
+     ds. w0     i1.    ;
+     rl  w2     0      ;
+i10:                   ; put char: (w0 = w2 = char)
+     jl. w3     f42.   ;   write char (char);
+     se  w2     10     ;   if char = newline then
+     jl.        i15.   ;     begin
+     jl. w3     f44.   ;     type line (buf);
+     jl. w3     f45.   ;     save work (buf);
+     am                ;+2:    error: (continue)
+                       ;     (maybe status-errors ougth to repeat a couple of times ???)
+     jl. w3     f41.   ;     init write;
+i15:                   ;     end;
+     dl. w2     i0.    ;   restore regs;
+     dl. w0     i1.    ;
+     jl     x3         ;   return;
+
+
+; procedure typetextline (text);
+;   outputs the text on the console, terminated by a newline char
+; call: w1=text addr, w3=link
+; exit: w0,w1,w3=unch, w2 = undef
+
+f2:                    ; typetextline:
+     am         10-32  ;   char := newline;
+                       ;   continue with typeout;
+
+; procedure typetext (text);
+;   outputs the text on the console, terminated by a space
+; call: w1=text addr, w3=link
+; exit: w0,w1,w3=unch, w2=undef
+
+f1:                    ; typetext:
+     al  w2     32     ;   char := space;
+     ds. w2     i0.    ;   save regs;
+     ds. w0     i1.    ;
+     jl. w3     f43.   ;   writetext (text);
+     al  w0  x2        ;
+     jl.        i10.   ;   goto put char
+
+i0=k+2, 0, 0           ; saved w1,w2
+i1=k+2, 0, 0           ; saved w3,w0
+e.                     ;
+
+; procedure typeresult(name,result)
+; comment: outputs a name and result on the console.
+;     call:     return:
+; w0  result    result
+; w1            unchanged
+; w2  link      link
+; w3  name      name
+
+b.i24                   ; begin
+w.f5: ds. w1  i2.       ;
+      ds. w3  i3.       ;
+      al  w1  x3+0      ; 
+      jl. w3  f1.       ;   typeout(name);
+      al. w1  e5.       ;
+      jl. w3  f1.       ;   typeout(<:result:>);
+      wa. w0  i1.       ;
+      jl. w3  f0.       ;   typechar(result+48);
+i0:                    ; end with newline:
+     jl. w3     f3.    ;   type newline;
+      dl. w1  i2.       ;
+      dl. w3  i3.       ;
+      jl      x2+0      ;
+  i1: 48                ;
+      0, i2: 0          ;
+      0, i3: 0          ; end
+
+; procedure typestatus(name,status)
+; comment: outputs a name and the number of the
+; leftmost status bit.
+;     call:     return:
+; w0  status    status
+; w1            unchanged
+; w2  link      link
+; w3  name      name
+
+                        ; begin
+w.f6: ds. w1  i2.       ;
+      ds. w3  i3.       ;
+      al  w1  x3+0      ;
+      jl. w3  f1.       ;   typeout(name);
+      al. w1  e7.       ;
+      jl. w3  f1.       ;   typeout(<:status:>);
+      rl  w1  0         ;   w1 := status;
+      al  w2  -1        ;
+  i4: sl  w1  0         ; rep:
+      am      46-49     ;   if leftmost bit(w1) = 0 then
+      al  w0  49        ;     outchar(point) else
+      jl. w3  f0.       ;     outchar(one);
+      ld  w2  1         ;   w1 := w1 shift 1;
+      se  w2  0         ;   if not all status is printed then
+      jl.     i4.       ;     goto rep;
+      jl.     i0.       ;   goto end with newline;
+e.                      ; end
+
+; procedure inchar(char, trouble)
+; comment: inputs the next character from the <input>
+;     call:     return:
+; w0            char
+; w1            unchanged
+; w2            unchanged
+; w3  link      link
+
+b.i24                   ; begin
+w.f7: ds. w2  i8.       ;
+      rs. w3  i9.       ;
+      rl. w2  d18.      ;
+      al  w2  x2+1      ;   cur char:=cur char+1;
+  i0: rs. w2  d18.      ;   while cur char=characters do
+      se. w2 (d17.)     ;   begin
+      jl.     i3.       ;
+      jl. w3   f9.      ;   inblock
+      jl.    (i9.)      ;+2:  trouble:  goto trouble;
+      jl.     i4.       ;+4:  end area: goto simulated end-character;
+                        ;+6:  ok:
+      al  w2  0         ;   end;
+      jl.     i0.       ;   cur char:=0;
+  i3: al  w1  0         ;   end;
+      wd. w2  i6.       ;
+      ls  w1  3         ;   pos:=(cur char mod 3)*8-16;
+      ls  w2  1         ;
+      wa. w2  d22.      ;   addr:=input buf+cur char/3*2;
+      rl  w0  x2+0      ;
+      ls  w0  x1-16     ;   char:=word(addr) shift pos;
+      sz  w0  255       ;   if char = null-char then
+      jl.     i5.       ;     begin
+      rl. w1  d40.      ;     if modekind <> tro then
+      sn  w1  m2        ;
+      jl.     i5.       ;
+i4:                     ; simulated end-char:
+      al  w0  255       ;       char := 255;
+      jl.     i10.      ;     end
+i5:                     ;   else
+      la. w0  i7.       ;     char := char extract 7;
+i10:                    ;
+      dl. w2  i8.       ;
+      rl. w3  i9.       ;
+      jl      x3+2      ;
+  i6: 3                 ;
+  i7: 8.177             ;
+      0, i8: 0          ;
+  i9: 0                 ;
+e.                      ; end
+
+; procedure inword(word, trouble, endseg)
+; comment: inputs a binary word from the <input>. at the
+; end of an input segment the checksum is checked.
+;     call:     return:
+; w0            word
+; w1            unchanged
+; w2            unchanged
+; w3  link      link
+
+b.i24                   ; begin
+w.f8: ds. w2  i7.       ;
+      rs. w3  i8.       ;
+      al  w0  0         ;   word:=0;
+      al  w1  18        ;   pos:=18;
+      rl. w2  d35.      ;   
+  i0: rs. w0  i6.       ;   repeat
+      jl. w3  f7.       ;   inchar(char, trouble);
+      jl.    (i8.)      ;
+      sl  w0  64        ;   if char>63
+      jl.     i1.       ;   then goto checksum;
+      wa  w2  0         ;   sum:=sum+char;
+      ls  w0  x1+0      ;
+      lo. w0  i6.       ;   word:=word or char shift pos;
+      al  w1  x1-6      ;   pos:=pos-6;
+      sl  w1  0         ;   until pos<0;
+      jl.     i0.       ;
+      rs. w2  d35.      ;
+      dl. w2  i7.       ;
+      rl. w3  i8.       ;
+      jl      x3+4      ;   goto exit;
+  i1: se  w1  18        ; checksum:
+      jl.     i2.       ;   if pos<>18
+      sn  w0  255       ;   (if null-char read
+      se  w2  0         ;     and sum=0 then
+      jl.     i9.       ;     begin
+      dl. w2  i7.       ;     restore (w1, w2);
+      sn  w1  x2        ;     if null-char allowed then
+      jl.    (i10.)     ;       goto end-action;
+      jl.     i2.       ;     goto sumerror;
+  i9:                   ;     end)
+      la. w0  i4.       ;
+      la. w2  i4.       ;   or char(18:23)<>sum(18:23)
+      sn  w0  x2+0      ;
+      jl.     i3.       ;   then
+  i2: al. w1  e9.       ;   begin
+     jl. w3  f2.       ;   type textline (<:input sumerror:>);
+      jl.    (i8.)      ;   end;
+  i3: al  w0  0         ;
+      rs. w0  d35.      ;   sum:=0;
+      dl. w2  i7.       ;
+      rl. w3  i8.       ;
+      jl      x3+2      ;   goto endseg;
+  i4: 8.77              ;
+  i5: 0, i6: 0          ;
+      0, i7: 0          ;
+  i8: 0                 ; exit:
+  i10:g54               ; end-action address
+e.                      ; end
+
+; procedure inoutseg(name, mess, trouble)
+; comment: inputs or outputs the load buffer from or to the backing store
+;     call:     return:
+; w0            logical status
+; w1  mess    mess
+; w2  link      link
+; w3  name      name
+
+b.i24                   ; begin
+w.f10:am      3-5       ; input:
+  f12:al  w0  5         ; output:
+      hs  w0  x1        ;   set operation in message;
+      ds. w3  i5.       ;
+      rs. w1  i6.       ;
+      jd  1<11+16       ;   send mess(name,area mess,buf);
+      al. w1  d15.      ;   wait answer(buf,answer,result);
+      jd      1<11+18   ;
+      al  w2  1         ;   logical status :=
+      ls  w2 (0)        ;     1 shift result
+      sn  w2  1<1       ;
+      lo  w2  x1        ;     + if ok then status;
+      al  w0  x2        ;   w0 := logical status;
+      dl. w2  i4.       ;   restore(w1,w2);
+      se  w0  1<1       ;   if any errors then
+      jl.     f6.       ;     type status (logical status) and trouble return;
+      rl  w3  x1+6      ;
+      al  w3  x3+1      ;
+      rs  w3  x1+6      ;   cur seg:=cur seg+1;
+      rl. w3  i5.       ;
+      jl      x2+2      ;
+  i3: 1<18              ;
+  i6: 0                 ; saved message address
+  i4: 0, i5: 0          ;
+e.                      ; end
+
+; procedure clear(first,last)
+; comment: initializes a storage area with -1.
+;     call:     return:
+; w0            -1
+; w1  last      last
+; w2  first     last+2
+; w3  link      link
+
+b.i24                   ; begin
+w.f11:al  w0  -1        ;
+  i0: rs  w0  x2+0      ;   repeat
+      al  w2  x2+2      ;   word(first):=-1;
+      sh  w2  x1+0      ;   first:=first+2;
+      jl.     i0.       ;   until first=last+2;
+      jl      x3+0      ;
+e.                      ; end
+
+; read block
+;
+; return address: link+0: trouble
+;                     +2: end area
+;                     +4: ok      (w2 = start of buffer)
+;
+; comment delivers one block from input;
+;             call     return
+;     w0       -       destroyed
+;     w1       -       destroyed
+;     w2       -       start of buffer
+;     w3      link     destroyed
+; on return d17 is initialized
+
+b. i20, j10
+w.
+
+f9:  am         3-5     ; read double buffered:
+f13: al  w0     5       ; write double buffered:
+     rx. w3     j3.     ;   save (return);  get mess addr;
+     hs  w0 (x3+8)      ;   save (operation) in opposite message;
+     rl  w2  x3+10      ;   get buffer address;
+i0:  al. w1    d15.     ; wait: get answer address;
+     rs. w3    d42.     ;   save current message address;
+     jd     1<11+18     ;   wait transfer;
+     se  w0      1      ;   if result <> 1 then
+     jl.        i1.     ;   goto result error;
+     rl  w0  x1+0       ;   test status;
+     sz. w0    (j0.)    ;   if any error then
+     jl.        i2.     ;   goto read error;
+i6:  rl  w0  x3+2       ; continue:   
+     rs. w0    d22.     ;   save buffer start;
+     rl  w2  x1+2       ;   no of characters :=
+     ls  w2     -1      ;   no of bytes +
+     wa  w2  x1+2       ;   no of no of bytes//2;
+     rs. w2     d17.    ;
+     rl  w2  x1+2       ;   w2 := bytes transferred;
+     ls  w2    -9       ;
+     wa  w2  x3+6       ;   w2 := segm := segms transferred + last segm;
+     rl  w1  x3+8       ;   get new message address;
+i5:                     ; start transfer:
+     rs  w2  x1+6       ;   save segmno in message;
+
+; prepare an empty catalog buffer, in case of kitlabel
+     dl  w3  x1+4       ;   w2 := first of buffer;  w3 := last of buffer;
+     al  w0    -1       ;
+i10: rs  w0  x2         ;   clear all buffer;
+     al  w2  x2+2       ;
+     se  w2  x3         ;
+     jl.        i10.    ;
+     al  w0     0       ;   last word of buffer := 0;
+     rs  w0  x2         ;
+     rs. w0     j4.     ;   error count := 0;
+
+     al. w3     e1.     ;   w3 := name;
+     jd     1<11+16     ;   start transfer;
+     rs  w2  x1+10      ;   save buffer address;
+     rl. w2     d22.    ;   w2 := start of buffer;
+     rx. w1     j3.     ;   save message address;
+     jl      x1+4       ;   return;
+
+; result error
+i1:  al. w1     f6.     ;
+      al  w2  1         ;
+      ls  w2 (0)        ;   logical status := 1 shift result;
+      al  w0  x2        ;
+     jl.        i4.     ;   out error(type result);
+
+; read error
+i2:  rl. w2     d40.    ;   w2 := modekind;
+     sn  w2     m2      ;   if kind = <tr> then goto
+     jl.        i7.     ;     goto test end of tape;
+     rs. w3     j2.     ;   save message address;
+     sn  w2     m0      ;   if kind = <bs> then
+     jl.        i11.    ;     goto test end area;
+     so. w0    (j1.)    ;   if not parity error then
+     jl.        i3.     ;     goto hard error;
+     al. w1     j5.     ;   insert move message address;
+     al. w3     e1.     ;   insert name address;
+     jd     1<11+16     ;
+     al. w1    d15.     ;   insert answer address;
+     jd     1<11+18     ;   wait move;
+     rl. w0     j1.     ;   (status := parity error);
+i9:                     ; repeat:
+     rl. w1     j4.     ;
+     al  w1  x1+1       ;   increase (error count);
+     rs. w1     j4.     ;
+     sl  w1     5       ;   if error count >= max then
+     jl.        i3.     ;     goto hard error;
+     al. w3     e1.     ;   w3 := name;
+     rl. w1     j2.     ;   restore message address;
+     jd     1<11+16     ;   start new input;
+     rl  w3      2      ;   w3 := message address;
+     jl.        i0.     ;   goto wait;
+
+i11:                    ; test end area:
+     so. w0    (j10.)   ;   if not end document then
+     jl.        i9.     ;     goto repeat;
+i13:                    ; end document:
+     al  w2     0       ;   pending answer := false;
+     rx. w2     j3.     ;
+     jl      x2+2       ;   goto end-area return;
+
+; hard error:
+i3:  al. w1     f6.     ;   out error( type status);
+      al  w2  1<1       ;   logical status := status + (result ok) shift 1;
+      lo  w0  4         ;
+
+; out error:
+i4:  al. w3     e1.     ;   get name address;
+     jl  w2  x1+0       ;   type error;
+     al  w2     0       ;   pending answer := false;
+     rx. w2     j3.     ;
+     jl      x2         ;   goto error return;
+
+; test end of tape
+i7:  sz. w0    (j6.)    ;   if end of tape then
+     jl.        i12.    ;     goto test empty;
+     jl.        i3.     ;   goto hard error;
+
+; test empty: if nothing was read from the paper tape reader then
+;             return via end-document-return;
+i12: rl  w2  x1+2       ;   if bytes transferred <> 0 then
+     se  w2     0       ;     goto continue;
+     jl.        i6.     ;
+     jl.        i13.    ;   goto end document;
+
+
+; procedure start transfer
+; comment initializes reading from input
+;          call     return
+;     w0    -       destroyed
+;     w1    -       destroyed
+;     w2    -       destroyed
+;     w3   link     destroyed
+
+f15: am         3-5     ; start transfer input:
+f16: al  w0     5       ; start transfer output:
+     ls  w0     12      ;
+     hl. w0     d40.    ;   w0 := operation shift 12 + mode;
+
+     al  w3  x3-4       ;   (prepare ok return via start-transfer-action)
+
+     rs. w3     j3.     ;   save return;
+     al. w1    d38.     ;
+     al. w2    d39.     ;   get message addresses;
+     rs  w0  x1         ;   save operation and mode in messages;
+     rs  w0  x2         ;
+     rs  w1  x2+8       ;   establish chain;
+     rs  w2  x1+8       ;
+     al  w0     512-2   ;   block length := 512 bytes;
+     rl. w3     j7.     ;
+                        ;   insert buffer addresses;
+     rs  w3  x1+2       ;
+     wa  w3      0      ;
+     rs  w3  x1+4       ;
+     al  w3  x3+2       ;
+     rs  w3  x2+2       ;
+     wa  w3      0      ;
+     rs  w3  x2+4       ;
+
+     al. w3     e1.     ;   w3 := name;
+     jd         1<11+8  ;   reserve process;
+
+     rl. w2     d41.    ;   w2 := first segment;
+     rl. w0     d40.    ;   w0 := kind;
+     bz  w0     1       ;
+     se  w0     m1      ;   if kind <> <mt> then
+     jl.        i5.     ;     goto start transfer;
+
+     rs. w2     j9.     ;   save position in setposition-message;
+     al. w1     j8.     ;
+     bz. w0     d40.    ;   mode.message := mode;
+     hs  w0  x1+1       ;
+     jd         1<11+16 ;   send message (setposition);
+     al. w1     d15.    ;
+     jd         1<11+18 ;   wait answer;  (no status check)
+
+     al. w1     d38.    ;   w1 := first message;
+     jl.        i5.     ;   goto start transfer;
+
+
+; procedure end transfer
+; comment the last answer is checked.
+;
+;   registers     call      return
+;      w0          -      destroyed
+;      w1          -      destroyed
+;      w2          -      destroyed
+;      w3         link    name
+
+f17: rx. w3     j3.     ;   save return;
+     sn  w3      0      ;   if no pending answer then
+     jl.        i8.     ;   goto exit;
+     rl  w2  x3+10      ;   get buffer address
+     al. w1    d15.     ;   insert answer address;
+     jd     1<11+18     ;   wait answer;
+i8:  al  w2      0      ; exit:
+     rx. w2     j3.     ;   change(0, return);
+     al. w3     e1.     ;   w3 := name;
+     jd         1<11+10 ;   release process(name);
+     jl      x2+0       ;   return;
+
+j0:  8.77 20 00 00      ;   error bits
+j1:  8.20 00 00 00      ;   parity error bit
+j2:              0      ;   saved message address
+j3:              0      ;   saved return or message address
+j4:              5      ;   error count
+j5:       8<12,  3      ;   backspace message
+j6:  8.01 20 00 00      ;   end of tape bit
+j7:  h10                ; 1. input buffer
+j8:  8 < 12             ; move operation:
+     6                  ;   setposition
+j9:  0                  ;   file number
+     0                  ;   (block = 0)
+j10: 1<18               ; end document status
+
+e.
+
+
+
+; procedure read  chain and prepare bs
+; procedure write chain and prepare bs
+;
+; the chainbuffer is either read from the device or written onto the device
+;   given by ..device number..
+;
+; call: w3 = link
+; exit: link+0: error    (all regs undef)
+;           +2: ok       (w3 = chainhead address, other regs undef)
+
+b. i30, j10 w.
+
+
+f21: am         3-5    ; read chain:
+f22: al  w0     5      ; write chain:
+     hs. w0     j1.    ;    set operation in message;
+
+     rs. w3     j0.    ;    save (return);
+
+     jl. w3     f39.   ;    move catname,docname to chainhead;
+                       ;    (in case of write chain)
+
+; give the device a wrk-name and reserve it
+     al. w3     j5.    ;    w3 := wrk-name address;
+     al  w0     0      ;
+     rs. w0     j6.    ;    (repeat count := 0;)
+     rs  w0  x3        ;    (clear first of name to get a new wrk-name)
+     rs  w0  x3+8      ;    (clear name table address)
+
+; convert device number to text
+     rl. w1     d43.   ;    w0w1 := devno;
+     wd. w1     j8.    ;
+     rl  w2     0      ;    w2 := last digit;
+     al  w0     0      ;
+     wd. w1     j8.    ;
+     ld  w1     8      ;
+     ls  w1     8      ;
+     wa  w2     0      ;    w2 := two rigthmost digits;
+     wa  w2     2      ;    w2 := three digits;
+     lo. w2     j7.    ;    convert digits to letters;
+     rs. w2     d48.   ;    save in text;
+
+i0:                    ; create process:
+     rl. w1     d43.   ;    w1 := devno;
+     jd         1<11+54;    create peripheral process (wrkname, devno);
+     se  w0     0      ;    if result not ok then
+     jl.        i10.   ;      goto alarm;
+
+     jd         1<11+8 ;    reserve process;
+     se  w0     0      ;    if result not ok then
+     jl.        i11.   ;      goto alarm;
+
+; start reading/writing one segment, and later read/write the rest
+
+     rl. w1     j2.    ;    addr := first address of chainhead buffer;
+
+i1:                    ; try greater size of transfer:
+     al  w1  x1+510+1  ;    last.mess :=
+     rs. w1     j3.    ;      addr + 510 + round up;
+
+     al. w1     j1.    ;
+     jd         1<11+16;    send message;
+     al. w1     d15.   ;
+     jd         1<11+18;    wait answer;
+     al  w2     1      ;
+     ls  w2    (0)     ;    w2 := logical status.answer;
+     sn  w0     1      ;
+     lo  w2  x1        ;
+     sn  w2     1<1    ;    if no errors then
+     jl.        i5.    ;      goto test transferred;
+
+; the only allowed error is disconnected (or intervention)
+     se  w2     1<5    ;    if not after intervention then
+     jl.        i12.   ;      goto alarm;
+
+; intervention is only allowed a limited number of times
+     rl. w1     j6.    ;
+     al  w1  x1+1      ;    increase (repeat count);
+     rs. w1     j6.    ;
+     se  w1     2      ;    if first time then
+     jl.        i0.    ;      goto create process;
+
+     bz. w0     j1.    ;
+     sn  w0     3      ;    if operation = input then
+     jl.       (j0.)   ;      return (no chain);
+     jl.        i13.   ;    goto alarm;
+
+
+i5:                    ; test transferred:
+     rl. w1     j2.    ;    w1 := first of chainhead buffer;
+     bz  w2  x1+d66    ;    w2 := last slice number.chainhead
+     al  w2  x2+a88+1-1;        + size of chainhead + 1;
+     wa  w1     4      ;    addr := first + bytes in chain;
+     sl. w2    (d14.)  ;    if bytes in chain > bytes transferred then
+     jl.        i1.    ;      goto try greater size of transfer;
+
+; the chainhead has been transferred succesfully:
+
+     jl. w3     f39.   ;    move catname,docname to chainhead;
+                       ;    (in case of read chain, i.e. after  kit <name> )
+
+; the chainbuffer now contains a chainhead
+
+     al. w3     j5.    ;
+     jd         1<11+64;    remove process(wrk-name);
+
+     jl. w3     f38.   ;    move catname,docname from chainhead;
+                       ;    (in case of read chain, i.e. after  kit <devno> )
+
+     rl. w1     d43.   ;    w1 := device number;
+     al. w3     e2.    ;    w3 := docname;
+     jd         1<11+54;    create peripheral process (docname, devno);
+     se  w0     0      ;    if result not ok then
+     jl.        i14.   ;      goto alarm;
+     jd         1<11+8 ;    reserve process (docname);
+
+     rl. w3     j2.    ;    w3 := chainhead buffer;
+     jd         1<11+102;   prepare bs (chainhead);
+     se  w0     0      ;    if result not ok then
+     jl.        i15.   ;      goto alarm;
+
+     am.       (j0.)   ;
+     jl        +2      ;    return ok;
+
+
+i10:                   ; error at create wrk-name:
+     jl. w1     i20.   ;
+     <:create peripheral process wrkname<0>:>
+
+i11:                   ; error at reserve process wrk-name:
+     jl. w1     i20.   ;
+     <:reserve process wrkname<0>:>
+
+i12:                   ; error at transfer:
+     jd         1<11+64;    remove process (wrk name);
+     al  w0  x2        ;    w0 := logical status;
+     al. w3     d47.   ;    w3 := <:on <devno>:>;
+     jl. w2     f6.    ;    typestatus (text, status);
+     jl.       (j0.)   ;    return (no chain);
+
+i13:                   ; intervention:
+     jd         1<11+64;    remove process (wrk name);
+     jl. w1     i20.   ;
+     <:intervention<0>:>
+
+i14:                   ; error at create peripheral process:
+     jl. w1     i20.   ;
+     <:create peripheral process documentname<0>:>
+
+i15:                   ; error at prepare bs:
+     rl  w2     0      ;    save (result);
+     al  w3  x3+d61    ;
+     jd         1<11+64;    remove process (doc name.chain buffer);
+     al  w0  x2        ;    restore (result);
+     jl. w1     i20.   ;
+     <:prepare bs<0>:>
+
+i20:                   ; outerror:
+
+     jl. w3     f1.    ;    typeout (text);
+
+     al. w3     d47.   ;    w3 := <:on <devno>:>;
+     jl. w2     f5.    ;    typeresult (text, result);
+
+     jl.       (j0.)   ;    return (no chain);
+
+
+
+j0:  0                 ; return
+j1:  5<12+0            ; message: operation
+j2:  h8                ;          first address
+j3:  0                 ;          last address
+     0 ; always        ;          segment number
+j5:  0, r.5            ; wrkname (+ name table address)
+j6:  0                 ; repeat count
+j7:  <:000:>           ; mask for converting to letters
+j8:  10                ; constant for converting ti digits
+
+e.                     ;
+
+
+
+; procedure insert all entries
+;
+; call: w3 = link
+; exit: link+0: trouble
+;       link+2: ok      (w3 = chainhead, other regs undef)
+
+b. i30, j20 w.
+
+j0:  0                 ; return
+j1:  0                 ; writeback  (0==false, else true)
+j2 = j1                ; entry count change
+j3:  h8                ; start of chainhead
+j4:  h12               ; start of entry count table
+j5:  0                 ; addr of cur entry in entry count table
+
+j6:  <:repair not possible<0>:>
+j8:  <:update of entry count not possible<0>:>
+j10: <:insert entry<0>:>
+
+j12=k+2, 0,0           ; saved w1,w2
+
+
+f23:                   ; insert all entries:
+     rs. w3     j0.    ;    save (return);
+
+     al  w0     m0     ;
+     rs. w0     d40.   ;    modekind := bs;
+     al  w0     0      ;
+     rs. w0     d41.   ;    first segment := 0;
+     rs. w0     j1.    ;    writeback := false;
+
+     rl. w3     j3.    ;
+     rl  w1  x3+d57    ;    w1 := auxcat size.chainhead
+     ls  w1     1      ;        * 2 ;
+
+; clear all relevant part of entry-count table:
+i1:                    ; clear next:
+     al  w1  x1-2      ;
+     am.       (j4.)   ;
+     rs  w0  x1        ;    (each field in the table occupies a word)
+     se  w1     0      ;
+     jl.        i1.    ;
+
+     jl. w3     f15.   ;    start transfer input;
+
+i2:                    ; next auxcat segment:
+     al  w0     0      ;
+     rx. w0     j1.    ;    writeback := false;
+     sn  w0     0      ;    if writeback was false already then
+     jl.        i5.    ;      goto read;
+
+; the catalog segment was inconsistent in some way
+     jl. w3     f40.   ;    test repair allowed;
+     jl.        i5.    ;+2:   not allowed: goto read;
+
+; the segment must be written back:
+     rl. w1     d42.   ;    w1 := current message address;
+     al. w3     e1.    ;    w3 := catname;
+     jl. w2     f12.   ;    outsegment (name, buffer);
+     jl.        i20.   ;+2:   trouble:  goto alarm;
+
+i5:                    ; read:
+     jl. w3     f9.    ;    input block:
+     jl.        i18.   ;+2:   trouble:  goto error return;
+     jl.        i10.   ;+4:   end area: goto test entry count table;
+
+; w2 = start of buffer
+     al  w1  x2-a88    ;    entry := base of buffer;
+     al  w2  x2+510    ;    top := top of last entry;
+
+     rl. w3     d42.   ;
+     rl  w3  x3+6      ;    index := segment.current buffer
+     ls  w3     1      ;           * 2 ;
+     wa. w3     j4.    ;
+     rl  w0  x2        ;    increase (entry count table (index) )
+     wa  w0  x3        ;       by entry count.buffer;
+     rs  w0  x3        ;
+
+i8:                    ; next entry:
+; w1 = old entry addr
+; w2 = top entry
+
+     al  w1  x1+a88    ;    increase (entry);
+     sl  w1  x2        ;    if all entries processed then
+     jl.        i2.    ;      goto next auxcat segment;
+
+     rl  w0  x1        ;    if empty entry then
+     sn  w0    -1      ;
+     jl.        i8.    ;      goto next entry;
+
+; compute the namekey of the entry, and if it was not like the old
+;   namekey.entry then modify entry
+
+     dl  w0  x1+d55+2  ;
+     aa  w0  x1+d55+6  ;    w0 := namekey function(name.entry);
+     wa  w0     6      ;
+     ba  w0     0      ;
+     al  w3     0      ;    (see procfunc);
+     am.       (j3.)   ;
+     wd  w0    +d57    ;
+
+     ls  w3     3      ;    w3 := namekey * 8;
+
+     al  w0     2.111  ;
+     la  w0  x1+d53    ;    w0 := permanens key.entry;
+
+     wa  w0     6      ;    w0 := namekey * 8 + permkey;
+
+     bz  w3  x1+d53    ;    store new namekey in entry;
+     hs  w0  x1+d53    ;
+     se  w0  x3        ;    if new namekey <> old namekey then
+     rs. w1     j1.    ;      writeback := true;
+
+     ls  w0    -2      ;
+     wa. w0     j4.    ;    addr := namekey / 4 + start of entry count table;
+     rs. w0     j5.    ;
+     al  w3    -1      ;
+     wa  w3    (0)     ;    decrease (entry count table (namekey) );
+     rs  w3    (0)     ;
+
+     rl. w3     j3.    ;    w3 := start of chainhead buffer;
+     jd         1<11+104;   insert entry (entry, chainhead);
+     se  w0     0      ;
+     sn  w0     7      ;    if result ok then
+     jl.        i8.    ;      goto next entry;
+
+     jl.        i25.   ;    goto alarm;
+
+i10:                   ; test entry count table:
+
+; all table-entries must be zero:
+     rl. w3     j3.    ;
+     rl  w3  x3+d57    ;    index := auxcatsize.chainhead
+     ls  w3     1      ;           * 2 ;
+     al  w0     0      ;
+
+i12:                   ; test next:
+; w0 = 0
+; w3 = index
+     al  w3  x3-2      ;    decrease(index);
+     sh  w3    -1      ;    if index < 0 then
+     jl.        i15.   ;      goto terminate;
+
+     am.       (j4.)   ;    entry count table (index) := 0;
+     rx  w0  x3        ;
+     sn  w0     0      ;    if old contents = 0 then
+     jl.        i12.   ;      goto test next;
+
+; an entry was found <> 0, i.e. a segment had an incorrect information
+;  of the number of entries with the corresponding namekey
+
+     ls  w3    -1      ;    segment number := index / 2;
+     rs. w0     j2.    ;    save (entry count change);
+     al. w1     d30.   ;    w1 := load buffer message;
+     rs  w3  x1+6      ;    segm.message := segment number;
+
+     jl. w3     f40.   ;    test repair allowed;
+     jl.        i21.   ;+2:   not allowed:  goto error at update entry count;
+
+     al. w3     e1.    ;    w3 := auxcat name;
+     jl. w2     f10.   ;    insegment (auxcat, loadbuffer);
+     jl.        i21.   ;+2:   trouble:  goto alarm;
+
+     rl  w0 (x1+4)     ;    entrycount.buffer :=
+     ws. w0     j2.    ;      entrycount.buffer
+     rs  w0 (x1+4)     ;    - change;
+
+     al  w0    -1      ;
+     wa  w0  x1+6      ;    decrease (segm.message);
+     rs  w0  x1+6      ;    (i.e. still same segment number);
+     jl. w2     f12.   ;    outsegment(auxcat, loadbuffer);
+     jl.        i21.   ;+2:   trouble:  goto alarm;
+
+     jl.        i10.   ;    goto test entry count table;
+                       ;    (notice: i.e. scan the whole table again)
+
+
+i15:                   ; terminate:
+     jl. w3     f17.   ;    end transfer;
+     jd         1<11+64;    remove process (auxcat);
+     rl. w3     j3.    ;    w3 := chainhead start;
+     am.       (j0.)   ;
+     jl        +2      ;    return ok;
+
+i18:                   ; error return;
+     jl. w3     f17.   ;    end transfer;
+     jd         1<11+64;    remove process (auxcat);
+     jl.       (j0.)   ;    error return;
+
+
+
+i20:                   ; error at output catsegment:
+     al. w1     j6.    ;
+     jl. w3     f2.    ;   type textline (<:repair not possible:>);
+     jl.        i5.    ;    goto read;
+
+i21:                   ; error at update entry count:
+     al. w1     j8.    ;
+     jl. w3     f2.    ;   type textline (<:update of entry count not possible:>);
+     jl.        i10.   ;    goto test entry count table;
+
+i25:                   ; error at insert entry:
+     ds. w2     j12.   ;    save (w1, w2);
+     al. w1     j10.   ;
+     jl. w3     f1.    ;   typetext (<:insert entry:>);
+
+     dl. w2     j12.   ;
+     al  w3  x1+d55    ;    w3 := name.entry;
+     jl. w2     f5.    ;    typeresult (name, result);
+
+     dl. w2     j12.   ;    restore (w1, w2);
+     se  w0     5      ;    if result <> 5 then
+     jl.        i8.    ;      goto next entry;
+
+; the current entry was inconsistent
+; maybe delete the entry manually
+
+     jl. w3     f40.   ;    test repair allowed;
+     jl.        i8.    ;+2:   not allowed:  goto next entry;
+
+     al  w0     1      ;
+     wa. w0    (j5.)   ;    increase (entry count table (addr) );
+     rs. w0    (j5.)   ;
+
+     al  w0    -1      ;
+     rs  w0  x1+d53    ;    clear entry;
+
+     rs. w0     j1.    ;    writeback := true;
+
+     jl.        i8.    ;    goto next entry;
+
+e.                     ;
+
+
+; description of auxcat:
+d3:  0                 ; bs kind
+d4:  0                 ; catsize
+d5:  0                 ; slice length
+d6:  0                 ; number of slices
+
+
+d15: 0, r.8            ; answer
+d14 = d15 + 2          ; bytes transferred
+d17: 0                 ; characters
+d18: -1                ; cur char
+
+d19: h0                ; start of action table
+d20: h1                ; end of action table
+d21: 0                 ; cur action
+d22: 0                 ; input buf
+d24: h4                ; start of command buf
+d25: h5                ; last  of command buf
+d26: 0                 ; cur command
+d27: 0                 ; top command
+d28: h6                ; start of load buf
+d29: h7                ; last of load buf
+d30: 5<12, h6, h7, 0   ; load buf message
+d33: 0                 ; input segment
+d34: 0                 ; max segment
+d35: 0                 ; checksum
+d36: 0  ; initcat switches: writetext (by entry byte0 holds load flag)
+d37: 0  ; initcat switches: medium
+d49: 0, r.4 ; initcat switches: automatic startup area name
+d38: 3<12,0,0,0,0,0    ; message 1
+d39: 3<12,0,0,0,0,0    ; message 2
+d40: g0                ; modekind     (initially:  start of initcat)
+d41: 0                 ; first segment  or  position
+d42: 0                 ; current message address
+d43: 0                 ; device number
+d44: 0                 ; repair allowed  ( 0==false, else true)
+d45: b118              ; address of integer just read
+d46: b119              ; address of name just read
+
+
+e1:  0, r.5            ; auxcatname  or  devicename
+e2:  0, r.5            ; document name
+e9:  <:input sumerror<0>:>
+e11: <:input sizeerror<0>:>
+e13: <:syntax error<0>:>
+
+
+; stepping stones:
+
+jl. d0.  , d0  = k-2
+
+jl. f0.  , f0  = k-2
+jl. f1.  , f1  = k-2
+jl. f2.  , f2  = k-2
+jl. f5.  , f5  = k-2
+jl. f6.  , f6  = k-2
+jl. f8.  , f8  = k-2
+jl. f12. , f12 = k-2
+jl. f15. , f15 = k-2
+
+
+
+; procedure dismount kit
+;
+; search through the chaintables to find a possible chaintable connected to
+;   the current device.
+; if found then remove chaintable etc
+;
+; call: w3 = link
+; exit: link+0: error,  all regs undef
+;       link+2: ok   ,  all regs undef
+
+b. i20, j10 w.
+
+j0:  0                 ; return
+j1:  0, r.4            ; docname to be removed
+
+j5:  <:delete bs<0>:>
+j7:  <:delete entries<0>:>
+
+f24:                   ; dismount kit:
+     rl. w0     d43.   ;    w0 := device number;
+     ls  w0     1      ;
+     wa  w0     b4     ;    w0 := name table address of device;
+
+     rl  w1     b22    ;    entry := first chain in nametable;
+     al  w1  x1-2      ;
+
+i1:                    ; next chain:
+     al  w1  x1+2      ;    increase (entry);
+     sn  w1    (b24)   ;    if all chaintables tested then
+     jl      x3+2      ;      return ok;  (i.e. not found)
+
+     rl  w2  x1        ;    chain := nametable (entry);
+     se  w0 (x2+d61+8-a88); if document name table address.chain <> w0 then
+     jl.        i1.    ;      goto next chain;
+
+     dl  w1  x2+d61+2-a88;
+     ds. w1     j1.+2  ;    move docname.chain;
+     dl  w1  x2+d61+6-a88;
+     ds. w1     j1.+6  ;
+
+     rs. w3     j0.    ;    save (return);
+
+     sn  w2    (b25)   ;    if maincat on document then
+     jd         1<11+114;     remove main catalog;
+
+     al. w2     j1.    ;
+     jd         1<11+108;   delete backing storage (docname);
+     se  w0     0      ;    if result not ok then
+     jl.        i10.   ;      goto alarm;
+
+i5:                    ; rep:
+     jd         1<11+110;   delete entries (docname);
+     sn  w0     3      ;    if not all entries deleted then
+     jl.        i5.    ;      goto rep;
+
+     se  w0     0      ;    if result not ok then
+     jl.        i11.   ;      goto alarm;
+
+     jl      x3+2      ;    return ok;
+
+
+i10:                   ; error at delete bs:
+     sn  w0     2      ;    if result = catalog io-error then
+     jl.        i5.    ;      goto rep;
+     am         j5-j7  ;   text := <:delete bs:>
+
+i11:                   ; error at delete entries:
+     al. w1     j7.    ;    text := <:delete entries:>;
+
+i15:                   ; typeout:
+     jl. w3     f1.    ;    typeout (text);
+     al. w3     j1.    ;
+     jl. w2     f5.    ;    typeresult (docname, result);
+     jl.       (j0.)   ;    error return;
+
+e.                     ;
+
+
+
+; procedure mount main catalog
+;
+; call: w3 = link
+; exit: link+0:  error  ,  all regs undef
+;           +2:  ok     ,  all regs undef
+
+b. i30, j20 w.
+
+j0:  0                 ; return
+j1:  h8                ; start of chainhead buffer
+j2:  0, r.4            ; wrk-name
+
+j3:  <:remove aux entry<0>:>
+j5:  <:connect main catalog<0>:>
+j7:  <:main catalog not defined<0>:>
+j9:  <:create aux entry<0>:>
+j11: <:no main catalog connected<0>:>
+
+f25:                   ; mount maincat:
+     rs. w3     j0.    ;    save (return);
+i0:                    ; try again:
+     al. w3     e1.    ;
+     jd         1<11+10;    release process (aux catalog);
+     rl. w2     d10.   ;    w2 := preferred size of maincat;
+
+     rl. w3     j1.    ;    w3 := chainhead;
+     al. w1     d9.    ;    w1 := maincat name;
+     jd         1<11+112;   connect main catalog (chainhead, maincat name);
+     al  w3  x1        ;    w3 := maincat name;
+     se  w0     0      ;    if result not ok then
+     jl.        i10.   ;      goto test create;
+
+; maincat was connected, but has it the rigth size
+     sh  w2     0      ;    if preferred size undefined then
+     jl.        i30.   ;      goto return ok;  (i.e. accept any size)
+
+; maincat exists, but a specific size was wanted
+
+     jd         1<11+4 ;    w0 := proc descr (maincat area process);
+     am        (0)     ;
+     sn  w2   (+a61)   ;    if size.areaproc = wanted size then
+     jl.        i30.   ;      goto return ok;
+
+; another size was wanted
+
+     jd         1<11+114;   remove main catalog;
+     al. w3     e1.    ;    remove process (aux catalog);
+     jd         1<11+64;
+
+     rl. w2     j1.    ;
+     al  w2  x2+d61    ;    w2 := docname.chainhead;
+     al. w1     d8.    ;    w1 := maincat entry;
+     jd         1<11+122;   remove aux entry (docname, entry);
+     se  w0     0      ;    if result not ok then
+     jl.        i15.   ;      goto alarm;
+
+i5:                    ; clean up:
+     jl. w3     f24.   ;    dismount kit;  (i.e. release all chains)
+     jl.        i20.   ;+2:   error:  goto error exit;
+
+     jl. w3     f21.   ;    read chain;
+     jl.        i20.   ;+2:   error:  goto error exit;
+
+     jl.        i0.    ;    goto try again;
+
+
+i10:                   ; test create:
+     se  w0     3      ;    if neither unknown nor already exist then
+     jl.        i17.   ;      goto alarm;
+
+; it will be assumed that the entry did'nt exist in auxcat
+
+     sh  w2     0      ;    if preferred size not defined then
+     jl.        i18.   ;      goto alarm;
+
+; before a maincat can be created, all chains on the document must
+;   be transferred
+
+; the auxcat areaprocess has been released.
+; in order to be able to repair the auxcat during the
+;   following cat-scan, the auxcat must be reserved again.
+; this may be done by means of a call of ..prepare bs..
+     al. w3     e1.    ;
+     jd         1<11+64;    remove process (auxcat);
+     jl. w3     f24.   ;    dismount kit;
+     jl.        i20.   ;+2:   error:  goto error exit;
+     jl. w3     f21.   ;    read chain;
+     jl.        i20.   ;+2:   error:  goto error exit;
+
+     jl. w3     f23.   ;    insert all entries;  (i.e. all chains)
+     jl.        i20.   ;+2:   error:  goto error exit;
+
+     jd         1<11+36;    w0w1 := get clock;
+     ld  w1     5      ;    w0 := shortclock;
+
+     al. w1     d8.    ;    w1 := maincat entry;
+     rs  w0  x1+d11-d8 ;    save shortclock in tail;
+
+     rl. w2     j1.    ;
+     al  w2  x2+d61    ;    w2 := docname.chainhead;
+
+     al  w0     0      ;
+     al. w3     j2.    ;    w3 := wrkname area;
+     rs  w0  x3        ;    (clear first word of name);
+
+     jd         1<11+120;   create aux entry and area process;
+     se  w0     0      ;    if result not ok then
+     jl.        i19.   ;      goto alarm;
+
+     jd         1<11+64;    remove process (aux area process);
+
+     jl.        i5.    ;    goto clean up;
+
+
+i15:                   ; error at remove aux entry:
+     am         j3-j5  ;   text := <:remove aux entry:>;
+i17:                   ; error at connect main catalog:
+     am         j5-j9  ;   text := <:connect main catalog:>;
+i19:                   ; error at create main catalog:
+     al. w1     j9.    ;   text := <:create aux entry:>;
+
+i16:                   ; typeout:
+     jl. w3     f1.    ;    typeout (text);
+
+     al. w3     d9.    ;    w3 := main cat name;
+     jl. w2     f5.    ;    typeresult (maincat name, result);
+
+     jl.        i20.   ;    goto error exit;
+
+i18:                   ; size of main cat not defined:
+     al. w1     j7.    ;    type textline (<:maincatalog not defined:>);
+     jl. w3     f2.    ;
+
+i20:                   ; error exit:
+     al. w1     j11.   ;    type textline (<:no maincat connected:>);
+     jl. w3     f2.    ;
+     al. w3     e1.    ;
+     jd         1<11+64;    remove process (aux catalog);
+
+     jl.       (j0.)   ;    error return;
+
+i30:                   ; return ok:
+     am.       (j0.)   ;
+     jl        +2      ;    return ok;
+
+e.                     ;
+
+
+
+; procedure get bskind
+;
+; call: w3 = link
+; exit: all regs undef
+; error exit: syntax alarm
+
+b. i10, j10 w.
+
+j0:                    ; start of table
+     <:fast:>, 0       ;
+     <:slow:>, 1       ;
+j1:                    ; top of table
+j2 = 6                 ; size of entry
+
+f29:                   ; get bskind:
+     am.       (d46.)  ;
+     dl  w1    +2      ;    w0w1 := two first word of name;
+     al. w2     j0.-j2 ;    entry := base of kind-table;
+i0:                    ; next kind:
+     al  w2  x2+j2     ;    increase (entry);
+     sn. w2     j1.    ;    if all kinds tested then
+     jl.        f30.   ;      goto syntax alarm;
+     sn  w0 (x2+0)     ;
+     se  w1 (x2+2)     ;    if name <> kindname.entry then
+     jl.        i0.    ;      goto next kind;
+
+     rl  w0  x2+4      ;    bskind := kind.entry;
+     rs. w0     d3.    ;
+
+     jl      x3        ;    return;
+
+e.                     ;
+
+
+
+
+f30: jl.       (2),b115; goto syntax error;
+f31: jl.       (2),b116; goto next command;
+f32: jl.       (2),b117; goto exam command;
+f33: jl.       (2),b112; call next param;
+f34: jl.       (2),b113; call next name;
+f35: jl.       (2),b114; call next integer;
+f41: jl.       (2),b121; call init write;
+f42: jl.       (2),b122; call write char;
+f43: jl.       (2),b123; call write text;
+f44: jl.       (2),b124; call type line;
+f45: jl.       (2),b125; call save work;
+f46: jl.       (2),b126; goto command aborted;
+f47: jl.       (2),b129; goto catalog error;
+f48: jl.       (2),b130; call stack input;
+
+; procedure read name
+;
+; call: w2 = name address, w3 = link
+; exit: all regs undef
+
+f36:                   ; read name:
+     al  w1  x3        ;
+     jl. w3     f34.   ;    next name;
+     al  w3  x1        ;
+
+; procedure move name
+;
+; call: w2 = name address, w3 = link
+; exit: w0w1 = undef, w2w3 = unchanged
+
+f37:                   ; move name:
+     am.       (d46.)  ;
+     dl  w1    +2      ;    move name just read to name-area;
+     ds  w1  x2+2      ;
+     am.       (d46.)  ;
+     dl  w1    +6      ;
+     ds  w1  x2+6      ;
+     jl      x3        ;    return;
+
+
+; procedure move catname,docname from chainbuffer
+;
+; call: w3 = link
+; exit: all regs undef
+
+b. j10 w.
+
+f38:                   ; move catname,docname from chainbuffer:
+     rl. w2     j2.    ;    w2 := first of chainbuffer;
+     dl  w1  x2+d61+2  ;
+     ds. w1     e2.+2  ;    move docname from chainbuffer;
+     dl  w1  x2+d61+6  ;
+     ds. w1     e2.+6  ;
+
+     dl  w1  x2+d55+2  ;
+     ds. w1     e1.+2  ;    move catname from chainbuffer;
+     dl  w1  x2+d55+6  ;
+     ds. w1     e1.+6  ;
+
+     jl      x3        ;    return;
+
+
+; procedure move catname,docname to chainbuffer
+;
+; call: w3 = link
+; exit: all regs undef
+
+f39:                   ; move catname etc to chainbuffer:
+     rl. w2     j2.    ;    w2 := first of chainbuffer;
+     dl. w1     e2.+2  ;    if docname(0) not defined then
+     sn  w0    -1      ;
+     jl      x3        ;      return;
+
+     ds  w1  x2+d61+2  ;    move docname to chainhead;
+     dl. w1     e2.+6  ;
+     ds  w1  x2+d61+6  ;
+
+     dl. w1     e1.+2  ;    move catname to chainhead;
+     ds  w1  x2+d55+2  ;
+     dl. w1     e1.+6  ;
+     ds  w1  x2+d55+6  ;
+
+     rl. w1     d3.    ;
+     ls  w1     3      ;    if bskind defined then
+     al  w1  x1+a110   ;      kind.chainhead := bskind;
+     sl  w1     0      ;      permkey.chainhead := max cat key;
+     hs  w1  x2+d53    ;
+
+     jl      x3        ;    return;
+
+j2:  h8                ; first of chainbuffer
+
+e.                     ;
+
+
+
+; procedure test repair allowed
+;
+; call: w3 = link
+; exit: link+0:  not allowed,  all regs undef
+;           +2:  allowed    , w0 = undef, other regs unchanged
+
+b. j10 w.
+
+f40:                   ; test repair allowed:
+     al  w0     0      ;    repair allowed := false;
+     rx. w0     d44.   ;
+     se  w0     0      ;    if repair was allowed then
+     jl      x3+2      ;      return ok;
+
+     jl. w1     f2.    ;   type textline... and return;
+     <:auxcat to be repaired<0>:>
+
+e.                     ;
+
+
+
+; *********************************************
+; *********************************************
+; **                                         **
+; **  main control of monitor initialization **
+; **                                         **
+; *********************************************
+; *********************************************
+
+b. i10 w.
+
+c.-880504
+i0:  f19               ; autoload device controllers
+i1:  f20               ; start up device controllers
+z. ; -880504
+
+
+g0:                    ; init catalog:
+     jl. w3     f41.   ;   init write;
+
+c.-880504
+
+
+     rl. w0     d36.   ;
+     se  w0     0      ;   if discload then
+     jl. w3    (i0.)   ;     autoload device controllers;
+
+     jl. w3    (i1.)   ;   start up device controller;
+
+z. ; 880504
+
+
+     rl. w0     d36.   ;   w0 := discload flag;
+     rl. w1     d49.   ;   w1 := first word of startup area name;
+     se  w0     0      ;   if not discload
+     sn  w1     0      ;   or area name <> 0 then
+     jl.        i2.    ;     goto write start header;
+
+; automatic startup is demanded
+     jl. w3     g11.   ;   call (automatic oldcat);
+
+     al. w2     d49.   ;   name := startup area name;
+     jl. w3     f48.   ;   stack input (name);
+
+     jl.        f31.   ;   goto next command;
+ i2:    am   (b4)      ; get name of console 2
+     rl  w2  +a199<1   ;
+     dl  w1  x2+4      ;
+     ds. w1  e1.+2     ;
+     dl  w1  x2+8      ;
+     ds. w1  e1.+6     ;
+     al. w3  e1.       ; send output message
+     al. w1  i3.       ;
+     jd  1<11+16       ;
+     jd  1<11+18       ; wait answer dont care about the answer and dont check
+     jl.     f31.      ;
+
+i3:  5<12, e19 , e20
+      0, r.5           ; eight words for answer
+
+e.                     ;
+
+; ************************************************
+; ************************************************
+
+
+
+
+
+
+; command syntax:   clearcat
+
+b. i10, j10 w.
+
+g40:                   ; clearcat:
+     rl  w2     b22    ;    entry := first chain in name table;
+     jl.        i3.    ;    (skip)
+i1:                    ; next chain:
+     rl. w2     j1.    ;    restore (entry);
+i2:  al  w2  x2+2      ;    increase (entry);
+i3:  sn  w2    (b24)   ;    if all chains tested then
+     jl.        f31.   ;      goto next command;
+
+     rl  w3  x2+0      ;    chain := name table (entry);
+     rl  w0  x3+d61-a88;
+     sn  w0     0      ;    if docname(0) = 0 then
+     jl.        i2.    ;      goto next chain;
+
+     rs. w2     j1.    ;    save (entry);
+
+     rl  w1  x3+d61+8-a88;  devno := (document name table address.chain
+     ws  w1     b4     ;           - first device in name table )
+     ls  w1    -1      ;           / 2 ;
+     rs. w1     d43.   ;
+
+     jl. w3     f24.   ;    dismount kit;
+     jl.        i1.    ;+2:   error:  goto next chain;
+
+     jl.        i1.    ;    goto next chain;
+
+j1:  0                 ; cur entry for chain 
+
+e.                     ;
+
+
+
+; command syntax:   nokit <device number>
+
+g41:                   ; nokit:
+     jl. w3     f35.   ;    devno :=
+     rs. w0     d43.   ;      next integer;
+
+     jl. w3     f24.   ;    dismount kit;
+     jl.        f31.   ;+2:   error:  goto next command;
+
+     jl.        f31.   ;    goto next command;
+
+
+
+; command syntax:   maincat <maincat name> <maincat size>
+
+b. j10 w.
+
+g42:                   ; maincat:
+     rl. w2     j1.    ;    maincatname :=
+     jl. w3     f36.   ;      readname;
+
+     jl. w3     f35.   ;    maincatsize :=
+     rs  w0  x2+d10-d9 ;      next integer;
+
+     jl.        f31.   ;    goto next command;
+
+j1:  d9                ; maincat name address
+e.                     ;
+
+
+
+; command syntax:  oldcat
+
+b. i10, j10 w.
+
+; oldcat action:
+g48:                   ; oldcat-command:
+     al. w3     f31.   ;    return := next command;
+g11:                   ; automatic oldcat:
+     rs. w3     j6.    ;    save (return);
+     rl. w0     j7.    ;
+     rs. w0     j9.    ;    number index := first bs device;
+     al. w0     i0.    ;
+     rs. w0     j10.   ;    read action := get next from list;
+     jl.        i1.    ;    goto next kitnumber;
+
+i0:                    ; get next from list:
+     rl. w1     j9.    ;    if number index = top of list then
+;     sn. w1    (j8.)  ;
+     se. w1    (j7.)   ; 93-06-19 00:43 HJ **** ONLY MOUNT 1st BS ****
+     jl.       (j6.)   ;      return;
+     rl  w0  x1        ;
+     rs. w0    (d45.)  ;    param := device number (number index);
+     al  w1  x1+2      ;    increase (number index);
+     rs. w1     j9.    ;
+     al  w0     2      ;    param kind := integer;
+     jl      x3        ;    return;
+
+
+
+; command syntax:  kit <docname> (<auxcatname> (<kind>)) <device number>
+;             or:  kit (<device number>)*
+
+g43:                   ; kit:
+     al. w3     f33.   ;    read action := next param;
+     rs. w3     j10.   ;
+
+     al  w0    -1      ;
+     rs. w0     e2.    ;    docname := unchanged;
+     rs. w0     d3.    ;    bskind := unchanged;
+
+     jl. w3     f33.   ;    next param;
+     se  w0     1      ;    if kind <> name then
+     jl.        i5.    ;      goto test;
+
+     al. w2     e2.    ;    docname := name;
+     jl. w3     f37.   ;
+
+     rl. w0     j0.    ;    (prepare no auxcatname parameter)
+     rs. w0     e1.    ;
+
+     al. w2     e1.+2  ;    auxcatname := <:cat:> + docname;
+     jl. w3     f37.   ;
+
+     jl. w3     f33.   ;    next param;
+     se  w0     1      ;    if kind <> name then
+     jl.        i5.    ;      goto test;
+     al. w2     e1.    ;    auxcatname := name;
+     jl. w3     f37.   ;
+
+     jl. w3     f33.   ;    next param;
+     se  w0     1      ;    if kind <> name then
+     jl.        i5.    ;      goto test;
+     jl. w3     f29.   ;    get bskind;
+     jl.        i2.    ;    goto get devno;
+
+i1:                    ; next kitnumber:
+     al  w0    -1      ;
+     rs. w0     e2.    ;    docname := unchanged;
+     rs. w0     d3.    ;    bskind := unchanged;
+i2:                    ; get devno:
+     jl. w3    (j10.)  ;    next param;
+i5:                    ; test:
+     se  w0     2      ;    if kind <> integer then
+     jl.        f32.   ;      goto exam command;
+
+     rl. w0    (d45.)  ;    devno :=
+     rs. w0     d43.   ;      param;
+
+     jl. w3     f21.   ;    read chain;
+     jl.        i1.    ;+2:   error:  goto next kitnumber;
+
+; w3 = chainhead address
+
+     dl  w1  x3+d61+2  ;    outtextline ( <docname> mounted on <devno>);
+     lo. w0     j1.    ;
+     lo. w1     j1.    ;
+     ds. w1     j3.    ;
+     dl  w1  x3+d61+6  ;
+     lo. w0     j1.    ;
+     lo. w1     j1.    ;
+     ds. w1     j4.    ;
+
+     al. w1     j2.    ;
+     jl. w3     f2.    ;
+
+     rl  w0     b25    ;    if no maincat yet then
+     se  w0     0      ;
+     jl.        i8.    ;      begin
+     jl. w3     f25.   ;      mount maincat;
+     jl.        f47.   ;+2:     error:  goto catalog error;
+i8:                    ;      end;
+
+     jl. w3     f23.   ;    insert all entries;
+     jl.        i1.    ;+2:   error:  goto next kitnumber;
+
+; w3 = chainhead address
+
+     al  w2  x3+d61    ;
+     jd         1<11+106;   insert bs (docname.chainhead);
+     sn  w0     0      ;    if result ok then
+     jl.        i1.    ;      goto next kitnumber;
+
+     al. w2     i1.    ;    typeresult ( <:insert bs:>, result);
+     jl. w3     f5.    ;    goto next kitnumber;
+     <:insert bs   <0>:>  ;
+
+j0:  <:cat:>           ; standard start of cat-name
+j1:  <:   :>           ; spaces for converting text to fixed length
+j2:  0, r.4            ; text: <docname>
+  j3=j2+2              ;
+  j4=j2+6              ;
+     <: mounted :>     ;
+d47: <:on :>           ;
+d48: 0, r.3            ; <device number as text>
+     0                 ; (end of text)
+
+j6:  0                 ; return from oldcat
+
+j7:  d1                ; start of device number list for oldcat
+j8:  d2                ; top   of device number list
+j9:  0                 ; number index
+j10: 0                 ; address of read action
+e.                     ;
+
+
+
+; command syntax:  kitlabel ( <devno> <docname> <auxcatname> <bskind> ,
+;                             <catsize> <slicelength> <number of slices> ) *
+
+b. i10, j10 w.
+
+g44:                   ; kitlabel:
+i0:                    ; next label:
+     jl. w3     f33.   ;    next param;
+     se  w0     2      ;    if kind <> integer then
+     jl.        f32.   ;      goto exam command;
+
+     rl. w0    (d45.)  ;
+     rs. w0     d43.   ;    device number := param;
+
+     al. w2     e2.    ;    docname := read name;
+     jl. w3     f36.   ;
+
+     al. w2     e1.    ;    auxcatname := read name;
+     jl. w3     f36.   ;
+
+     jl. w3     f34.   ;    next name;
+     jl. w3     f29.   ;    get bskind;
+
+     jl. w3     f35.   ;    catsize := next integer;
+     rs. w0     d4.    ;
+
+     jl. w3     f35.   ;    slicelength := next integer;
+     rs. w0     d5.    ;
+
+     jl. w3     f35.   ;    number of slices := next integer;
+     rs. w0     d6.    ;
+
+; notice: if the device is already included in the bs-system, it will
+;         not automaticly be dismounted
+
+     rl. w3     j0.    ;    w3 := start of chainhead buffer;
+
+                       ;    move:
+
+     rl. w1     d4.    ;           auxcat size
+     rs  w1  x3+d57    ;
+
+     rl. w1     d5.    ;           slice length
+     rs  w1  x3+d64    ;
+
+     rl. w1     d6.    ;           last slice
+     al  w1  x1-1      ;                      (= number of slices - 1)
+     hs  w1  x3+d66    ;
+
+     al  w1  x1+a88+1+511;         first slice of aux catalog
+     ls  w1    -9      ;
+     al  w0     0      ;             ( = (size of chainhead + number of slices)
+     wd  w1  x3+d64    ;               / slice length )
+     se  w0     0      ;
+     al  w1  x1+1      ;             (rounded up to an integral number of slices))
+     hs  w1  x3+d54    ;
+
+     al  w1     0      ;           first slice in chaintable
+     hs  w1  x3+d67    ;                      (= 0)
+
+; setup chains for the whole chaintable etc
+
+     al  w0     1      ;
+     bz  w1  x3+d66    ;    w1 := last slice number;
+
+i5:                    ; next slice:
+     am      x3+a88    ;
+     hs  w0  x1        ;    slice (w1) := 1;
+     al  w1  x1-1      ;    decrease (w1);
+     sl  w1     0      ;    if not all slices initialized then
+     jl.        i5.    ;      goto next slice;
+
+     jl. w3     f22.   ;    write chain;
+     jl.        i0.    ;+2:   error:  goto next label;
+
+; clear auxcat
+
+     rl. w1     d29.   ;    w1 := last  of load buffer;
+     rl. w2     d28.   ;    w2 := first of load buffer;
+      am      -2048   ;
+     jl. w3     f11.+2048;    clear (from, to);
+
+     al  w0     0      ;    last word of buffer := 0;
+     rs  w0  x1        ;
+
+     al. w1     d30.   ;    w1 := load buffer message;
+     rs  w0  x1+6      ;    segment.message := 0;
+
+     al. w3     e1.    ;    name := auxcat name;
+
+i8:                    ; next segment:
+     jl. w2     f12.   ;    outsegment (auxcat, buffer);
+     jl.        i10.   ;+2:   trouble:  goto dismount;
+
+     rl  w0  x1+6      ;    w0 := segment number of message;
+     se. w0    (d4.)   ;    if segment.message <> auxcat size then
+     jl.        i8.    ;      goto next segment;
+
+     jd         1<11+64;    remove process (aux catalog);
+
+     jl.        i0.    ;    goto next label;
+
+
+i10:                   ; dismount:
+     jd         1<11+64;    remove process (aux catalog);
+     jl. w3     f24.   ;    dismount kit;
+     jl.        i0.    ;+2:   error:  goto next label;
+
+     jl.        i0.    ;    goto next label;
+
+j0:  h8                ; start of chainhead
+
+e.                     ;
+
+
+
+; command syntax:  repair
+
+g45:                   ; repair:
+     al  w0    -1      ;    repair allowed := true;
+     rs. w0     d44.   ;
+     jl.        f31.   ;    goto next command;
+
+
+
+; command syntax:  auxclear (<bskind>) <device number> (<lower> <upper> <name>)*
+
+b. i10, j10 w.
+
+g49:                   ; auxclear:
+     al. w3     e1.    ;
+     jd         1<11+68;    get wrk-name (auxcat name);
+     al. w3     e2.    ;
+     jd         1<11+68;    get wrk-name (docname);
+
+     al  w0    -1      ;
+     rs. w0     d3.    ;    bskind := unchanged;
+
+     jl. w3     f33.   ;    next param;
+     se  w0     1      ;    if kind = name then
+     jl.        i1.    ;      begin
+     jl. w3     f29.   ;      get bskind;
+     jl. w3     f33.   ;      next param;
+i1:                    ;      end;
+
+     se  w0     2      ;    if kind <> integer then
+     jl.        f30.   ;      goto syntax error;
+
+     rl. w0    (d45.)  ;
+     rs. w0     d43.   ;    devno := integer;
+
+     jl. w3     f21.   ;    read chain;
+     jl.        f30.   ;+2:   error:  goto syntax (or better: goto ready);
+
+     al  w3  x3+d55    ;
+     jd         1<11+64;    remove process (aux cat);
+
+i3:                    ; next entry:
+     jl. w3     f33.   ;    next param;
+     se  w0     2      ;    if kind <> integer then
+     jl.        i9.    ;      goto dismount;
+
+     rl. w0    (d45.)  ;
+     rs. w0     j1.    ;    lower interval := param;
+     jl. w3     f35.   ;
+     rs. w0     j2.    ;    upper interval := next integer;
+
+     al. w2     j3.    ;    entry name :=
+     jl. w3     f36.   ;      read name;
+
+     al. w1     j0.    ;    w1 := entry;
+     al. w2     e2.    ;    w2 := docname;
+     jd         1<11+122;   remove aux entry (entry, docname);
+     sn  w0     0      ;    if result ok then
+     jl.        i3.    ;      goto next entry;
+
+     al. w1     j5.    ;
+     jl. w3     f1.    ;    typeout (<:remove aux entry:>);
+
+     al. w3     j2.    ;    w3 := entry name;
+     jl. w2     f5.    ;    typeresult (result, entry name);
+
+     jl.        i3.    ;    goto next entry;
+
+i9:                    ; dismount:
+     jl. w3     f24.   ;    dismount kit;
+     jl.        f32.   ;+2:   error:  goto exam command;
+     jl.        f32.   ;    goto exam command;
+
+j0 = k-2               ; entry:
+j1:  0                 ;   lower interval
+j2:  0                 ;   upper interval
+j3:  0, r.4            ;   entry name
+
+j5:  <:remove aux entry<0>:>
+
+e.                     ;
+
+
+
+; command syntax:  binin <modekind> <docname> (<position>)*
+
+b. i10, j10 w.
+
+m0 = 0                 ; bs-kind
+m1 = 2                 ; mt-kind
+m2 = 4                 ; tr-kind
+
+;    name    , modekind,  tabelentry size
+     j3=0    ,  j4=2   ,  j1=j4+2
+j0:                    ; start of table:
+     <:bs:>  ,      m0 ;
+     <:mto:> ,    0+m1 ;
+     <:nrz:> , 4<12+m1 ;
+     <:tro:> ,      m2 ;
+     <:flx:> ,      m1 ;
+j2:                    ; top of table
+
+j8:  <:modekind illegal<0>:>
+j10:   0,0             ; current command name
+       0               ;   (end of name)
+j6:  0, 0              ; saved w3,w0
+
+g46:                   ; binin:
+     jl. w3     f34.   ;    next name;
+     rl. w3     d46.   ;
+     dl  w0  x3+2      ;    w3w0 := parameter;
+
+     al. w2     j0.-j1 ;
+
+i1:                    ;
+     al  w2  x2+j1     ;    if modekind unknown then
+     sn  w0     0      ;
+     sn. w2     j2.    ;
+     jl.        i5.    ;      goto alarm;
+     se  w3 (x2+j3)    ;
+     jl.        i1.    ;
+
+; w2 = entry in mode-table
+
+     rl  w3  x2+j4     ;    modekind := table-contents;
+     rs. w3     d40.   ;
+
+     al. w2     e1.    ;    device name := read name;
+     jl. w3     f36.   ;
+
+     jl. w3     f35.   ;    position := next integer;
+
+     jl.        g13.   ;    goto initialize input;
+
+i5:                    ; modekind illegal:
+     al. w1     j8.    ;    type textline (<:modekind illegal:>);
+     jl. w3     f2.    ;
+
+     jl.        f31.   ;    goto next command;
+
+g54:                   ; end:
+     jl. w3     f17.   ;    end transfer;
+     jl. w3     f33.   ;    next param;
+     se  w0     2      ;    if kind <> integer then
+     jl.        f32.   ;      goto exam command;
+     rl. w0    (d45.)  ;    position := param;
+
+g13:                   ;
+     rs. w0     d41.   ;    save (position);
+
+; initialize input
+     al  w0      0      ;
+     al  w1     -1      ;   characters := 0;
+     ds. w1    d18.     ;   cur char := -1;
+     rs. w0    d35.     ;   sum := 0;
+     jl. w3    f15.     ;   start transfer input;
+
+  g1: rl. w1  d24.      ; input commands:
+      rs. w1  d26.      ;   cur command:=
+      al  w2  x1      ;   null-char allowed at start of buffer;
+  g2: jl. w3  f8.       ;   top command:=command buf;
+      jl.     g54.      ;
+      jl.     g4.       ;   repeat
+      sh. w1 (d25.)     ;   input word(input, end-action,next command);
+      jl.     g3.       ;   if top command>command end then
+      al. w1  e11.      ;   begin
+                       ; type textline (<:input sizeerror:>);
+      jl. w3  f2.       ;   goto end-action;
+      jl.     g54.      ;   end;
+  g3: rs  w0  x1+0      ;   word(command top):=input;
+      al  w1  x1+2      ;   command top:=command top+2;
+      jl.     g2.       ;   until no limit;
+  g4: rs. w1  d27.      ;
+  g5: rl. w1  d26.      ; next command:
+      sl. w1 (d27.)     ;   if cur command>=command end
+      jl.     g1.       ;   then goto input commands;
+     dl  w1  x1+2      ;   w0 := first word of command;
+     ds. w1     j10.+2 ;   save command;
+                       ;   cur action := action table;
+  g6: rl. w2  d19.      ;   repeat
+  g7: sn  w0 (x2+0)     ;   if word(cur action)=word(cur command)
+      jl.     g8.       ;   then goto before command;
+      al  w2  x2+6      ;   cur action:=cur action+6;
+      sh. w2 (d20.)     ;
+      jl.     g7.       ;   until cur action>action end;
+      jl. w2  f4.       ;   typecommand;
+      al. w1  e13.      ;
+      jl. w3  f2.       ;   type textline(<:syntaxerror:>);
+      jl.     g54.      ;   goto end-action;
+  g8: rs. w2  d21.      ; before command:
+      rl. w3  d26.      ;
+      al  w3  x3+4      ;
+      al  w1  x3+8      ;
+      jl     (x2+2)     ;   goto word(cur action+2);
+;     w1=cur command+12   w3=cur command+4
+
+  g9: rl. w2  d21.      ; after command:
+      rl. w1  d26.      ;
+      wa  w1  x2+4      ;   cur command:=
+      rs. w1  d26.      ;   cur command+word(cur action+4);
+      jl.     g5.       ;   goto next command;
+
+; local procedure type command;
+;
+; call: w2=link
+; exit: w0,w2,w3=unch, w1=undef
+f4:                    ; type command:
+     ds. w0     j6.+2  ;   save regs;
+     al. w1     j10.   ;
+     jl. w3     f1.    ;   typetext (command name);
+     dl. w0     j6.+2  ;   restore regs;
+     jl      x2        ;   return;
+
+         
+                        ; create:
+  g20:jd  1<11+48       ;   (remove maybe an old entry)
+      jd  1<11+40       ;   create entry(name,tail,result);
+      jl.     g25.      ;   goto test result;
+
+                        ; change:
+  g21:jd  1<11+44       ;   change entry(name,tail,result);
+      jl.     g25.      ;   goto test result;
+
+                        ; rename:
+  g22:jd  1<11+46       ;   rename entry(name,result);
+      jl.     g25.      ;   goto test result;
+
+                        ; remove:
+  g23:jd  1<11+48       ;   remove entry(name,tail,result);
+      jl.     g25.      ;   goto test result;
+
+  g24:rl  w1  x1+0      ; perman:
+      jd  1<11+50       ;   permanent entry(name,key,result);
+      
+                        ; test result:
+  g25:sn  w0  0         ;   if result<>0 then
+      jl.     g9.       ;   begin
+      jl. w2  f4.       ;   typecommand;
+      jl. w2  f5.       ;   typeresult(result, name);
+      jl.     g54.      ;   goto end-action;
+                        ;   end;
+                        ;   goto after command;
+
+  g30:al  w0  0         ; load:
+      rl  w1  x1+0      ;   input seg:=0;
+      ds. w1  d34.      ;   max seg:mand param;
+      sh  w1  0         ;   if max seg<=0
+      jl.     g9.       ;   then goto after command;
+      rs. w0  d30.+6    ;   cur seg:=0;
+      jd  1<11+52       ;   create area process(name,result);
+      se  w0  0         ;   if result<>0
+      jl.     g25.      ;   then goto test result;
+      jd  1<11+8        ;   reserve process(name,result);
+  g31:rl. w1  d28.      ; next buf: addr:=load buf;
+      al  w2  0         ;   null-char := not allowed;
+  g32:jl. w3  f8.       ; next word:
+      jl.     g35.      ;
+      jl.     g33.      ;   inword(binword,after trouble,next segment;
+      rs  w0  x1+0      ;   word(addr):=bin word;
+      al  w1  x1+2      ;   addr:=addr+2;
+      sh. w1 (d29.)     ;   if addr<=load end
+      jl.     g32.      ;   then goto next word;
+      al. w1  d30.      ;
+      rl. w3  d26.      ;
+      al  w3  x3+4      ;
+      jl. w2  f12.      ;   outseg(name, area output,
+      jl.     g35.      ;            after trouble);
+      jl.     g31.      ;   goto next buf;
+  g33:rl. w3  d33.      ; next segment:
+      al  w3  x3+1      ;
+      rs. w3  d33.      ;   input seg:=input seg+1;
+      se. w3 (d34.)     ;   if input seg<>max seg
+      jl.     g32.      ;   then goto next word;
+      sn. w1 (d28.)     ;
+      jl.     g34.      ;   if addr<>load buf then
+      al. w1  d30.      ;
+      rl. w3  d26.      ;
+      al  w3  x3+4      ;
+      jl. w2  f12.      ;   outseg(name, area output,
+      jl.     g35.      ;            after trouble);
+  g34:rl. w3  d26.      ; after load:
+      al  w3  x3+4      ;
+      jd  1<11+64       ;   remove process(name,result);
+      jl.     g9.       ;   goto after command;
+
+  g35:rl. w3  d26.      ; after trouble:
+      al  w3  x3+4      ;
+      jd  1<11+64       ;   remove process(name,result);
+      jl.     g54.      ;   goto end-action;
+
+e.                     ; end binin-command
+
+
+
+
+
+d1=k  ; first chain head
+
+
+; this block transfers the bs-table from the monitor option
+; table area to the bs catalog table.
+
+b.p2,m13 w.
+
+; make room for the bs-catalog:
+m0:    0,r.a112         ;  catalog table
+m1:   q6                ;  top addr of catalog
+
+m2:   q6+12             ;  start addr(bs-table),init: addr(mon opt table)
+m3:   0                 ;  top addr(bs-table)
+m4:   0                 ;  insert addr(bs-catalog)
+m5:   0                 ;  slang base
+m6:   0                 ;  return addr to slang
+m7:   <:<10>                            bs table included<0>:>
+
+; initiate:
+b.j0 w.
+p0:   ds.  w3   m6.     ;  save slang base,return addr;
+      dl.  w3  (m2.)    ;  store start addr,
+      ds.  w3   m3.     ;        top addr(bs-table);
+      al.  w2   m0.     ;
+      rs.  w2   m4.     ;  insert addr(bs-catalog):=start addr(bs-cat area);
+      al.  w1   m0.     ;
+      rl.  w2   m2.     ;
+j0:   rl   w0   x2+0    ;  move bs-table;
+      rs   w0   x1+0    ;
+      al   w1   x1+2    ;
+      al   w2   x2+2    ;
+      se.  w2  (m3.)    ;
+      jl.       j0.     ;
+; end of creation of bs-catalog.
+      rl.  w3   m1.     ;  load addr(mon opt table);
+      al.  w1   m0.     ;  start:=start addr(bs-catalog);
+      al.  w2   m1.     ;  first free addr:=top addr(bs-catalog area);
+      ds   w2   x3+30   ;  insert start,top addr(bs-cat) in mon opt table;
+      rs.  w2  (m5.)    ;  insert first free in slang base;
+      al.  w0   m7.     ;  insert addr(text);
+      al   w2   0       ;  status:=ok;
+      jl.      (m6.)    ; exit: return to slang;
+e.
+      jl.       p0.     ;  goto init;
+
+e. ; end of bs-catalog generating.
+j.
+d2=k  ; chain head end
+
+
+; action table:
+; each command is described by its name, the address of
+; the command action, and the number of command bytes.
+
+w.h0=k
+      <:cre:>, g20,32   ; <:create:><name><tail>
+      <:cha:>, g21,32   ; <:change:><name><tail>
+      <:ren:>, g22,20   ; <:rename:><name><new name>
+      <:rem:>, g23,12   ; <:remove:><name>
+      <:per:>, g24,14   ; <:perman:><name><cat key>
+      <:loa:>, g30,14   ; <:load:><name><segments>
+      <:new:>, g9 ,4    ; <:newcat:>
+      <:old:>, g9 ,4    ; <:oldcat:>
+  h1: <:end:>, g54,2    ; <:end:>
+
+h3 = -k                ; start of initcat command-table:
+     <:binin:>   ,  1<20 + g46-b110
+     <:clearc:>  ,  1<18 + g40-b110
+     <:kit<0>:>  ,  1<18 + g43-b110
+     <:kitlab:>  ,  1<18 + g44-b110
+     <:mainca:>  ,  1<21 + g42-b110
+     <:nokit:>   ,  1<18 + g41-b110
+     <:oldcat:>  ,  1<18 + g48-b110
+     <:repair:>  ,  1<18 + g45-b110
+     <:auxcle:>  ,  1<18 + g49-b110
+     0
+
+
+  h4=k                  ; command buf:
+  h5=h4+510             ; command end:
+
+  h6=h5+2               ; load buf:
+  h7=h6+510             ; load end:
+  h8=h7+2               ; chain buf
+  h11 = a116           ; (minimum size of chaintable buffer)
+  c. a114-a116, h11 = a114 z.;
+  h9 = h8+(:h11+511:)>9<9-2; last of chainbuffer
+  h10=h9+2             ; start of 1. input buffer
+  h12=h10 + 2 * 512    ; start of entry count table
+  h13=h12 + 2 * 500    ; top   of entry count table (prepared for 500 segments
+
+c.-880504
+
+
+
+
+; initial start up of external processes and creation of
+; local links to front ends. before linkup the external
+; process description is released.
+
+b.i30,j10,p15 w.
+
+p6=0    ; start of message
+p7=16   ; start of data
+p8=30   ; jh.linkno
+p9=38   ; process name
+p10=46  ; length of item
+
+i2=k                   ; start of linkup list
+t.
+m.                init linkup list included
+
+i3=k                   ; top of linkup list
+i6:  i2-p10            ;   start of linkup list
+i7:  i3                ;   top of linkup list
+
+i8:  0,r.4,0           ;   name of fpa, name table entry
+
+i9:  8<12+0            ;   master clear message
+
+i10: 0, r.8            ;   answer area
+i11: 0                 ;   link
+i12: 0                 ;   saved pointer
+
+i13: <:host:>,0,0,0    ;   host-name and name table entry
+
+i21: <:clock:>,0,0,0   ;   clock-name and name table entry
+
+i22: 0<12              ;   delay message
+     5                 ;   time (in seconds) 
+
+f20: rs. w3  i11.      ; init externals: save link;
+     rl  w3  b4        ;
+j0:  rl  w0 (x3)       ;   for devno:=0 step 1 until maxdevno do
+     se  w0  80        ;     proc:=proc(devno);
+     jl.     j1.       ;     if kind(proc)=mainproc kind then
+     rs. w3  i12.      ;       name:=name(proc);
+     rl  w3  x3        ;
+     al  w0  0         ;   if start flag(proc)<>0 then
+     rx  w0  x3+a56    ;     start flag(proc):=0;
+     se  w0  0         ;     goto cont;
+     jl.     j3.       ;
+     dl  w2  x3+a11+2  ;
+     ds. w2  i8.+2     ;
+     dl  w2  x3+a11+6  ;
+     ds. w2  i8.+6     ;
+     al. w3  i8.       ;
+     jd      1<11+8    ;   reserve process(name);
+     al. w1  i9.       ;       message:=master clear;
+     jd      1<11+16   ;       send message(name,message);
+     al. w1  i10.      ;
+     jd      1<11+18   ;       wait answer(answer area);
+     jd      1<11+10   ;   release process(name);
+j3:  rl. w3  i12.      ;
+j1:  al  w3  x3+2      ;
+     se  w3 (b5)       ;
+     jl.     j0.       ;
+     al. w3  i21.      ; wait:
+     al. w1  i22.      ;
+     jd      1<11+16   ;   send message(clock,wait);
+     al. w1  i10.      ;
+     jd      1<11+18   ;   wait answer(answer area);
+
+     rl. w1  i6.       ; insert links:
+     rs. w1  i12.      ;
+j2:  rl. w1  i12.      ;   for dev:=first item in linkup list until last do
+     al  w1  x1+p10    ;    begin
+     rs. w1  i12.      ;
+     sl. w1 (i7.)      ;
+     jl.     j8.       ;
+     al. w3  i13.      ;
+     jd      1<11+16   ;     send message(host,linkup);
+     al. w1  i10.      ;
+     jd      1<11+18   ;     wait answer(answer area);
+     bz. w3  i10.+1    ;
+     sn  w0  1         ;     if result=ok
+     se  w3  0         ;     and function result=ok then
+     jl.     j2.       ;
+     rl. w3  i12.      ;
+     rl  w1  x3+p8     ;
+     al  w3  x3+p9     ;
+     jd      1<11+54   ;       create peripheral process;
+     jl.     j2.       ;    end;
+j8:
+     jl.     (i11.)    ; exit: return to link;
+e.
+
+
+
+
+
+; program used for autoload of local device controllers.
+; jr -  07.10.76
+;
+; the communication takes place via the transmitter part of a fpa 801.
+; after autoload this program reads commands from the device controller
+; simulating a magtape station locally connected to the device controller.
+; the load file must be placed on backing storage in consecutive segments.
+; the load file consists of a number of records with the format:
+;   <ident> <data>
+; where ident > 0 : size of data block (in characters)
+;             = 0 : tapemark (datablock empty)
+;             =-3 : end of tape (datablock empty)
+;
+; information about load device and load file is part of monitor options,
+; and shall be packed in this way:
+;   <name of load device(fpa transmitter)>
+;   <device number of bs device holding the load file>
+;   <first segment (load file)>
+;
+; the device controllers are loaded one by one according to the options.
+
+b.m10,n10,p10,q10,r10,s40 w.
+
+; format of options:
+p0=0                   ; load device
+p1=p0+8                ; device number of bs device
+p2=p1+2                ; first segment
+p3=p2+2                ; length of load command
+
+; counters.
+p4=10                  ; maxnumber of autoloads
+p5=1                   ; max number of errors
+
+s30:
+
+; start of options
+t.
+m.                device autoload list included
+
+
+s31=k
+
+; reset process.
+s0:  4<12+0            ;   operation:=reset all subprocesses
+
+; transmit status message.
+s1:  5<12+2.11         ;   operation:=transmit, mode:=reset, receive
+     s6                ;   first:=first of sense area
+     s7                ;   last:=last of sense area
+     8                 ;   charcount:=8
+     249               ;   startchar:=sense block
+
+; transmit status message.
+s2:  5<12+2.01         ;   operation:=transmit, mode:=receive
+     s6                ;   first:=first of sense area
+     s7                ;   last:=last of sense area
+     8                 ;   charcount:=8
+     249               ;   startchar:=sense block
+
+; transmit data block.
+s3:  5<12+2.01         ;   operation:=transmit, mode:=receive
+     0                 ;   first
+     s24               ;   last (max upper limit)
+     0                 ;   charcount
+     251               ;   strtchar:=data block
+
+; autoload.
+s4:  6<12+2.11         ;   operation:=autoload, mode:=reset, receive
+                       ;   dummy
+
+; answer area.
+s5:  0                 ;   status
+     0                 ;   bytes transferred
+     0                 ;   chars transferred
+     0                 ;   command character (status character)
+     0, r.4            ;   dummy
+
+; sense information area.
+s6:  0                 ;   char0,1:=status(0:15), char2:=size(0:7),
+     0                 ;   char3:=size(8:15),char4,5:=filenumber(0:15),
+s7:  0                 ;   char6,7:=blocknumber(0:15)
+
+; name of load device
+s8:  0, r.4, 0         ;
+
+s10: 0                 ;   status
+s11: 0                 ;   size(data)
+s12: 0                 ;   filenumber
+s13: 0                 ;   blocknumber
+
+s14: 0                 ;   first(record)
+s15: 0                 ;   link
+s16: 0                 ;   current load command
+s17: 0                 ;   errorcount
+
+; input message.
+s20: 3<12+0            ;   operation:=read
+     s22               ;   first:=first of record buffer
+     s24               ;   last:=last of record buffer
+     0                 ;   first segment number
+
+; name of bs device.
+s21: <:loaddevice:>    ;   ork name of bs device
+     0                 ;   (s21+8) name table entry of bs device
+
+; delay message.
+s25: 0<12+2            ;   operation:=wait, mode:=msec
+     0,15000           ;   time:=1,5 sec
+
+; name of clock.
+s26: <:clock:>,0,0     ;   name of clock device
+     0                 ;   name table entry
+
+
+f19: rs. w3  s15.      ; start: save link;
+     al. w3  s30.-p3   ;
+     rs. w3  s16.      ;
+     al. w1  s25.      ;   message:=wait;
+     al. w3  s26.      ;  name:=clock;
+     jl. w2  n1.       ;   send and wait;
+     am      0         ;    ok:
+m0:  rl. w3  s16.      ; next load:
+     al  w3  x3+p3     ;   current command:=current command+length of command;
+     rs. w3  s16.      ;
+     sl. w3  s31.      ;   if no more commands then
+     jl.    (s15.)     ;     return to link;
+     jd      1<11+8    ;   reserve process(name);
+     jl. w3  n2.       ;   transfer command;
+     jl.     r4.       ;   goto autoload;
+
+m2:  rl. w0  s5.+6     ; execute:
+     sn  w0  0         ;   if command char=0 then
+     jl.     q0.       ;     goto transmit next block;
+     sn  w0  1         ;   if command char=1 then
+     jl.     q1.       ;     goto retransmit block;
+     sn  w0  2         ;   if command char=2 then
+     jl.     q2.       ;     goto rewind;
+     sn  w0  4         ;   if command char=4 then
+     jl.     q3.       ;     goto upspace block;
+     sn  w0  8         ;   if command char=8 then
+     jl.     q4.       ;     goto upspace file;
+     sn  w0  12        ;   if command char=12 then
+     jl.     q5.       ;     goto end;
+     sn  w0  128       ;   if command char=128 then
+     jl.     q6.       ;     goto sense;
+     sn  w0  255       ;   if command char=255 then
+     jl.     q7.       ;     goto wait;
+     jl.     q8.       ;   goto error;
+
+b.j10 w.
+
+; after error, reset and transmit status, receive command.
+r1:  al  w0  0         ; reset,trm status:
+     rs. w0  s17.      ;   errorcount:=0;
+     jl. w3  n3.       ;   set up status area;
+j0:  al. w1  s1.       ; repeat0: message:=reset,transmit status,receive;
+     al. w3  s8.       ;   name:=name(load device);
+     jl. w2  n1.       ;   send and wait;
+     jl.     m2.       ;  ok: goto execute;
+     al  w3  1         ;  error:
+     wa. w3  s17.      ;   errorcount:=errorcount+1;
+     rs. w3  s17.      ;
+     sh  w3  p5        ;   if errorcount=<maxerrorcount then
+     jl.     j0.       ;     goto repeat0;
+     jl.     m0.       ;   goto load next;
+
+; transmit status.
+r2:  jl. w3  n3.       ; transmit status: setup status area;
+     al. w1  s2.       ;   message:=transmit status;
+     al. w3  s8.       ;   name:=name(load device);
+     jl. w2  n1.       ;   send and wait;
+     jl.     m2.       ;  ok: goto execute;
+     jl.     r1.       ;  error: goto restart;
+
+; transmit data.
+r3:  rl. w2  s14.      ; transmit data:
+     al  w2  x2+2      ;   first(data):=first(record)+2;
+     rs. w2  s3.+2     ;   size:=size(data);
+     rl. w2  s11.      ;   if size=0 then
+     sn  w2  0         ;     size:=1;
+     al  w2  1         ;
+     rs. w2  s3.+6     ;   char count:=size;
+     al. w1  s3.       ;   message:=transmit block;
+     al. w3  s8.       ;   name:=name(load device);
+     jl. w2  n1.       ;   send and wait;
+     jl.     m2.       ;  ok: goto execute;
+     jl.     r1.       ;  error: goto restart;
+
+; autoload.
+r4:  al  w0  0         ; autoload:
+     rs. w0  s17.      ;   errorcount:=0;
+     al. w1  s0.       ;   message:=reset;
+     al. w3  s8.       ;   name:=namee(load device);
+     jl. w2  n1.       ;   send and wait;
+     jl.     j1.       ;    ok: goto start load;
+     jl.     m0.       ;    error: goto load next;
+j1:  al. w1  s4.       ; start load: message:=autoload;
+     al. w3  s8.       ;   name:=name(load device);
+     jl. w2  n1.       ;   send and wait;
+     jl.     m2.       ;  ok: goto execute;
+     al  w3  1         ;
+     wa. w3  s17.      ;
+     rs. w3  s17.      ;   errorcount:=errorcount+1;
+     sh  w3  p5        ;   if errorcount=<maxerrorcount then
+     jl.     j1.       ;     goto repeat;
+     jl.     m0.       ;   goto load next;
+e.
+
+; transmit next block.
+q0:  jl. w3  n0.       ; transmit next block: next block;
+     jl.     r3.       ;   goto transmit block;
+
+; retransmit block.
+q1=r3                  ; retransmit block: goto transmit block;
+
+; rewind.
+q2:  jl. w3  n2.       ; rewind: transfer command;
+     jl.     r2.       ;   goto transmit status;
+
+; upspace block.
+q3:  jl. w3  n0.       ; upspace block: next block;
+     al  w3  1<2       ;
+     sz  w0  1<8+1<4   ;   if status=end of tape or end of file then
+     rs. w3  s10.      ;     status:=position error;
+     al  w3  0         ;   size(data):=0;
+     rs. w3  s11.      ;
+     jl.     r2.       ;   goto transmit status;
+
+; upspace file.
+q4:  jl. w3  n0.       ; upspace file:
+     sn  w0  0         ;   while status=0 do
+     jl.     q4.       ;     next block;
+     al  w3  0         ;
+     sz  w0  1<8       ;   if status=end of file then
+     rs. w3  s10.      ;     status:=ok;
+     rs. w3  s11.      ;   size(data):=0;   
+     jl.     r2.       ;   goto transmit status;
+
+; end.
+q5:  rl. w3 (s21.+8)   ; end:
+     ld  w1  -100      ;   remove work name of bs device;
+     ds  w1  x3+4      ;
+     ds  w1  x3+8      ;
+     rl. w3  s16.      ;
+     jd      1<11+10   ;   release process(name);
+     al. w1  s25.      ;
+     al. w3  s26.      ;
+     jl. w2   n1.      ;   send and wait(clock)
+     am      0         ;
+     jl.     m0.       ;   goto load next;
+
+; sense.
+q6=r2                  ; sense: goto transmit status;
+
+; wait.
+q7:  al. w1  s25.      ; wait:
+     al. w3  s26.      ;
+     jl. w2  n1.       ;   send and wait(clock);
+     am      0         ;
+     jl.     r1.       ;
+
+; error.
+q8=r2                  ; error: goto transmit status;
+
+
+; procedure next block.
+; this procedure finds the start of the next record.
+;
+; status: 0     ok
+;         1<4   end of tape
+;         1<8   end of file
+;         1<14  disc error
+;
+;        call:         return:
+; w0                   status
+; w1                   size(data)
+; w2                   destroyed
+; w3     link          destroyed
+b.i4,j4 w.
+i0:  0                 ; saved link
+i1:  3                 ; constant
+i2:  1<14              ; disc error
+i3:  1<18              ;   end of medium
+
+n0:  rs. w3  i0.       ; next block:
+     rl. w1 (s14.)     ;
+     al  w1  x1+2+3    ;   first(next record):=
+     al  w0  0         ;     (size(data)+3)+2)//3*2+first(record);
+     wd. w1  i1.       ;
+     ls  w1  1         ;
+     wa. w1  s14.      ;
+     rs. w1  s14.      ;   first(record):=first(next record);
+     sh. w1  s23.      ;   if first(record)>first(buf)+510 then
+     jl.     j0.       ;     first(record):=first(record)-512;
+     al  w1  x1-512    ;     first segmentno:=first segmentno+1;
+     rs. w1  s14.      ;
+     al  w0  1         ;
+     wa. w0  s20.+6    ;
+     rs. w0  s20.+6    ;
+     al. w1  s20.      ;     message:=input;
+     al. w3  s21.      ;     name:=name(load file device);
+     jl. w2  n1.       ;     send and wait;
+     jl.     j0.       ;  ok: goto cont;
+     rl. w3  s6.+2     ;  error:
+     sn. w1 (i3.)      ;   if status=end of medium
+     se  w3  512       ;   and bytes transferred=1 segment then
+     jl.     j4.       ;   goto cont;
+     jl.     j0.       ;
+j4:  rl. w0  i2.       ;   status:=disc error;
+     al  w1  0         ;   size:=0;
+     dl. w3  s13.      ;   fileno:=fileno, blockno:=blockno;
+     jl.     j3.       ;   goto exit;
+j0:  rl. w1 (s14.)     ; cont:
+     sh  w1  0         ;   if ident(record)>0 then
+     jl.     j1.       ;     size(data):=ident(record);
+     al  w0  0         ;     status:=0;
+     dl. w3  s13.      ;     filenumber:=filenumber;
+     al  w3  x3+1      ;     blocknumber:=blocknumber+1;
+     jl.     j3.       ;   else
+j1:  se  w1  0         ;     if size(record)<>0 then
+     am      1<4-1<8   ;       status:=1end of tape
+     al  w0  1<8       ;     else status:=end of file;
+j2:  al  w1  0         ;     size(data):=0;
+     al  w2  1         ;     filenumber:=filenumber+1;
+     wa. w2  s12.      ;     blocknumber:=1;
+     al  w3  1         ;
+j3:  ds. w1  s11.      ; exit:
+     ds. w3  s13.      ;
+     jl.    (i0.)      ;   return;
+e.
+
+; procedure send and wait.
+; the procedure returns to link in case of result ok (which is
+; status=0 and result=1), else to link+2.
+;        call:         return:
+; w0                   destroyed
+; w1     message       result(0: ok, 1: error)
+; w2     link          destroyed
+; w3     name          destroyed
+b.i0 w.
+n1:  rs. w2  i0.       ; send and wait:
+     jd      1<11+16   ;   send message;
+     al. w1  s5.       ;   answer area:=std answer area;
+     jd      1<11+18   ;   wait answer;
+     rl. w1  s5.+0     ;   if result<>1
+     rl. w2  i0.       ;
+     sn  w0  1         ;   or status<>0 then
+     se  w1  0         ;     return to link+2
+     jl      x2+2      ;   else return to link;
+     jl      x2+0      ;
+i0:  0                 ;   saved link
+e.
+
+; procedure transfer command.
+;       call           return:
+; w0                   destroyed
+; w1                   destroyed
+; w2                   destrlyed
+; w3    link           destroyed
+b.i1w.
+n2:  rs. w3  i0.       ; transfer command:
+     rl. w2  s16.      ;
+     dl  w1  x2+p0+2   ;
+     ds. w1  s8.+2     ;
+     dl  w1  x2+p0+6   ;   transfer name(load device);
+     ds. w1  s8.+6     ;
+     rl  w3  x2+p1     ;
+     ls  w3  1         ;
+     wa  w3  b4        ;   name table entry(bs device):=deviceno*2+start(name table);
+     rs. w3  s21.+8    ;
+     rl  w3  x3        ;   proc(bs device):=word(name table entry);
+     dl. w1  s21.+2    ;
+     ds  w1  x3+4      ;   transfer work name to proc;
+     dl. w1  s21.+6    ;
+     ds  w1  x3+8      ;
+     ld  w1  -100      ;
+     ds. w1  s11.      ;   ident,size:=0,0;
+     al  w0  1         ;
+     rs. w0  s12.      ;   filenumber:=1;
+     rs. w0  s13.      ;   blocknumber:=1;
+     rl  w1  x2+p2     ;   first segment:=first segment number(load file) - 1;
+     al  w1  x1-1      ;
+     rs. w1  s20.+6    ;
+     al  w0  768-3     ;   assure that first and second segment are
+     rs. w0  s22.      ;     transferred to core first time the
+     al. w0  s22.      ;     record buffer are used;
+     rs. w0  s14.      ;
+     jl.    (i0.)      ; exit: return;
+i0:  0                  ;   save link
+e.
+
+; procedure setup status area.
+;        call:         return:
+; w0                   destroyed
+; w1                   destroyed
+; w2                   destroyed
+; w3     link          destroyed
+b.w.
+n3:  rl. w0  s10.      ; setup status area:
+     rl. w1  s11.      ;
+     se  w0  0         ;   if status<>ok then
+     al  w1  0         ;     size(data):=0;
+     ls  w1  8         ;
+     ld  w1  8         ;
+     lo. w1  s12.      ;   sense status area:=
+     rl. w2  s13.      ;     status(0:15)<8+size(0:7),
+     ls  w2  8         ;     size(8:15)<16+filenumber(0:15),
+     ds. w1  s6.+2     ;     blocknumber(0:15)<8;
+     rs. w2  s6.+4     ;
+     jl      x3        ; exit: return;
+e.
+
+s22=k                  ; start of record buffer
+s23=s22+510            ; last of first segment in record buffer
+s24=s22+512*2-2        ; last of record buffer
+
+e.
+
+z. ; 880504
+
+
+
+b.i24                   ; begin
+w.
+i0:                    ; initialize segment:
+     rl. w0     i3.    ;   initialize (top of initcat code);
+     rs. w0    (i4.)   ;
+
+     rl. w2     i5.    ;
+
+     dl  w1  x3-2      ;   move initcat switches;
+     ds  w1  x2+d37-d36;
+
+     dl  w1  x3-10     ;   move startup area name;
+     ds  w1  x2+d49+2-d36;
+     dl  w1  x3-6      ;
+     ds  w1  x2+d49+6-d36;
+
+     jl        (10)    ;   goto system start;
+
+i3:  h13               ; top of initcat code
+i4:  b120              ; pointer to ...
+i5:  d36               ; pointer to initcat switches
+
+      jl.     i0.       ;   goto initialize segment;
+  c25=k - b127 + 2
+e.                      ; end
+i.
+e.     ; end of initialize catalog on backing store
+
+
+
+; segment 10
+; rc 05.08.70 bj|rn |-thomsen
+;
+; this segment moves segment 2 - 9 in this way:
+;
+; segment 2 is moved to cell 8 and on, after which
+; control is transferred to the last moved word with the
+; following parameters:
+;     w2 = top load address (= new address of last  moved 
+;                              word + 2)
+;     w3 = link
+;
+; after initializing itself, the program segment returns
+; to this segment with:
+;     w2 = load address of next segment
+;
+; the next segment will then be moved to cell(w2) and on,
+; after which it is entered as described above.
+;
+; when initialize catalog (segment 9) is entered, the values
+; of the two switches (writetext, medium) may be found in
+; the words x3-4 and x3-2.
+;
+; segment 10 is entered from segment 1 in its last word
+;   entry conditions:
+;     w0,w1 = init catalog switches
+;     w2    = start address of segment 2
+
+
+
+
+s.   i10,  j10
+w.
+                j3.     ;   length of segment 10
+j9: t.                  ;x3-12:  init cat switch: startup area name
+j10:
+c. (:j10-j9-8:)*(:j10-j9-8:)-1
+m. startup area name improper length
+z.
+c.-(:j10-j9-8:)*(:j10-j9-8:)
+m.                startup area name included
+z.
+;   changed / onn880520
+;   j9:              0, r.4 ;x3-12:  init cat switch: startup area name 
+j0:              0      ;x3-4:  init cat switch: writetext
+j1:              0      ;x3-2:  init cat switch: medium
+
+
+; return point from initializing of some segment
+
+i0:  rl. w1     j2.     ; get load address;
+i1:  wa  w1  x1+0       ; calculate top address:
+     rx. w1     j2.     ;   change(old load address, top address);
+     al  w1  x1+2       ;   skip segment length;
+
+; now w1, w2 = old, new load address
+
+; move segment:
+
+     sh  w2  x1        ;   if new addr > old addr then
+     jl.        i2.    ;     begin
+
+     ds. w2     j5.    ;     save (old, new);
+     ws  w2     2      ;     diff := new - old;
+     sh  w2     i5     ;    (at least size of move loop);
+     al  w2     i5     ;
+
+     al. w1     j2.    ;     from := last of segment;
+                       ; move to higher:
+i4:  rl  w0  x1        ;     move word(from)
+     am      x2        ;       to word(from + diff);
+     rs  w0  x1        ;
+     al  w1  x1-2      ;
+     sn. w1     j0.    ;     if exactly all moveloop moved then
+     jl.     x2+i4.    ;       goto the moved moveloop...
+
+     sl. w1    (j4.)   ;     if not all moved then
+     jl.        i4.    ;       goto move to higher;
+
+     rl. w1     j4.    ;     old := old + diff;
+     wa  w1     4      ;
+     wa. w2     j2.    ;     top address := top address + diff;
+     rs. w2     j2.    ;
+     rl. w2     j5.    ;     restore(new);
+                       ;     end;
+
+i2:  rl  w0  x1+0       ;   move word from old
+     rs  w0  x2+0       ;     to new address;
+     al  w1  x1+2       ;   update old addr;
+     al  w2  x2+2       ;   update new addr;
+     se. w1    (j2.)    ;   if old addr <> top addr
+     jl.        i2.     ;   then goto move segment;
+
+; now the segment has been moved
+; jump to the last moved word
+
+     al. w3     i0.     ;   insert return;
+     jl      x2-2       ;   goto word(top addr - 2);
+
+; comment:  jump to last loaded word with
+;           w2         = top load address
+;           w3         = link
+;           word(x3-4) = init cat switch, writetext
+;           word(x3-2) = init cat switch, medium
+
+
+; initialize segment 10
+
+i3:  ds. w1     j1.     ;   save init cat switches
+     rs. w2     j2.     ;   
+
+c.-880504
+
+
+; ************* note: uses special knowledge to format of autoboot-program
+     dl  w1     30     ;   get startup area name from fixed part of autoboot!!!
+     ds. w1     j9.+2  ;
+     dl  w1     34     ;
+     ds. w1     j9.+6  ;
+
+; get monitor mode and clear all interrupts
+
+     gg  w3     b91    ;   w3 := inf;
+
+     rl. w0     j6.    ;   w0 := monitor mode;
+     al. w1     i6.    ;   w1 := new entry;
+     al. w2     j7.    ;   w2 := regdump;
+
+     rs  w2  x3+a326   ;   user regdump := regdump;
+     rs  w0  x3-a325+a328+6; monitor status := monitor mode;
+     rs  w1  x3-a325+a328+2; monitor call entry := new entry;
+     jd         1<11+0 ;   call monitor;  i.e. enter below, in monitor mode;
+
+i6:  al  w0     1      ; after monitor mode got:
+     gp  w0     b91    ;   inf := 1;  i.e. prevent any response;
+
+     al  w1     1<3    ;   device := 1;
+
+i7:  am.       (j8.)   ; next device:
+     do      x1+2      ;   reset device (device);
+     al  w1  x1+1<3    ;   increase (device);
+     sh  w1     255<3  ;   if device <= 255 then
+     jl.        i7.    ;     goto next device;
+
+z. ; 880504
+
+
+     al  w2     8      ;   new load address := 8;
+     jd.        i0.    ;   goto get load address;
+
+j6:  1 < 23            ; monitor mode;
+j7:  0, r. a180>1      ; regdump
+j8:  1 < 23            ; device address bit
+j4:  0                 ; saved old
+j5:  0                 ; saved new
+i5 = k - j0            ; aproximate size of moveloop
+
+j2:              0      ;   top address
+     jl.        i3.     ;   goto initialize segment 10
+j3:                     ; top address of segment 10:
+
+e.   ;  end segment 10
+i.
+
+; last segment
+
+s.w.
+     0   ; last segment empty
+
+e. ; end of last segment
+m.                end of monitor
+e.       ; end global block / onn 880510
+
+e.

@@ -1,0 +1,1872 @@
+
+
+
+m.                monitor text 5
+
+
+; rc 4195 graphic display:
+
+; process description format:
+;
+; a48:
+; a49: <interval>
+; a10: <kind=40>
+; a11: <name>
+; a50: <device number*64>
+; a52: <reserved>
+; a53: <users>
+; a54: <next message>
+; a55: <last message>
+; a56: <interrupt addr=c33>
+; a70: <max bytes>
+; a71: <timer count>
+
+c.(:a91>11a.1:)-1       ; if include rc 4195 graphic display then
+m.          rc 4195
+b.i24   ,a0=1<23        ; begin
+w.      a0>0+a0>3+a0>5  ;
+  i0:   a0>0+a0>2       ;
+  h19:  jl w3 g15       ;   check reservation;
+        dl.w1 i0.       ;
+        jl w3 g16       ;   check operation(0.3.5,0.2);
+        jl w3 g17       ;   link operation;
+  i1:                   ; start:
+        se w0 0         ;   if operation(buf)<>0 then
+        jl.   i3.       ;     goto input output;
+        rl w0 x2+12     ;   timer count(proc):=
+        rs w0 x1+a71    ;       max timer count(buf);
+  i2:   am   (b18)      ; enable:
+        rl w0 10        ;
+        am   (x1+a50)   ;
+        io w0 3<2+1     ;   control3(word(buf+10));
+        sx    2.11      ;   if ex<>0 then
+        jl.   i11.      ;     goto disconnect;
+        jl w3 c32       ;   wait interrupt(proc);
+        jl.   i13.      ;   if regretted then goto done1
+        am   (x1+a50)   ;
+        io w0 3<2+0     ;   status(buf):= sense3(sense addr);
+        sx    2.11      ;   if ex<>0 then
+        jl.   i11.      ;     goto disconnect;
+        rs w0 x2+8      ;
+        al w3 -1        ;
+        wa w3 x1+a71    ;   timer count:= timer count-1;
+        rs w3 x1+a71    ;
+        so w0(g59)      ;   if status(2)=0 then
+        jl.   i12.      ;     goto sense;
+        sl w3 0         ;   if timer count>=0 then
+        jl.   i2.       ;     goto enable;
+        ld w0 -65       ;   lpx(buf):= lpy(buf):= 0;
+        jl.   i10.      ;   goto done;
+  i12:  rl w3 x1+a50    ; sense:
+        io w0 x3+2<2+0  ;   lpy:= sense2(sense addr);
+        sx    2.11      ;   if ex<>0 then
+        jl.   i11.      ;     goto disconnect;
+        io w3 x3+1<2+0  ;   lpx:= sense1(sense addr);
+        sx    2.11      ;   if ex<>0 then
+        jl.   i11.      ;     goto disconnect;
+        jl.   i10.      ;   goto done;
+  i3:   rl w3 0         ; input output:
+        ls w3 1         ;   i:= operation(buf)*2
+        ba w3 x2+9      ;       +mode(buf);
+        jl.   x3-4      ;   repeat addr:= case i of(
+        am    i15       ;      6:  read,
+        am    i14       ;      8:  read point,
+        am    i17       ;     10:  write,
+        al.w3 i6.       ;     12:  write point);
+        rs.w3 i22.      ;
+        ba.w0 1         ;
+        ls w0 -1        ;   if operation(buf)=3 then
+        wa w0 x1+a50    ;     read addr:= sense addr(proc)+2
+        al w3 1         ;   else write addr:= sense addr(proc)+3;
+        wa w3 x1+a50    ;
+        ds.w0 i21.      ;   control addr:= sense addr(proc)+1;
+        rl w0 x2+14     ;
+        io.w0(i20.)     ;   control(control addr,word(buf+14);
+        sx    2.11      ;   if ex<>0 then
+        jl.   i11.      ;     goto disconnect;
+        rl w3 x2+10     ;   max addr:= first addr(buf)
+        al w0 x3-2      ;       -2+max bytes(proc);
+        wa w0 x1+a70    ;   if max addr<last addr(buf) then
+        sl w0(x2+12)    ;     last addr(buf):= max addr;
+        rl w0 x2+12     ;   last addr(buf):=
+        bs w0 x2+9      ;       last addr(buf)-mode(buf);
+        rs w0 x2+12     ;   addr:= first addr(buf);
+        jl.   i9.       ;   goto check addr;
+  i4:   rl w0 x3+0      ; read point:
+        io.w0(i20.)     ;   control(control addr, word(addr));
+        sx    2.11      ;   if ex<>0 then
+        jl.   i11.      ;     goto disconnect;
+        al w3 x3+2      ;   addr:= addr+2;
+  i5:                   ; read:
+        io.  (i21.)     ;   read(read addr);
+        sx    2.11      ;   if ex<>0 then
+        jl.   i11.      ;     goto disconnect;
+        io w0(x1+a50)   ;   word:= sense(sense addr);
+        sx    2.11      ;   if ex<>0 then
+        jl.   i11.      ;     goto disconnect;
+        rs w0 x3+0      ;   word(addr):= word;
+        jl.   i8.       ;   goto increase addr;
+  i6:   rl w0 x3+0      ; write point:
+        io.w0(i20.)     ;   control(control addr, word(addr));
+        sx    2.11      ;   if ex<>0 then
+        jl.   i11.      ;     goto disconnect;
+        al w3 x3+2      ;   addr:= addr+2;
+  i7:   rl w0 x3+0      ; write:
+        io.w0(i21.)     ;   write(write addr, word(addr));
+        sx    2.11      ;   if ex<>0 then
+        jl.   i11.      ;     goto disconnect;
+  i8:                   ; increase addr:
+        al w3 x3+2      ;   addr:= addr+2;
+  i9:                   ; check addr:
+        sh w3(x2+12)    ;   if addr<=last addr(buf) then
+        jl.  (i22.)     ;     goto repeat addr;
+        ws w3 x2+10     ;   status(buf):= 0;
+        al w0 0         ;   bytes(buf):= addr-first addr(buf);
+        rs w0 x2+8      ;   characters(buf):= 0;
+  i10:  ds w0 x2+12     ; done:
+        al w0 1         ;
+        rs w0 x2+4      ;   receiver(buf):= 1;
+        am    d15-g29   ;   deliver answer(buf);
+                        ;   goto done 1;
+  i11:                  ; disconnect:
+        jl w3 g29       ;   disconnected device;
+                        ; done 1:
+  i13:  jl w3 g25       ;   next operation;
+        jl.   i1.       ;   goto start;
+
+  i15=i5-i4
+  i14=i4-i7
+  i17=i7-i6
+  i20:  0       ; control addr
+  i21:  0       ; read addr, write addr
+  i22:  0       ; repeat addr
+e.              ; end of rc 4195 graphic display
+z.      h19=g3  ; goto result 5;
+
+; spt 401 set-point terminal:
+
+; process description format:
+;
+; a48:
+; a49: <interval>
+; a10: <kind=44>
+; a11: <name>
+; a50: <device no*64>
+; a52: <reserved>
+; a53: <users>
+; a54: <next message>
+; a55: <last message>
+; a56: <interrupt address=c33>
+; a70: <command word>
+
+c.(:a91>10 a. 1:)-1       ; if include spt 401 then
+m.          spt 401
+b. i30,a0=1<23            ; begin
+w.     a0>8
+  i0:  a0>0
+  h20: jl  w3  g15        ;   check reservation;
+       dl. w1  i0.
+       jl  w3  g16        ;   check operation(8,0);
+       ld  w1  -65
+       ds  w1  x2+10      ;   word(buf+8):=word(buf+10):=
+       ds  w1  x2+14      ;   word(buf+12):=word(buf+14):=0;
+       am      (x2+6)
+       rl  w3  a29        ;   mess:=save w1(sender);
+       dl  w1  x3+10
+       ds  w1  x2+18      ;   move last four words of message to buffer;
+       dl  w1  x3+14
+       ds  w1  x2+22
+       rl  w3  b19        ;   proc:=current receiver;
+       al  w1 x3+a70     
+       rs. w1  i1.
+       al  w1  x3+a54     ;   head:=mess q(proc);
+       jl  w3  d6         ;   link(head,buf);
+       al  w2  x2+16      ;   base:=buf+16;station:=0;
+       sn  w1  x3         ;   if head=old last(head) then
+       jl.     i10.       ;   goto no old buf;
+       rl  w1  x1         ;   oldbuf:=next(head);
+       al  w1  x1+16      ;   oldbase:=oldbuf+16;
+       rl. w3  i2.
+  i13: rl. w0  (i1.)      ; loop:
+       sz  w0  x3         ;   if command(station)<>0 then
+       jl.     i11.       ;   goto update;
+  i12: al  w1  x1+1       ; next:
+       al  w2  x2+1       ;   station:=station+1;
+       ls  w3  -3
+       se  w3  0          ;   if station<8 then
+       jl.     i13.       ;   goto loop;
+       al  w1  x1-24
+       al  w0  1
+       rs  w0  x1+4       ;   result(oldbuf):=1;
+       rx  w1  4
+       jl  w3  d15        ;   deliver answer(oldbuf);
+       al  w2  x1-8
+  i10: al  w1  x2+8       ; no old buf:
+       al  w3  0          ;   for station:=0 step 1 until 7 do
+  i14: bl  w0  x2         ;   command(station):=
+       sl  w0  0          ;    if byte(base+station)>=0
+       am      1          ;    then 2
+       al  w3  x3+1       ;    else 1;
+       al  w2  x2+1
+       sl  w2  x1
+       jl.     i15.       ;   goto end message;
+       ls  w3  3
+       jl.     i14.
+
+  i11: bl  w0  x1         ; update:
+       ba  w0  x2         ;   newcount:=byte(oldbase+station)
+       sh  w0  2047       ;   +byte(base+station);
+       sh  w0  -2048      ;   if newcount=<2047
+       jl.     4          ;    and newcount=>-2048 then
+       jl.     i16.       ;    goto store newcount;
+       al  w0  1<8
+       ba  w0  x1-8       ;   byte(oldbase-8+station):=
+       hs  w0  x1-8       ;    1 shift 8 or byte(oldbase-8+station);
+       bl  w0  x1         ;   newcount:=byte(oldbase+station);
+  i16: hs  w0  x2         ; store newcount: byte(base+station):=
+       hs  w0  x1         ;   byte(oldbase+station):=newcount;
+       jl.     i12.       ;   goto next;
+
+  i15: al  w2  x2-24      ; end message:
+       rl  w1  b19
+       rs  w3  x1+a70
+       rl  w3  x1+a56
+       am     (x1+a50)
+       io      2          ;   read(device);
+       sn. w3  i17.       ;   if interrupt address(proc)<>
+       sx      2.10       ;     dummy interrupt
+       jl.     i17.       ;    and ex<>0 disconnect then
+       jl  w3  c32        ; wait: wait interrupt(proc);
+       jl      c33        ;   if regretted then set dimmy ir
+  i17:
+       ; w1=proc  w2=buf
+       al  w3  x1+a70
+       rs. w3  i1.
+       rl  w3  x2+6
+       io  w0  (x1+a50)   ;   statusword:=sense(device);
+       sl  w3  0          ;   if sender(buf)<0
+       sx      2.11       ;    or ex<>0 then
+       jl.     i18.       ;    goto disconnect;
+       al  w1  0
+       ds. w1  i7.        ;   return:=false;
+       al  w2  x2+16      ;   base:=buf+16;station:=0;
+       rl. w3  i2.
+  i19: rl. w0  (i1.)      ; loopstation:
+       sz  w0  x3         ;   if command(station)<>0 then
+       jl.     i21.       ;   goto check station;
+  i20: al  w2  x2+1       ; nextstation:
+       ls  w3  -3         ;   station:=station+1;
+       se  w3  0          ;   if station<8 then
+       jl.     i19.       ;   goto loopstation;
+       rl  w1  b19
+       al  w2  x2-24
+       rl. w0  (i1.)
+       rl. w3  i7.
+       se  w0  0          ;   if commandword=0
+       se  w3  0          ;    or return then
+       jl.     i22.       ;    goto returnbuf;
+       am      (x1+a50)
+       io  w0  3          ;   write(commandword,device);
+       sx      2.11       ;   if ex<>0 then
+       jl.     i18.       ;   then goto disconnect;
+       al  w2  x2+16
+       rl. w3  i2.
+       rl  w0  x1+a70
+  i25: sz  w0  x3         ;   for station:=0 step 1 until 7 do
+       jl.     i26.       ;   if command(station)<>0 then
+  i27: al  w2  x2+1       ;    byte(base+station):=
+       ls  w3  -3         ;     byte(base+station)-
+       se  w3  0          ;     sign(byte(base+station));
+       jl.     i25.
+       rl  w1  b19
+       jl.     i17.-2     ;   goto wait;
+  i26: bl  w1  x2
+       sh  w1  0
+       am      2
+       al  w1  x1-1
+       hs  w1  x2
+       jl.     i27.
+
+  i18: am      3          ; disconnect:result(buf):=4;
+                          ;   goto sendback;
+  i22: al  w0  1          ; returnbuf:result(buf):=1;
+       rs  w0  x2+4       ; sendback:
+       al  w0  0
+       rs  w0  x1+a70     ; commandword:=0;
+       jl  w3  d15        ;   deliver answer(buf);
+       jl      c33        ;   goto dummy interrupt;
+
+  i21: rl. w0  i6.        ; checkstation:
+       sz  w0  x3         ;   if status(station)<>0 then
+       jl.     i23.       ;   goto insert status;
+       bl  w1  x2
+       se  w1  0          ;   if byte(base+station)<>0 then
+       jl.     i20.       ;   goto nextstation;
+  i24: ac  w0  x3+1       ; zerocommand:
+       la. w0  (i1.)
+       rs. w0  (i1.)      ;   command(station):=0;
+       jl.     i20.       ;   goto nextstation;
+
+  i23: bl  w1  x2-8       ; insert status:
+       la  w0  6          ;   byte(base-8+station):=
+       sz. w0  (i3.)      ;   byte(base-8+station) or
+       al  w1  x1-1<11    ;   (if manual(status(station)) then
+       sz. w0  (i4.)      ;    1 shift 11) or
+       al  w1  x1+1<5     ;   (if upper(status(station)) then
+       sz. w0  (i5.)      ;    1 shift 5) or
+       al  w1  x1+1<4     ;   (if lower(status(station)) then
+       hs  w1  x2-8       ;    1 shift 4);
+       bl  w1  x2
+       se  w1  0          ;   if byte(base+station)<>0 then
+       rs. w1 i7.        ;   return:=true;
+       jl.     i24.       ;   goto zerocommand;
+
+                          ; comment:
+  i1:  0                  ;   address of commandword(proc)
+  i2:  8.7000 0000        ;   commandmask(0)
+  i3:  8.4444 4444        ;   manual status mask
+  i4:  8.2222 2222        ;   upper limit status mask
+  i5:  8.1111 1111        ;   lower limit status mask
+  i6:  0                  ;   statusword
+  i7:  0                  ;   return;
+e.                        ; end of spt 401;
+z.     h20=g3             ; goto result 5;
+
+; dct 2000:
+;
+; the dct 2000 is treated as two logical devices with two
+; process descriptions, one for output (main process description)
+; and one for input; messages sent to the input process are after
+; checking of reservation and operation linked to the output
+; process description.
+;
+; main process description format(output):
+;
+; a48:
+; a49: <interval>
+; a10: <kind=48>
+; a11: <name of logical output device>
+; a50: <device number*64>
+; a52: <reserved>
+; a53: <users>
+; a54: <next message>
+; a55: <last message>
+; a56: <interrupt address=c39>
+; a70: <main proc. description address>
+; a71: <saved shift>
+; a72: <saved address>
+; a73: <saved last>
+; a74: <shift>
+; a75: <address>
+; a76: <count>
+; a77: <parity>
+; a78: <repeat>
+; a78+2: <link 0>
+; a78+4: <link 1>
+; a78+6: <link 2>
+; a78+8: <saved char>
+; a78+10:<link 3>
+; a78+12:<extra shift>
+; a78+14:<extra addr>
+; a78+16:<extra buf>
+; a78+70:<extra buf top><mcc switch>
+; a78+72:<ack count>
+; a78+74:<input proc. description address>
+; a78+76:<eof test>
+; a78+78:<eof word>
+; a78+80:<eot><state>
+; a78+82:<end line char>
+; a78+84:<nl0><nl1>
+; a78+86:<vt0><vt1>
+; a78+88:<ff0><ff1>
+; a78+90:<eof count><eof flag>
+; a78+92:<control test><old inter>
+; a78+94:<timer count>
+; a78+96:<max timer>
+; a78+98:<inter exit>
+; a78+100:<stand by count>
+; a78+102:<special ack count>
+;
+; process description format(input):
+;
+; a48:
+; a49: <interval>
+; a10: <kind=48>
+; a11: <name of logical input device>
+; a50: <device number*64>
+; a52: <reserved>
+; a53: <users>
+; a54: <next message> (not used)
+; a55: <last message> (not used)
+; a56: <interrupt address=c33>
+; a70: <main proc. description address>
+;
+;      state:  0  output
+;              1  disconnect input
+;              2  wait for output end
+;              3  input
+
+c.(:a91>9a.1:)-1        ; if include dct 2000 then
+m.          dct 2000
+b.i80   ,a0=1<23        ; begin
+w.      a0>0+a0>3+a0>14 ;
+  i60:  a0>0+a0>4+a0>10 ;
+        a0>0+a0>5       ;
+  i0:   a0>0            ;
+  h21:  jl w3 g15       ;   check reservation;
+        rl w1 b19       ;
+        se w1(x1+a70)   ;
+        am    i60-i0    ;   if current receiver<>main proc(proc) then
+        dl.w1 i0.       ;     check operation(0.3.14,0.4.10)
+        jl w3 g16       ;     else chech operation(0.5,0);
+        jl w3 g17       ;   link operation;
+        jl.   i53.      ;   goto start1;
+  i1:                   ; start:
+        rl w1 x1+a70    ;
+        jl w3 c32       ;   wait interrupt(main proc);
+        jl.   i18.      ;   if regretted then goto exam queue;
+        bz w0 x1+a78+81 ;
+        sn w0 3         ;   if state(proc) = 3 then
+        rl w1 x1+a78+74 ;     proc:= input proc(proc);
+        rs w1 b19       ;
+        rl w2 x1+a54    ;
+        rs w2 b18       ;
+  i53:                  ; start1:
+        bz w0 x2+8      ;   oper:= operation(buf);
+        am   (x1+a70)   ;
+        bz w3 a78+81    ;   state:= state(main proc(proc));
+        so w0 2.1       ;   if oper(23) <> 1 then
+        jl.   i17.      ;     goto sense;
+        sl w3 2         ;   if state < 2 then
+        jl.   i61.      ;   begin
+        sn w1(x1+a70)   ;     if proc = main proc(proc) then
+        jl.   i62.      ;       goto init;
+        jl.   i70.      ;     goto disconnect1;
+                        ;   end;
+  i61:  se w1(x1+a70)   ;   if proc = main proc(proc)
+        sn w3 2         ;   or state = 2 then
+        jl   (b20)      ;     return;
+  i62:  rl w1 x1+a70    ; init:  proc:= main proc(proc);
+        rs w1 b19       ;
+        dl w0 x2+12     ;   saved addr(proc):= first addr(buf);
+        ds w0 x1+a73    ;   saved last]proc):= last addr(buf);
+        jl w3 g31       ;   increase stop count;
+        bz w0 x2+8      ;
+        se w0 5         ;   if operation(buf)<>5 then
+        jl.   i7.       ;     goto input;
+        al w0 -16       ; output:
+        rs w0 x1+a71    ;   saved shift(proc):= -16;
+  i2:   rl w0 x1+a73    ; next output:
+        ws w0 x1+a72    ;
+        rl w3 x1+a78+14 ;   if extra addr(proc)<>-1
+        sn w3 -1        ;       or saved last(proc)
+        sl w0 54        ;       -saved addr(proc)>=54 then
+        jl.   i22.      ;     goto set repeat;
+        sh w0 -1        ;   if saved addr(proc)>saved last addr(proc) then
+        jl.   i15.      ;     goto done output;
+        rl w0(x1+a73)   ;
+  i58:  al w3 0         ;   if word(saved last(proc))
+        ld w0 8         ;     contents an <em> character
+        sn w3 25        ;     then
+        jl.   i22.      ;     goto set repeat;
+        se w0 0         ;
+        jl.   i58.      ;
+        rl w2 x1+a73    ;   from:= saved last(proc);
+        al w3 x1+a78+70 ;   to:= extra buf top;
+  i21:  rl w0 x2+0      ; again:
+        rs w0 x3-2      ;   word(to-2):= word(from);
+        al w2 x2-2      ;   from:= from-2;
+        al w3 x3-2      ;   to:= to-2;
+        sl w2(x1+a72)   ;   if from>=saved addr(proc) then
+        jl.   i21.      ;     goto again;
+        rl w2 x1+a71    ;   extra shift(proc):= saved shift(proc);
+        ds w3 x1+a78+14 ;   extra addr(proc):= to;
+        al w3 0         ;   saved shift(proc):=0;
+        rl w0 x1+a73    ;   saved addr(proc):=saved last(proc);
+        ds w0 x1+a72    ;
+        jl.   i15.      ;   goto done output;
+  i22:  al w0 3         ; set repeat:
+        rs w0 x1+a78    ;   repeat(proc):= 3;
+  i3:   jl w3 g34       ; repeat output:
+        jl.   i15.      ;   exam sender(done output);
+        jl.w3 i45.      ;   check repeat(
+        jl.   i14.      ;       output parity);
+        jl.w3 i39.      ;   write control(<mcc>);
+        jl.w3 i43.      ;   init message;
+  i4:   rs w2 x1+a74    ; next outchar:
+        jl.w3 i44.      ;   check count(
+        jl.   i50.      ;       check new line);
+        rl w2(x1+a75)   ;   word:= word(addr(proc));
+        ls w2(x1+a74)   ;   word:= word shift shift(proc);
+        la w2 g54       ;   char:= word(17:23);
+        sl w2 13        ;   if char<13
+        jl.   6         ;
+        sl w2 10        ;   or char>=10 then
+        jl.   i56.      ;     goto fill 2;
+        jl.w3 i38.      ;   write char(char);
+        al w2 x2+8      ;   shift(proc):= shift(proc)+8;
+        sh w2 0         ;   if shift(proc)<=0 then
+        jl.   i4.       ;     goto next outchar;
+        rl w3 x1+a75
+        al w3 x3+2      ;   addr(proc):= addr(proc)+2;
+        al w2 -16       ;   shift(proc):= -16;
+        al w0 -1        ;
+        sn w3 x1+a78+70 ;   if addr(proc)=extra buf top then
+        rs w0 x1+a78+14 ;     extra addr(proc):=-1;
+        sn w3 x1+a78+70 ;   if addr(proc)=extra buf top then
+        rl w3 x1+a72    ;     addr(proc):= saved addr(proc);
+        ds w3 x1+a75
+        sh w3(x1+a73)   ;   if addr(proc)<=saved last(proc) then
+        jl.   i4.       ;     goto next outchar;
+  i5:                   ; fill:
+        jl.w3 i44.      ;   check count(
+        jl.   i6.       ;       end output);
+        jl.w3 i37.      ;   write char(<sp>);
+        jl.   i5.       ;   goto fill;
+  i50:                  ; check new line:
+        rl w2(x1+a75)   ;   word:=word(addr(proc));
+        ls w2(x1+a74)   ;   word:=word shift shift(proc);
+        la w2 g54       ;   char:=word(17:23);
+        sl w2 13        ;   if char>=13 then
+        jl.   i6.       ;     goto end output;
+        sh w2 9         ;   if char<=9 then
+        jl.   i6.       ;     goto end output;
+  i56:                  ; fill2:
+        al w2 x2-10     ;
+        ls w2 1         ;   end line char(proc):=
+        rs w2 x1+a78+82 ;    (char-10)*2;
+        al w3 1         ;
+        wa w3 x1+a76    ;   count(proc):=count(proc)+1;
+        rs w3 x1+a76    ;
+        dl w3 x1+a75    ;
+        al w2 x2+8      ;   shift(proc):= shift(proc)+8;
+        sh w2 0         ;   if shift(proc)>0 then
+        jl.   i59.      ;
+        al w3 x3+2      ;     begin
+        sn w3 x1+a78+70 ;     addr(proc):=addr(proc)+2;
+        al w2 -1        ;       if addr(proc)=extra buf top then
+        sn w2 -1        ;         begin
+        rs w2 x1+a78+14 ;           extra addr(proc):=-1;
+        sn w2 -1        ;           addr(proc):=saved addr(proc);
+        rl w3 x1+a72    ;         end;
+        al w2 -16       ;       shift(proc):=-16;
+  i59:  ds w3 x1+a75    ;     end;
+        jl.   i5.       ;   goto fill;
+  i6:                   ; end output:
+        jl.w3 i36.      ;   write char(<eom>);
+        jl.w3 i32.      ;   write char(parity(proc));
+        al w0 1         ;
+        hs w0 x1+a78+92 ;   control test(proc):= 1;
+        jl.w3 i46.      ;   read acknowledge(
+        jl.   i57.      ;       sorry output);
+                        ;   if extra addr(proc)=-1 then
+        dl w0 x1+a75    ;     begin saved shift(proc):=shift(proc);
+        rl w2 x1+a78+14 ;       saved addr(proc):=addr(proc);
+                        ;     end
+        se w2 -1        ;   else
+        am    a78+14-a72;     begin extra shift(proc):=shift(proc);
+        ds w0 x1+a72    ;       extra addr(proc):=addr(proc);
+                        ;     end;
+        al w0 0         ;
+        hs w0 x1+a78+92 ;   control test(proc):= 0;
+        jl.   i2.       ;   goto next output;
+  i57:                  ; sorry output:
+        bl w2 x1+a78+70 ;   block parity bit:=
+        rx w2 x1+a78+70 ;       if block parity bit=1
+        hs w2 x1+a78+70 ;       then 0 else 1;
+        al w0 0         ;
+        hs w0 x1+a78+92 ;   control test(proc):= 0;
+        jl.   i3.       ;   goto repeat output;
+  i7:   al w0 16        ; input:
+        rs w0 x1+a71    ;   saved shift(proc):= 16;
+  i8:   rl w0 x1+a73    ; next input:
+        ws w0 x1+a72    ;   if saved last(proc)
+        sh w0 50        ;       -saved addr(proc)<=50 then
+        jl.   i13.      ;     goto done input;
+        jl.w3 i47.      ;   send acknowledge;
+        al w0 3         ;
+        rs w0 x1+a78    ;   repeat(proc):= 3;
+        jl.   i9.       ;   goto repeat input;
+  i54:                  ; send naknowledge 2:
+        jl.w3 i30.      ;   read char(char);
+        se w3 129       ;   if char<><eom> then
+        jl.   i54.      ;     goto send naknowledge 2;
+  i55:                  ; send naknowledge 1:
+        jl.w3 i30.      ;   read char(char);
+  i52:                  ; send naknowledge 0:
+        jl.w3 i48.      ;   send naknowledge;
+  i9:   am   (x1+a78+74); repeat input:
+        rl w2 a54       ;   current buf:=
+        rs w2 b18       ;     next message(input proc(proc));
+        jl w3 g34       ;   exam sender(done input);
+        jl.   i13.      ;
+        jl.w3 i45.      ;   check repeat(
+        jl.   i12.      ;       input parity);
+        jl.w3 i31.      ;   read control(char);
+        bz.w3 x3+i28.   ;   char:= output table(char);
+        se w3 97        ;   if char=<eot> then
+        jl.   i64.      ;   begin
+  i72:  al w0 1         ; set eot:    eot(proc):= 1;
+        hs w0 x1+a78+80 ;     status:= 1 shift 23 + 1 shift 18;
+        rl.w3 i41.      ;     goto input eot;
+        jl.   i24.      ;   end;
+  i64:  so w3 2.11000   ;   if char <> <mcc> then
+        jl.   i54.      ;     goto send naknowledge 2;
+        jl.w3 i43.      ;   init message;
+  i10:  rs w2 x1+a74    ; next inchar:
+        jl.w3 i44.      ;   check count(
+        jl.   i11.      ;       end input);
+        jl.w3 i30.      ;   read char(char);
+        ls w3 x2+0      ;   word:= char shift shift(proc);
+        se w2 16        ;   if shift(proc)<>16 then
+        lo w3(x1+a75)   ;     word:= word or word(addr(proc));
+        rs w3(x1+a75)   ;   word(addr(proc)):= word;
+        al w2 x2-8      ;   shift(proc):= shift(proc)-8;
+        sl w2 0         ;   if shift(proc)>=0 then
+        jl.   i10.      ;     goto next inchar;
+        al w0 2         ;
+        wa w0 x1+a75    ;   addr(proc):= addr(proc)+2;
+        rs w0 x1+a75    ;
+        al w2 16        ;   shift(proc):= 16;
+        jl.   i10.      ;   goto next inchar;
+  i11:                  ; end input:
+        jl.w3 i30.      ;   read char(char);
+        se w3 129       ;   if char<><eom> then
+        jl.   i55.      ;     goto send naknowledge 1;
+        jl.w3 i30.      ;   read char(char);
+        rl w0 x1+a77    ;
+        sz w0 2.111111  ;   if parity(proc)(18:23)<>0 then
+        jl.   i52.      ;     goto send naknowledge 0;
+        al w3 10        ;   char:= 10;
+        ls w3 x2+0      ;   word:= char shift shift(proc);
+        se w2 16        ;   if shift(proc)<>16 then
+        lo w3(x1+a75)   ;     word:= word or word(addr(proc));
+        rs w3(x1+a75)   ;   word(addr(proc)):= word;
+        al w2 x2-8      ;   shift(proc):= shift(proc)-8;
+        rl w3 x1+a75
+        sl w2 0         ;   if shift(proc)<0 then
+        jl.   i51.      ;     begin
+        al w3 x3+2      ;       addr(proc):= addr(proc)+2;
+        al w2 16        ;       shift(proc):= 16
+                        ;     end;
+  i51:  ds w3 x1+a72    ;   saved shift(proc):= shift(proc);
+                        ;   saved addr(proc):= addr(proc);
+        rl w0 x1+a78+76 ;   test:=eof test(proc);
+        rl w2 x3-54     ;   word:=word(addr(proc)-54);
+        se w0 0         ;   if test=0
+        se w2(x1+a78+78);   or word<>eof word(proc) then
+        jl.   i8.       ;     goto next input;
+        am    16-22     ; input eof:   status:=1<16
+  i12:  am    22+65     ; input parity:     or 1<22
+  i13:  al w2 -65       ; done input:       or 0;
+        al w3 1         ;
+        ls w3 x2+0      ;
+  i24:  rl w2 x1+a78+74 ; input eot:
+        rs w2 b19       ;   current proc:= input proc(proc);
+        rl w2 x2+a54    ;
+        rs w2 b18       ;   current buf:= next message(input proc(proc));
+        ac w2(x1+a71)   ;   shift:= -saved shift(proc);
+        jl.   i16.      ;   goto done;
+  i14:  am   (g58)      ; output parity: status:= 1<22
+  i15:  al w3 0         ; done output:         or 0;
+        rl w2 x1+a71    ;   shift:= saved shift(proc);
+  i16:  as w2 -3        ; done:
+        am    x2+2      ;   count:= shift/8+2;
+        al w0 x3+0      ;
+        rl w2 x1+a72    ;   addr:= addr(proc);
+        jl w3 g33       ;   prepare answer(status,count,addr);
+        rl w0 g20       ;
+        sz w0(g58)      ;   if status(1)<>0 then
+        al w2 x2-81     ;     characters:=characters-81;
+        sh w1 -1        ;   if characters<=-1 then
+        al w1 0         ;     charracters:=0;
+        rs w1 g23       ;   error free(buf):=characters;
+        jl w3 g32       ;   decrease stop count;
+        jl w3 g18       ;   deliver result(1);
+  i18:  rl w1 b19       ; exam queue:
+        rl w1 x1+a70    ;   proc:= main proc(proc);
+        bz w0 x1+a78+81 ;   state:= state(proc);
+        sh w0 1         ;   if state <= 1 then
+        jl.   i67.      ;     goto exam1;
+        sn w0 2         ;   if state = 2 then
+        al w0 3         ;     state:= 3;
+        hs w0 x1+a78+81 ;   state(proc):= state;
+        bz w3 x1+a78+80 ;
+        sn w3 0         ;   if eot(proc) = 0 then
+        jl.   i66.      ;     goto exam0;
+        al w3 0         ;
+        rs w3 x1+a78+80 ;   eot(proc):= state(proc):= 0;
+        rl w1 x1+a78+74 ;
+        rs w1 b19       ;   current proc:= input proc(proc);
+  i65:  rl w2 x1+a54    ; next:  buf:= next message(proc);
+        sn w2 x1+a54    ;   if buf = addr(next message(proc)) then
+        jl.   i67.      ;     goto exam1;
+        rs w2 b18       ;
+        jl w3 g29       ;   disconnected device;
+        jl.   i65.      ;   goto next;
+  i66:  rl w1 x1+a78+74 ; exam0:
+        se w1 x1+0      ;   proc:= input proc(proc)
+  i67:  rl w1 x1+a70    ; exam1: or main proc(proc);
+        rs w1 b19       ;
+        jl w3 g64       ;   exam queue(
+        jl.   i20.      ;     close transmission);
+        jl.   i1.       ;   goto start;
+  i19:  bz w0 x1+a78+81 ; disconnect:
+        sn w0 3         ;   if state(proc) = 3 then
+        rl w1 x1+a78+74 ;     proc:= input proc(proc);
+        rs w1 b19       ;
+        rl w2 x1+a54    ;
+        rs w2 b18       ;
+        jl w3 g32       ;   decrease stop count;
+        jl w3 g29       ;   disconnected device;
+  i20:  al w3 c33+2     ; close transmission:
+        rl w1 x1+a70    ;   proc:= main proc(proc);
+        am   (x1+a78+74);   interrupt addr(input proc(proc)):=
+        rs w3 a56       ;     dummy interrupt;
+        al w3 0         ;
+        rs w3 x1+a78+92 ;   control test(proc):=old inter(proc):= 0;
+        al.w3 i33.      ;
+        al w3 x3+2      ;
+        rs w3 x1+a56    ;   interrupt addr(proc):=stand by;
+        jl   (b20)      ;   goto return;
+  i17:                  ; sense:
+        se w0 0         ;   if oper <> 0 then
+        jl.   i68.      ;     goto eof;
+        bz w0 x2+9      ;
+        se w0 0         ;   if mode(buf) = 0
+        sl w3 2         ;   or state >= 2 then
+        jl.   i69.      ;     goto no oper;
+        al w3 x3+1      ;   state:= state + 1;
+        rl w2 x1+a70    ;
+        hs w3 x2+a78+81 ;   state(main proc):= state;
+        sn w3 1         ;   if state = 1 then
+        jl.   i70.      ;     goto disconnect1;
+        al w0 x2+a54    ;
+        sn w0(x2+a54)   ;   if message queue empty then
+        al w3 x3+1      ;     state:= state + 1;
+        hs w3 x2+a78+81 ;   state(main proc):= state;
+        jl.   i69.      ;   goto no oper;
+  i68:  rl w3 x2+10     ; eof:
+        bz w2 x2+9      ;   eof test(proc):= mode(buf);
+        am   (x1+a70)   ;   eof word(proc):= word(buf+10);
+        ds w3 a78+78    ;
+  i69:  am    g26-g29   ; no oper:  no operation;  goto exam2;
+  i70:  jl w3 g29       ; disconnect1: disconnected device;
+  i71:  jl w3 g64       ; exam2:  exam queue(
+        jl   (b20)      ;            return);
+        jl.   i53.      ;   goto start1;
+
+  i41:  1<23+1<18
+
+
+; input table
+;        0   1   2   3   4   5   6   7   8   9
+h.i27:   26, 33, 45, 26, 49, 26, 26, 52, 53, 26;   +0
+         26, 56, 26,124, 59, 26, 43, 26, 26, 60;  +10
+         26, 98, 99, 26, 26,102,103, 26,105, 26;  +20
+         26, 59, 39, 26, 26, 37, 26,107,108, 26;  +30
+         26,111,112, 26,114, 26, 26, 62, 26, 40;  +40
+         44, 26, 47,128, 26,117,118, 26, 26,121;  +50
+         26, 41, 34, 26, 32, 26, 26, 48, 26, 50;  +60
+         51, 26, 26, 54, 55, 26, 57, 26, 26, 25;  +70
+         26, 38, 46, 26, 97,129, 26,100,101, 26;  +80
+         26,104, 26, 61, 63, 26, 26, 42, 36, 26;  +90
+        106, 26, 26,109,110, 26, 26,113, 26,123; +100
+         39, 26, 95, 26, 26, 58, 26,115,116, 26; +110
+         26,119,120, 26,122, 26, 26,125        ; +120
+
+; output table
+;        0   1   2   3   4   5   6   7   8   9
+h.i28:  128,128,128,128,128,128,128,128,128,128;   +0
+        128,128,128,128,128,128,128,128,128,128;  +10
+        128,128,128,128,128, 79,128,128,128,128;  +20
+        128,128, 64,  1, 61,128, 13, 49, 16, 32;  +30
+        109,127, 97,115, 50,  2, 82, 52, 67,  4;  +40
+         69, 70,  7,  8, 73, 74, 11, 76, 81, 14;  +50
+         94, 31, 62, 19, 35, 84, 21, 22, 87, 88;  +60
+         25, 26, 91, 28,100, 37, 38,103,104, 41;  +70
+         42,107, 44,117,118, 55, 56,121,122, 59;  +80
+        124, 93,110, 98, 47,112,128, 84, 21, 22;  +90
+         87, 88, 25, 26, 91, 28,100, 37, 38,103; +100
+        104, 41, 42,107, 44,117,118, 55, 56,121; +110
+        122, 59,124, 93,110, 98,128,128, 53, 85; +120
+
+; procedure read char(char);
+;       call:           exit:
+; w0                    destroyed
+; w1    proc            proc
+; w2                    shift(proc)
+; w3    link            char;
+w.i30:  rs w3 x1+a78+10 ; begin
+        al w0 0         ;
+        rs w0 x1+a78+94 ;   timer count(proc):=0;
+        rl w1 x1+a78+74 ;   proc:= input proc(proc);
+        jl w3 c32       ;   wait interrupt(proc);
+        am    0         ;
+        rl w1 x1+a70    ;   proc:=main proc(proc);
+        rl w0 x1+a54    ;
+        ds w1 b19       ;
+        rl w0 x1+a56    ;
+        sz w0 2.1       ;   if interrupt addr(proc)=odd then
+        jl.   i18.      ;     goto exam queue;
+        io w3(x1+a50)   ;   sense device(status);
+        sx    2.11      ;   if ex<>0 then
+        jl.   i19.      ;     goto disconnect;
+        la w3 g54       ;   char:= status(17:23);
+        al w0 x3+0      ;
+        lx w0 x1+a77    ;   if char<><eom> then
+        se w3 85        ;     parity(proc):= parity(proc)
+        rs w0 x1+a77    ;         exor char;
+        bz.w3 x3+i27.   ;   char:= input table(char)
+        rl w2 x1+a74    ;
+        jl   (x1+a78+10); end;
+
+; procedure read control(char);
+;       call:           exit:
+; w0                    destroyed
+; w1    proc            proc
+; w2                    shift(proc)
+; w3    link            char;
+b.j3                    ; begin
+w.i31:  rs w3 x1+a78+4  ;
+        al w0 0         ;
+        rs w0 x1+a78+72 ;   ack count(proc):=0;
+   j0:                  ; start:
+        jl.w3 i30.      ;   read char(char);
+        sn w3 128       ;   if char<><sync> then
+        jl.   j2.       ;   begin
+        al w0 1         ;
+        wa w0 x1+a78+72 ;     ack count(proc):=
+        rs w0 x1+a78+72 ;       ack count(proc)+1;
+        rl w3 x1+a78+4  ;
+        sl w0 4         ;     if count<4
+        se.w3 i63.      ;       or not called from read acknowlegde then
+        jl.   j0.       ;       goto start;
+        al w3 50        ;     char:=<ack>;
+        rl w2 x1+a74    ;     goto exit;
+        jl.   j3.      ;   end;
+  j2:   jl.w3 i30.      ;   read char(char);
+        se w3 128       ;   if char<><sync> then
+        jl.   j0.       ;     goto start;
+  j1:                   ; after sync:
+        jl.w3 i30.      ;   read char(char);
+        sn w3 128       ;   if char=<sync> then
+        jl.   j1.       ;     goto after sync;
+        se w3 32        ;   if char<><som> then
+        jl.   j0.       ;     goto start;
+        al w0 0         ;
+        rs w0 x1+a77    ;   parity(proc):= 0;
+        jl.w3 i30.      ;   read char(char);
+   j3:  al w0 0         ; exit:
+        hs w0 x1+a78+93 ;   old inter(proc):=0;
+        jl   (x1+a78+4) ;   exit;
+e.                      ; end;
+
+; procedure write char(parity(proc));
+w.i32:  al w0 63        ; begin
+        la w0 x1+a77    ;   char:= parity(proc)(18:23);
+        rs w3 x1+a78+2  ;   goto outchar;
+        jl.   i23.      ; end;
+
+w.i33:  am    0         ; stand by:
+        bz w0 x1+a78+92 ;
+        sn w0 0         ;   if control test(proc) = 0 then
+        jl.   i78.      ;     goto read;
+        al w0 1         ;
+        wa w0 x1+a78+100;   stand by count(proc):=
+        rs w0 x1+a78+100;     stand by count(proc)+1);
+        al w0 1         ;
+        wa w0 x1+a78+94 ;   timer count(proc):=
+        rs w0 x1+a78+94 ;     timer count(proc)+1;
+        sh w0(x1+a78+96);   if timer count <= max timer(proc) then
+        jl.   i78.      ;     goto read;
+        io w3(x1+a50)   ;   char:=sense(device);
+        sx    2.11      ;   if ex<>0 then
+        jl.   i19.      ;     goto disconnect;
+        am   (x1+a50)   ;
+        io    2         ;   read(device);
+        al w0 127       ;
+        am   (x1+a50)   ;
+        io w0 3         ;   write(device);
+        al w3 50        ;   char:= 50;
+        bz w0 x1+a78+93 ;   inter:= old inter(proc);
+        rs w3 x1+a78+92 ;   control test(proc):=old inter(proc):= 0;
+        al w3 127       ;   char:=127;
+        rl w2 x1+a74    ;
+        jl   (x1+a78+4) ;   goto exit for read control;
+  i78:                  ; read:
+        am   (x1+a50)   ;
+        io    2         ;   read device;
+  c39:  al w0 127       ; first entry:
+        am   (x1+a50)   ;
+        io w0 3         ;   write device(127);
+        jl w3 c32       ;   wait interrupt(proc);
+        am    0         ;
+        jl.   i33.      ;   goto stand by;
+
+; procedure write char(<som>);
+w.i34:  am    32-128    ;     or <som>
+
+; procedure write char(<sync>);
+w.i35:  am    128-129   ;     or <sync>
+
+; procedure write char(<eom>);
+w.i36:  am    129-32    ;     or <eom>
+
+; procedure write char(<sp>);
+w.i37:  al w2 32        ;     or <sp>;
+
+; procedure write char(char);
+;       call:           exit:
+; w0                    destroyed
+; w1    proc            proc
+; w2    char            shift(proc)
+; w3    link            destroyed;
+b.j1
+w.i38:  rs w3 x1+a78+2  ; begin
+        bz.w0 x2+i28.   ;   char:= output table(char);
+        sh w0 127       ;   if char>127 then
+        jl.   i23.      ;     begin
+        al w0 1         ;       count(proc):= count(proc)+1;
+        wa w0 x1+a76    ;       goto exit
+        rs w0 x1+a76    ;     end;
+        jl.   j1.
+  i23:  am   (x1+a50)   ; outchar:
+        io w0 3         ;   write device(char);
+        sx    2.11      ;   if ex<>0 then
+        jl.   i19.      ;     goto disconnect;
+        rl w3 0
+        lx w0 x1+a77    ;   if char<><eom> then
+        se w3 85        ;     parity(proc):= parity(proc)
+        rs w0 x1+a77    ;         exor char;
+        jl w3 c32       ;   wait interrupt(proc);
+        jl.   i18.      ;   if regretted then goto exam queue;
+  j1:   rl w2 x1+a74    ; exit:
+        jl   (x1+a78+2) ; end;
+e.
+
+; procedure write control(<mcc>);
+w.i39:  bl w2 x1+a78+70 ; char:=<mcc>;
+        rx w2 x1+a78+70 ;   block parity bit:=
+        hs w2 x1+a78+70 ;       if block parity bit=1
+        bl w2 5         ;       then 0 else 1;
+        wa w2 x1+a78+82 ;
+        am    x2+0      ;
+        bl w2 x1+a78+84 ;
+        am    x2-50     ;
+
+; procedure write control(<ack>);
+w.i40:  am    50-51     ;     or <ack>
+
+; procedure write control(<spec ack>);
+w.i77:  am    51-49     ;     or <spec ack>
+
+; procedure write control(<nak>);
+;       call:           exit:
+; w0                    destroyed
+; w1    proc            proc
+; w2                    shift(proc)
+; w3    link            destroyed;
+w.i42:  al w2 49        ;    or <nak>;
+        rs w2 x1+a78+8  ; begin
+        rs w3 x1+a78+4  ;   saved char(proc):= char;
+        al w3 c33+2     ;
+        am   (x1+a78+74);   interrupt addr(input proc(proc):=
+        rs w3 a56       ;     dummy interrupt;
+        al w0 10        ;
+        rs w0 x1+a78+10 ;   for i:=1 step 1 until 10 do
+        jl.w3 i35.      ;     write char(<sync>);
+        al w0 -1        ;
+        wa w0 x1+a78+10 ;
+        se w0 0         ;
+        jl.   -10       ;
+        jl.w3 i34.      ;   write char(<som>);
+        al w0 0         ;
+        rs w0 x1+a77    ;   parity(proc):= 0;
+        rl w2 x1+a78+8  ;   char:= saved char(proc);
+        jl.w3 i38.      ;   write char(char)
+        jl   (x1+a78+4) ; end;
+
+; procedure init message;
+;       call:           exit:
+; w0                    destroyed
+; w1    proc            proc
+; w2                    shift(proc)
+; w3    link            destroyed;
+w.i43:  rs w3 x1+a76    ; begin
+                        ;   shift(proc):= extra shift(proc);
+        al.w0 i10.      ;
+        dl w3 x1+a78+14 ;   addr(proc):= extra addr(proc);
+        se w0(x1+a76)   ;   if called from repeat input
+        sn w3 -1        ;   or extra addr(proc)=-1 then
+                        ;     begin
+        dl w3 x1+a72    ;       shift(proc):= saved shift(proc);
+        ds w3 x1+a75    ;       addr(proc):= saved addr(proc);
+        al w3 80        ;     end;
+        rx w3 x1+a76    ;   count(proc):= 80
+        jl    x3+0      ; end;
+
+; procedure check count(sorry);
+;       call:           exit:
+; w0                    destroyed
+; w1    proc            proc
+; w2                    destroyed
+; w3    link            link;
+w.i44:  am    a76-a78   ; begin
+                        ;   count(proc):= count(proc)-1;
+                        ;   if count(proc)<0 then
+                        ;     goto sorry
+                        ; end;
+
+; procedure check repeat(sorry);
+;       call:           exit:
+; w0                    destroyed
+; w1    proc            proc
+; w2                    destroyed
+; w3    link            link;
+w.i45:  al w2 x1+a78    ; begin
+        al w0 -1        ;
+        wa w0 x2+0      ;   repeat(proc):= repeat(proc)-1;
+        rs w0 x2+0      ;
+        sl w0 0         ;   if repeat(proc)<0 then
+        jl    x3+2      ;     goto sorry
+        jl    x3+0      ; end;
+
+; procedure read acknowledge(sorry);
+;       call:           exit:
+; w0                    destroyed
+; w1    proc            proc
+; w2                    shift(proc)
+; w3    link            destroyed;
+b.j1
+w.i46:  rs w3 x1+a78+6  ; begin
+        al w0 127
+        am   (x1+a50)
+        io w0 3         ;   write device(127);
+        sx    2.11      ;   if ex<>0 then
+        jl.   i19.      ;     goto disconnect;
+        al.w0 j0.       ;   write interrupt addr(proc):=continue;
+        rs w0 x1+a56    ;
+        al w0 0         ;
+        rs w0 x1+a78+100;   stand by count(proc):=0;
+        jl.   j1.       ;   goto start read;
+        jl.   i18. ;note: relative -6;   if regretted then goto exam queue;
+  j0:   al w0 127       ; continue:
+        rl w3 x1+a50    ;   write device(127);
+        io w0 x3+3
+        sx    2.11      ;   if ex<>0 then
+        jl.   i19.      ;     goto disconnect;
+        io    x3+2      ;   read device;
+        sx    2.11      ;   if ex<>0 then
+        jl.   i19.      ;     goto disconnect;
+        al.w0 i33.+2    ;   write interrupt addr(proc):=
+        rs w0 x1+a56    ;       stand by;
+        jl   (b20)      ;   goto return;
+  j1:   jl.w3 i31.      ; start read:
+                        ;   read control(char);
+   i63: al w0 c33+2     ;
+        am   (x1+a78+74);   interrupt addr(input proc(proc)):=
+        rs w0 a56       ;     dummy interrupt;
+        se w3 50        ;   if char<><ack> then
+        jl   (x1+a78+6) ;     goto sorry;
+        rl w3 x1+a78+6  ;   
+        jl    x3+2      ; end; 
+e.
+
+; procedure send naknowledge;
+;       call:           exit:
+; w0                    destroyed
+; w1    proc            proc
+; w2                    shift(proc)
+; w3    link            destroyed;
+w.i48:  rs w3 x1+a78+6  ; begin
+        jl.w3 i42.      ;   write control(<nak>);
+        jl.   i49.      ;   goto end of message
+                        ; end;
+
+; procedure send acknowledge;
+;       call:           exit:
+; w0                    destroyed
+; w1    proc            proc
+; w2                    shift(proc)
+; w3    link            destroyed;
+w.i47:  rs w3 x1+a78+6  ; begin
+        jl.w3 i40.      ;   write control(<ack>);
+                        ; end of message:
+  i49:  jl.w3 i36.      ;   write char(<eom>);
+        jl.w3 i32.      ;   write char(parity(proc))
+        al w0 127
+        am   (x1+a50)
+        io w0 3         ;   write device(127);
+        sx    2.11      ;   if ex<>0 then
+        jl.   i19.      ;     goto disconnect;
+        jl w3 c32       ;   wait interrupt(proc);
+        jl.   i18.      ;   if regretted then goto exam queue;
+        al w0 127  
+        rl w3 x1+a50    ;   write device(127);
+        io w0 x3+3
+        sx    2.11      ;   if ex<>0 then
+        jl.   i19.      ;     goto disconnect;
+        io    x3+2      ;   read device;
+        sx    2.11      ;   if ex<>0 then
+        jl.   i19.      ;     goto disconnect;
+        al.w0 i33.+2    ;   write interrupt addr(proc):=
+        rs w0 x1+a56    ;     stand by;
+        jl   (x1+a78+6) ; end;
+
+e.                      ; end dct 2000;
+z.      h21=g3          ; goto result 5;
+
+
+
+; wdt 401 watch dog timer:
+;
+; process description format:
+;
+; a48:
+; a49: <interval>
+; a10: <kind=58>
+; a11: <name>
+; a50: <device number*64>
+; a52: <reserved>
+; a53: <users>
+; a54: <next message>
+; a55: <last message>
+; a56: <interrupt address=c33>
+;
+c.(:a91>4a.1:)-1          ; if include wdt 401 watch dog timer then
+m.          wdt 401
+b.i0,   a0=1<23           ; begin
+w.      a0>8              ;
+  i0:   a0>0+a0>4+a0>8    ;
+  h25:  jl w3 g14         ;   check user;
+        dl.w1 i0.         ;
+        jl w3 g16         ;   check operation(8,0.4.8);
+        bz w0 x2+9        ;   mode:=mode(buf+9);
+        am   (b19)        ;
+        rl w1 a50         ;
+        am   (0)          ;
+        io    x1+1        ;   control(mode,device);
+        io w3 x1+0        ;   status:=sense(device);
+        rs w3 g20         ;
+        al w0 1           ;
+        sx    2.11        ;   if ex<>0 then
+        am    g29-g28     ;     goto disconnected device
+        jl w3 g28         ;     else deliver result(1);
+        jl   (b20)        ;   goto return;
+e.                        ; end of wdt 401 watch dog timer;
+z.      h25=g3            ; goto result 5;
+
+
+; rc 747  magnetic tape:
+; rc 749  magnetic tape:
+; rc 4739 magnetic tape:
+; rc 4775 magnetic tape:
+;
+; process description format:
+;
+; a48:
+; a49: <interval>
+; a10: <kind=if rc 747 then 18 else if rc 749 then 34 else 60>
+; a11: <name>
+; a50: <device number*64>
+; a52: <reserved>
+; a53: <users>
+; a54: <next message>
+; a55: <last message>
+; a56: <interrupt address=c41>
+; a70: <state>
+; a71: <file count>
+; a72: <block count>
+; a73: <return>
+; a74: <old block count>
+; a75: <remoter>
+; a76: <old op.state> <old op. state effect = if on then 0 else 2>
+; a77: <read op>
+; a78: <read par>
+; a78+2: <write op>
+; a78+4: <write par>
+; a78+6: <erase op>
+; a78+8: <erase par>
+; a78+10: <not used>
+; a78+12: <error log flag>
+; if testcase 10 then
+; a78+14: <buffer top address>   (no test, if buffer top address = 0)
+; a78+16: <pointer>
+;
+;    state: 0  named tape in remote state
+;           1  unknown tape in local state
+;           2  unknown tape in remote state
+;    old operation state:
+;           0  last operation: input,move,reverse,erase
+;           1  last operation: output,output mark
+;              sense and set mode has no effect
+;              at old operation state
+;
+; magtape1 ::= rc 747 or rc 749
+; magtape2 ::= rc 747 or rc 749 or rc 4739 or rc 4775
+;
+
+b.i80                   ; begin
+w.                      ;
+a83 = (:a92>10a.1:)-1   ; testcase 10;
+
+c.(:a91>18a.1:)-1       ; if include magtape1 then
+m.          rc 747, rc749
+z.
+c.(:a91>5a.1:)-1        ; if include magtape2 then
+m.          rc 4739, rc 4775
+
+c.a83                   ; if include testcase 10 then
+m.          with testbuffer administartion  (testcase 10)
+z.
+
+a91 = a91o.1<18         ; include magtape1
+
+  h26:                  ; magtape2:
+        bz w0 x2+8      ;
+        se w0 18        ;   if operation(buf) <> 18 then
+        jl w3 g15       ;     check reservation;
+        bz w3 x2+9      ;   mode:=mode(buf);
+        hs w3 x2+19     ;   save mode;
+        bz w0 x2+8      ;   trail:= mode//16;
+        se w0 5         ;   if operation(buf)<>5 then
+        la.w3 i30.      ;     trail:= 0;
+        ld w0 -4        ;
+        ls w0 -20       ;
+        hs w0 x2+9      ;   mode:=mode mod 16;
+        sl w3 6         ;   if trail>=1 then
+        jl    g5        ;     goto result 3;
+        rl w1 x2+12     ;
+        sl w3 3         ;   if trail>=3 then
+        al w1 x1-2      ;   begin
+        rs w1 x2+12     ;     last addr(buf):=last addr(buf)-2;
+        sl w3 3         ;     trail:=trail-3;
+        al w3 x3-3      ;   end;
+        ws w1 x2+10     ;   length:= last addr(buf)
+        al w1 x1+2      ;       -first addr(buf)+2;
+        bz w0 x2+8
+        so w0 2.1       ;   if operation(buf) mod 1<>1 then
+        al w1 0         ;     length:= 0;
+        sh.w1(i31.)     ;   if length>43690
+        sh w1 -1        ;   or length<=-1 then
+        jl    g5        ;     goto result 3;
+        bz w1 x2+9      ;
+        ac w3 x3-3      ;   trail:= 3-trail;
+        sz w1 2.10      ;
+        al w3 x3+8.100  ;   trail(17):= mode(buf)(22);
+        hs w3 x2+17     ;   buf(17):= trail;
+        ls w1 -2        ;
+        bl.w0 x1+i32.   ;
+        hs w0 x2+16     ;   buf(16):= mode bits(mode(buf)(20:21));
+        jl.   i29.      ;   goto check;
+z.                      ;
+
+c.(:a91>18a.1:)-1       ; if include magtape1 then
+w.a0=1<23               ;
+        a0>0+a0>3+a0>5+a0>6+a0>8+a0>10+a0>14+a0>16+a0>18
+  i0:   a0>0+a0>2+a0>4+a0>6
+  h12:                  ; magtape1:
+        bz w0 x2+8      ;
+        se w0 18        ;   if operation(buf) <> 18 then
+        jl w3 g15       ;     check reservation;
+        bz w3 x2+9      ;   mode:= mode(buf);
+        hs w3 x2+19     ;   save mode;
+        la.w3 i61.      ;   mode(9):= 0;
+        hs w3 x2+9      ;   mode(buf):= mode;
+        rl w3 x2+12     ;   length:= last address(buf)
+        ws w3 x2+10     ;     - first address(buf);
+        rl w0(b19)      ;
+        sn w0 18        ;   if kind(proc) = 18
+        am    i12       ;   and length >= 32766
+        sl.w0(i31.)     ;   or length >= 43690 then
+        jl    g5        ;     goto result 3;
+  i29:  dl.w1 i0.       ; check:
+        jl w3 g16       ;   check operation(0.3.5.6.8.10.14.16.18,0.2.4.6);
+        jl w3 g17       ;   link operation;
+  i1:                   ; start:
+        sz w0 2.1       ;   if operation(23) <> 0 then
+        jl w3 g31       ;     increase stop count;
+c.a83                   ; testcase 10;
+        jl.w3 i79.      ;   save actions;
+              1888      ;
+z.      ls w0 -1        ;   op.state:=
+        am   (0)        ;
+        bz.w0 i58.      ;     case operation//2 of (3,0,1,2,0,1,0,3,3,3);
+        bz w3 x1+a76    ;   old op.state:=old op.state(proc);
+        sn w0 x3+0      ;   if op.state=old op.state then
+        jl.   i57.      ;     goto operation;
+        sl w0 2         ;   if op.state>=2 then
+        jl.   i55.      ;     goto new op.state(0);
+        sn w3 0         ;   if old op.state=0 then
+        jl.   i56.      ;     goto new op.state(1);
+        bz w3 x1+a76+1  ;
+        sn w3 0         ;   if old op.state effect(proc)=0 then
+        jl.w3 i16.      ;     erase(device);
+        rl w2 b18       ; new op.state:
+        al w0 0         ;   new op.state:=
+  i55:  am    0-1       ;     if operation=output then
+  i56:  al w3 1         ;       1 else 0;
+        se w0 3         ;   if op.state<>3 then
+        hs w3 x1+a76    ;     old op.state:=new op.state;
+  i57:  bz w0 x2+8      ; operation:
+        am   (0)        ;
+        jl.  (2)        ;   goto case operation(buf) of
+        i20             ;    (0: sense,
+        i3              ;     3: input output,
+        i3              ;     5: input output,
+        i18             ;     6: erase,
+        i6              ;     8: move,
+        i17             ;    10: output mark,
+        i20             ;    13: not used,
+        i19             ;    14: set mode,
+        i54             ;    16: set old op.state effect,
+        i54             ;    18: set error log flag);
+
+; i2:   al w3 60        ; reverse:
+;       se w3(x1+a10)   ;   if kind(proc)<>60 then
+;       jl.   i20.      ;     goto sense;
+;       rl w3 x2+12     ;
+;       rx w3 x2+10     ;   exchange(first addr(buf),
+;       rs w3 x2+12     ;       last addr(buf));
+  i3:                   ; input output:
+        jl.w3 i40.      ;   set mode;
+c.a83,        111       ; testcase 10;
+z.      bz w3 x2+9      ;
+        ls w3 4         ;   mode:=
+        al w0 60        ;
+        sn w0(x1+a10)   ;   if kind=60 or mode=0 then
+        al w3 0         ;     0
+        hs w3 x2+9      ;   else 32;
+        rl w1 x1+a50    ;
+        bz w0 x2+8      ;
+        rl w3 x2+12     ;
+;       sn w0 13        ;   transfer(device,last addr(buf));
+;       am    37-5      ;
+        io w3 x1+5      ;
+        sx    2.11      ;   if ex<>0 then
+        jl.   i23.      ;     goto disconnect;
+;       sn w0 13        ;   control:= case operation(buf) of
+;       al w1 x1+45-13  ;     3: input,
+        sn w0 5         ;     5: output,
+        al w1 x1+17-13  ;    13: input reverse);
+        ba w1 x2+9      ;   control:=control+mode;
+        rl w3 x2+10     ;
+        io w3 x1+13     ;   control(device,first addr(buf));
+        sx    2.11      ;   if ex<>0 then
+        jl.   i23.      ;     goto disconnect;
+        jl w3 c42       ;   wait interrupt;
+        jl.   i49.      ;   if regretted then goto regret;
+        jl.w3 i47.      ;   sense2 magtape(status);
+c.a83,        201       ; testcase 10;
+z.      bz w2 x2+8      ;   operation:=operation(buf);
+        al w3 2.1100    ;
+        la w3 4         ;   index:=operation-operation mod 4;
+        am    x3+0      ;
+        al w1 x1+a77    ;   addr:=addr(read op(proc))+index;
+        dl w3 x1+2      ;
+        al w2 x2+1      ;   word(addr):=word(addr)+1;
+        sz.w0(i35.)     ;
+        jl.   6         ;   if status(7)=0
+        sz w0(g58)      ;     and status(1)=1 then
+        al w3 x3+1      ;     word(addr+2):=word(addr+2)+1;
+        ds w3 x1+2      ;
+;       al w3 x1+0      ;
+        rl w1 b19       ;
+        rl w2 b18       ;
+;       sn w3 x1+a78+10 ;   if addr=addr(reverse op(proc)) then
+;       am    i50       ;     last block
+        jl.w3 i42.      ;   else next block;
+        am   (x1+a50)   ;
+        io w0 4         ;   characters:= sense size(device);
+c.a83                   ; testcase 10;
+        jl.w3 i80.      ;   save actions;
+              5         ;
+z.      sx    2.11      ;   if ex<>0 then
+        jl.   i23.      ;     goto disconnect;
+        rs w0 g22       ;
+        al w3 0         ;
+        al w2 18        ;
+        sn w2(x1+a10)   ;
+        am    i14       ;
+        wd.w0 i33.      ;   words:= characters//if kind(proc)=18 then 4 else 3;
+        se w3 0         ;   if remainder<>0 then
+        ba.w0 1         ;     words:= words+1;
+        ls w0 1         ;   bytes:= words*2;
+        rs w0 g21       ;
+
+  i4:                   ; done 0:
+        jl w3 g32       ;   decrease stop count;
+        rl w2 b18       ;
+        bz w0 x2+19     ;
+        hs w0 x2+9      ;   mode(buf):= saved mode(buf);
+        rl w0 g20       ;   status:=
+        la.w0 i78.      ;     status and error log mask;
+        rl  w1  b19     ;
+        se w0(x1+a78+12);   if status <> error log flag(proc) then
+        jl w3(b111)     ;     error log entry(link);
+c.a83                   ; testcase 10;
+        jl.w3 i79.      ;   save actions;
+              1999      ;
+z.      jl w3 g18       ;   deliver result(1);
+  i5:                   ; done 1:
+        jl w3 g64       ;   examine queue(
+        jl.   i27.      ;       idle tape);
+        jl.   i1.       ;   goto start;
+
+  i6:                   ; move:
+        jl.w3 i41.      ;   sense1 magtape(status);
+c.a83,        102       ; testcase 10;
+z.      rl w0 x2+10     ;
+        sl w0 0         ;   if move operation(buf)<0
+        sl w0 7         ;       or move operation(buf)>=7 then
+        jl.   i20.      ;     goto sense;
+        al.w3 i22.      ;   return:= size zero;
+        se w0 6         ;   if operation(buf)<>6 then
+        jl.   i15.      ;     goto save return;
+        dl w0 x2+14     ;   file:=word(buf+12);
+        sl w3 0         ;   block:=word(buf+14);
+        sh w0 -1        ;   if file<0 or block<=-1 then
+        jl.   i20.      ;     goto sense;
+        sn w3 0         ;   if file = 0
+        se w0 0         ;   and block = 0 then
+        sz              ;
+        jl.   i13.      ;     goto rewind;
+        se w0(x1+a74)   ;   if block <> old block count(proc) then
+        jl.   i7.       ;     goto next move;
+        rl w0 x1+a71    ;
+        sn w0 x3+1      ;   if file count(proc) = file + 1 then
+        jl.   i9.       ;     goto backspace file;
+  i7:   rl w2 b18       ; next move:
+        rl w3 x2+12     ;   file:=word(buf+12);
+        rl w0 x1+a71    ;   file count:=file count(proc);
+        se w0 0         ;   if (file count<>0
+        se w3 0         ;       and file=0)
+        sh w0 -1        ;       or file count<=-1 then
+        jl.   i13.      ;     goto rewind;
+        sn w0 x3+0      ;   if file count=file then
+        jl.   i8.       ;     goto check block;
+        sh w0 x3+0      ;   if file count<file then
+        jl.   i11.      ;     goto upspace file;
+        ls w0 -1        ;   if file count//2>=file
+        sl w0 x3+0      ;     then
+        jl.   i13.      ;     goto rewind;
+        jl.   i9.       ;   goto backspace file;
+  i8:                   ; check block:
+        rl w3 x2+14     ;   block:=word(buf+14);
+        rl w0 x1+a72    ;   block count:=block count(proc);
+        se w0 0         ;   if (block count<>0
+        se w3 0         ;       and block=0)
+        sh w0 -1        ;       or block count<=-1 then
+        jl.   i9.       ;     goto backspace file;
+        sn w0 x3+0      ;   if block count=block then
+        jl.   i21.      ;     goto load point and size zero;
+        sh w0 x3+0      ;   if block count< block then
+        jl.   i10.      ;     goto upspace block;
+        ls w0 -1        ;   if block count//2>=block then
+        sl w0 x3+0      ;     goto backspace file;
+        sz              ;
+        am    3-2       ; backspace block: move operation:= 3
+  i9:   am    2-1       ; backspace file:                or 2
+  i10:  am    1-0       ; upspace block:                 or 1
+  i11:  am    0-4       ; upspace file:                  or 0
+  i13:  al w0 4         ; rewind:                        or 4;
+        rs w0 x2+10     ;   move operation(buf):= move operation;
+        al.w3 i7.       ;   return:= next move;
+  i15:  rs w3 x1+a73    ; save return:
+        am   (x1+a50)   ;   return(proc):= return;
+        io w0 9         ;   move(device,move operation);
+c.a83                   ; testcase 10;
+        jl.w3 i80.      ;   save actions;
+              8         ;
+z.      sx    2.11      ;   if ex<>0 then
+        jl.   i23.      ;     goto disconnect;
+        jl w3 c32       ;   wait interrupt(proc);
+        jl.   i49.      ;   if regretted then goto regret;
+        jl.w3 i47.      ;   sense2 magtape(status);
+c.a83,        202       ; testcase 10;
+z.      rl w3 x2+10     ;   case move operation(buf) of
+        jl.   x3+2      ;    (0: next block,
+        am    i51       ;     1: next block,
+        am    i52       ;     2: last block,
+        jl.w3 i46.      ;     3: last block,
+                        ;     4: load point,
+                        ;     5: load point);
+        jl   (x1+a73)   ;   goto return;
+
+  i17:                  ; output mark:
+        jl.w3 i41.      ;   sense1 magtape(status);
+c.a83,        103       ; testcase 10;
+z.      al w0 7         ;
+        am   (x1+a50)   ;
+        io w0 3         ;   write(device);
+        sx    2.11      ;   if ex<>0 then
+        jl.   i23.      ;     goto disconnect;
+        jl w3 c32       ;   wait interrupt(proc);
+        jl.   i49.      ;   if regretted then goto regret;
+        jl.w3 i47.      ;   sense2 magtape(status);
+c.a83,        203       ; testcase 10;
+z.      jl.w3 i42.      ;   next block;
+        dl w3 x1+a78+4  ;
+        al w2 x2+1      ;   write op(proc):=write op(proc)+1;
+        sz w0(g58)      ;   if status(1)=1 then
+        al w3 x3+1      ;     write par(proc):=
+        ds w3 x1+a78+4  ;     write par(proc)+1;
+        jl.   i22.      ;   goto size zero;
+
+  i18:                  ; erase:
+        al.w3 i21.      ;   return:=(load piont; goto size zero;);
+  i16:  rs w3 x1+a73    ;   return(proc):=return;
+        jl.w3 i41.      ;   sense1 magtape(status);
+c.a83,        104       ; testcase 10;
+z.      am   (x1+a50)   ;
+        io    21        ;   erase(device);
+        sx    2.11      ;   if ex<>0 then
+        jl.   i23.      ;     goto disconnect;
+        jl w3 c32       ;   wait interrupt(proc);
+        jl.   i49.      ;   if regretted then goto regret;
+        jl.w3 i47.      ;   sense2 magtape(status);
+c.a83,        204       ; testcase 10;
+z.      dl w3 x1+a78+8  ;
+        al w2 x2+1      ;   erase op(proc):=erase op(proc)+1;
+        sz w0(g58)      ;   if status(1)=1 then
+        al w3 x3+1      ;     erase par(proc):=
+        ds w3 x1+a78+8  ;     erase par(proc)+1;
+        jl    (x1+a73)  ;   goto return;
+
+  i19:                  ; set mode:
+        jl.w3 i40.      ;   set mode;
+c.a83,        115       ; testcase 10;
+z.                      ;   load point;
+        jl.   i21.      ;   goto size zero;
+  i54:                  ; set old op. state effect:
+        bz w3 x2+9      ;
+        se w0 16        ;   if operation <> 16 then
+        am    a78+12-a76;     error log flag(proc):=mode(buf)
+        hs w3 x1+a76+1  ;   else old op. state effect(proc):=mode(buf);
+  i20:                  ; sense:
+        jl.w3 i41.      ;   sense1 magtape(status);
+c.a83,        106       ; testcase 10;
+z.i21:  jl.w3 i46.      ;   load point;
+  i22:  ld w3 -65       ; size zero:
+        ds w3 g22       ;   characters:= bytes:= 0;
+        jl.   i4.       ;   goto done 0;
+  i23:                  ; disconnect:
+        jl w3 g32       ;   decrease stop count;
+        jl w3 g29       ;   disconnected device;
+        jl.   i5.       ;   goto done 1;
+
+  i24:                  ; intervention:
+        jl w3 g32       ;   decrease stop count;
+  i25:  al w0 5         ; reject message:
+        jl w3 g19       ;   deliver result(5);
+  i48:  rl w2 x1+a54    ;
+        rs w2 b18       ;   buf:= next(mess q(proc));
+        se w2 x1+a54    ;   if buf<>mess q(proc) then
+        jl.   i25.      ;     goto reject message;
+        al w0 1         ;
+        rs w0 x1+a70    ;   state(proc):= 1;
+  i26:  ld w0 -65       ; remove name:
+        rs w0 x1+a11    ;   name(proc):= 0;
+        rs w0 x1+a52    ;   reserved(proc):= 0;
+        rs w0 x1+a76    ;   old op.state(proc):=old op.state effect(proc):=0;
+        al w3 -1        ;
+        al w0 -1        ;   file(proc):=
+        ds w0 x1+a72    ;     block(proc):=-1;
+        am   (x1+a50)   ; remove intervention:
+        io    5         ;   transfer(device,irrelevant);
+  i27:  jl w3 c32       ; idle tape:
+        am    0         ;   wait interrupt(proc);
+  c41:                  ;
+  c37:  am   (x1+a50)   ;
+        io    5         ;
+        io w0(x1+a50)   ;   status:=sense(device);
+        sx    2.11      ;   if ex<>0 then
+        jl.   i27.      ;     goto idle tape;
+        sh w0 -1        ;   state(proc):=
+        am    1-2       ;     if status(0)=1 then 1
+        al w0 2         ;       else 2;
+        rs w0 x1+a70    ;
+        se w0 2         ;   if state(proc)<>2 then
+        jl.   i26.      ;     goto remove name;
+  i28:                  ; next:
+        rl w3 x1+a75    ;   remoter:=remoter(proc);
+        rl w2 x3+a54    ;   buf:=event q(remoter);
+        sl w3 1         ;   if remoter<1
+        sn w2 x3+a54    ;     or buf=event q(remoter) then
+        jl.   i26.      ;     goto remove name;
+        rs w2 b18       ;
+        al w0 0         ;   answer(0):=0;
+        ds w1 g21       ;   answer(2):=proc;
+        jl w3 g18       ;   deliver result(1);
+        jl.   i28.      ;   goto next;
+
+  i49:                  ; regret:
+        al w3 -1        ;
+        al w0 -1        ;
+        ds w0 x1+a72    ;   file(proc):=block(proc):=-1;
+        io w0(x1+a50)   ;   status:=sense(device);
+        sx    2.11      ;   if ex <> then
+        jl.   i5.       ;     goto done1;
+        sh w0 -1        ;   if status(0)=1 then
+        jl.   i48.      ;     goto reject message;
+        jl.   i5.       ;   goto done1;
+
+; procedure set mode(status);
+;       call:           exit:
+; w0                    status
+; w1    proc            proc
+; w2    buf             buf
+; w3    link            destroyed;
+;
+b.j5                    ; begin set mode:
+w.i40:  rl w0 x2+16     ;
+        am   (x1+a50)   ;
+        io w0 1         ;   control(set mode,buf(16));
+        sx    2.11      ;   if ex<>0 then
+        jl.   i23.      ;     goto disconnect;
+                        ;   sense1 magtape(status);
+                        ; end;
+; procedure sense magtape(status);
+w.                      ; begin sense magtape:
+  i41:  al w3 x3+1      ; sense1: link:=link+1;
+  i47:  rs.w3 i37.      ; sense2: save link;
+        io w0(x1+a50)   ;   status:= sense(device);
+c.a83                   ; testcase 10;
+        jl.w3 i80.      ;   save actions;
+              1000      ;
+z.      sx    2.11      ;   if ex<>0 then
+        jl.   i23.      ;     goto disconnect;
+        rs w0 x2+20    ;   status(message+20):= status;
+        al w3 60        ;   if kind(proc)<>60 then
+        se w3(x1+a10)   ;     status(9):=0;
+        la.w0 i60.      ;
+        rs w0 g20       ;
+        sh w0 -1        ;   if status(0)=1 then
+        jl.   i24.      ;     goto intervention;
+        bz w3 x2+8      ;   operation:=operation(buf);
+        sl w3 5         ;   if operation<5
+        sl w3 11        ;     or operation>=11 then
+        jl.   j1.       ;     goto test status;
+        se w3 8         ;   if operation=8
+        sz.w0(i36.)     ;     or status(8)=1 then
+        jl.   j1.       ;     goto test status;
+        am   (x1+a50)   ;
+        io    5         ;   transfer(device,irrelevant);
+        io w0(x1+a50)   ;   status:=sense(device);
+c.a83                   ; testcase 10;
+        jl.w3 i80.      ;   save actions;
+              300       ;
+z.      sx    2.11      ;   if ex<>0 then
+        jl.   i23.      ;     goto disconnect;
+        rs w0 x2+20    ;   status(message+20):= status;
+        al w3 60        ;   if kind(proc)<>60 then
+        se w3(x1+a10)   ;     status(9):=0;
+        la.w0 i60.      ;
+        rs w0 g20       ;
+        rl.w3 i37.      ;
+        sz w3 2.1       ;   if link(23)<> 0 then
+        jl.   i21.      ;     goto size zero;
+        jl.   j2.       ;   goto unknown position;
+  j1:                   ; test status:
+        se w3 8         ;   if operation <> 8 then
+        jl.   j4.       ;     goto test mode error;
+        rl w3 x2+10     ;
+        sl w3 4         ;   if move operation(buf) < 4
+        sl w3 7         ;   or move operation(buf) >= 7 then
+        jl.   j4.       ;     goto test mode error;
+        se w3 6         ;   if move operation(buf) <> 6 then
+        jl.   j3.       ;     goto test more;
+        dl w3 x2+14     ;
+        sn w2 0         ;   if file(buf) = 0
+        se w3 0         ;   and block(buf) = 0
+  j4:   so.w0(i38.)     ; test mode error:  or status(9) <> 1 then
+        jl.   j3.       ;     goto test more;
+        al w3 0         ;
+        hs w3 x1+a76    ;   old op.state:= 0;
+  j2:   al w3 -1        ; unknown position:
+        al w2 -1       ;
+        ds w3 x1+a72    ;   file(proc):= block(proc):=-1;
+        rl w2 b18       ;   w2:= current buf;
+        jl.   i21.      ;   goto load point; size zero;
+  j3:   rl w2 b18       ; test more:
+        rl.w3 i37.      ;
+c.a83                   ; testcase 10;
+        al w3 x3+2      ;   link:=saved link + 2;
+z.      so w3 2.1       ;   if link(23)<>0
+        so.w0(i43.)     ;     or status(1)=0 or status(7)=0 then
+        jl    x3+0      ;     goto link;
+        jl.   j2.       ;   goto unknown position;
+e.                      ; end;
+
+; procedure next block;
+;       call:           exit:
+; w0    status          status
+; w1    proc            proc
+; w2    buf             destroyed
+; w3    link            destroyed;
+;
+b.j24                   ; begin next block:
+w.i42:  rs.w3 i37.      ;   save link;
+        so.w0(i35.)     ;   if status(7)=1 then
+        jl.   j0.       ;     begin
+        dl w3 x2+10     ;       if operation(buf)=8
+        sn.w2(i36.)     ;           and word(buf+10)<2 then
+        sl w3 2         ;         begin
+        jl.   j1.       ;
+        al w2 -1        ;
+        se w3 1         ;           if word(buf+10)<>1 then
+        rs w2 x1+a72    ;             block(proc):=-1;
+        al.w2 i22.      ;
+        se w3 0         ;           if word(buf+10)<>0 then
+        rs.w2 i37.      ;             link:=size zero;
+                        ;         end;
+                        ;       goto next file;
+        jl.   j1.       ;     end
+  j0:   rl w3 x1+a72    ;   else
+        so w0(g59)      ;     begin
+        al w3 x3+1      ;       if status(2)=0 then
+        rs w3 x1+a72    ;         block(proc):= block(proc)+1;
+        jl.   i53.      ;       load point;
+                        ;     end;
+  j1:   rl w3 x1+a71    ; next file:
+        al w3 x3+1      ;   file(proc):= file(proc)+1;
+        rs w3 x1+a71    ;
+        al w3 0         ;
+        rx w3 x1+a72    ;   old block(proc):=block(proc);
+        rs w3 x1+a74    ;   block(proc):=0;
+        jl.   i53.      ;   load point;
+e.                      ; end;
+
+; procedure last block;
+;       call:           exit:
+; w0    status          status
+; w1    proc            proc
+; w2    buf             destroyed
+; w3    link            destroyed;
+;
+b.j24                   ; begin last block:
+w.i44:  rs.w3 i37.      ;   save link;
+        so.w0(i35.)     ;   if status(7)=1 then
+        jl.   j0.       ;     begin
+        dl w3 x2+10     ;       if operation(buf)=8
+        sn.w2(i36.)     ;           and word(buf+10)=3 then
+        se w3 3         ;         link:= size zero;
+        jl.   j1.       ;
+        al.w3 i22.      ;
+        rs.w3 i37.      ;       goto last file;
+        jl.   j1.       ;     end
+  j0:   rl w3 x1+a72    ;   else
+        al w3 x3-1      ;     begin
+        rs w3 x1+a72    ;       block(proc):= block(proc)-1;
+        jl.   i53.      ;       load point;
+                        ;     end;
+  j1:   rl w3 x1+a71    ; last file:
+        al w3 x3-1      ;
+        rs w3 x1+a71    ;   file(proc):= file(proc)-1;
+        al w3 -1        ;
+        rx w3 x1+a74    ;   w3:=old block(proc);   old block(proc):=-1;
+                        ;   block(proc):=w3;
+        rs w3 x1+a72    ;   load point;
+        jl.   i53.      ;
+e.                      ; end;
+
+; procedure load point;
+;       call:           exit:
+; w0    status          status
+; w1    proc            proc
+; w2                    destroyed
+; w3    link            destroyed;
+;
+b.j24                   ; begin
+w.i46:  rs.w3 i37.      ;
+  i53:  ld w3 -65       ;
+        sz.w0(i34.)     ;   if status(6)=1 then
+        ds w3 x1+a72    ;     file(proc):= block(proc):= 0;
+        dl w3 x1+a72    ;   file count:= file(proc);
+        ds w3 g24       ;   block count:= block(proc);
+        jl.  (i37.)     ; end;
+e.                      ;
+
+c.a83                   ; testcase 10;
+
+; procedure save actions:
+;
+b.j24                   ; begin save actions:
+w.i80:  sx    2.11      ;   if ex<>0 then
+        jl.   i23.      ;     goto disconnect;
+        al w3 x3+1      ;   link:=link+1;
+  i79:  ds.w3 j1.       ;
+        ds.w1 j0.       ;
+        rl w1 b19       ;
+        rl w3 x1+a78+14 ;   top address:= buffer top address(proc);
+        sn w3 0         ;   if top address = 0 then
+        jl.   j2.       ;     goto load;
+        rl w2 x1+a78+16 ;   addr:= pointer(proc);
+        rs w2 x2+2      ;   word(addr+2):= addr;
+        sh w3 x2+14     ;   if top address <= addr+14 then
+        al w2 x1+a78+16 ;     addr:= addr(pointer(proc));
+        al w2 x2+4      ;   addr:= addr+4;
+        rl.w3(j1.)      ;   ident:= word(link);
+        sn w3 1000      ;   if ident = 1000 then
+        rl.w3(i37.)     ;     ident:= word(link to sense);
+        ds w0 x2+0      ;   word(addr-2):= ident; word(addr):= word;
+        rs w2 x1+a78+16 ;   test addr(proc):= addr;
+        sh w3 1000      ;   if ident > 1000 then
+        jl.   j2.       ;   begin
+        al w2 x2+8      ;     addr:= addr + 8;
+        rs w2 x1+a78+16 ;     test addr(proc):= addr;
+        rl w1 b18       ;
+        sl w3 1900      ;
+        al w1 g20-8     ;
+        rl w0 x1+8      ;
+        ds w0 x2-8      ;     save ident and message or answer;
+        dl w0 x1+12     ;
+        ds w0 x2-4      ;
+        dl w0 x1+16     ;
+        ds w0 x2+0      ;   end;
+  j2:   dl.w1 j0.       ; load:  load registers;
+        dl.w3 j1.       ;
+        so w3 2.1       ;   if link(23) = 0 then
+        jl    x3+2      ;     goto link+2
+        jl    x3+6      ;   else goto link+6;
+
+        0
+  j0:   0
+        0
+  j1:   0
+e.                      ; end;
+z.
+
+  i30:  2.111110001111  ; trail mask
+  i61:  2.111111111011  ; density mask
+  i60:  8.77737777      ; high density mask
+m.          error mask for magtape
+  i78:  8.37070000      ; error log mask
+  i31:  43690           ; max block length for rc 749 and rc 4739 and rc 4775
+  i39:  32766           ; max block length for rc 747
+h.i32:  2.1000          ; mode bits table
+        2.0100
+  i58:  3, 0, 1, 2,     ; op.states
+        0, 1, 0, 3,     ;
+        3, 3            ;
+w.i33:  3               ; constant
+  i45:  4               ; constant
+  i34:  1<23>6          ; bit 6
+  i35:  1<23>7          ; bit 7
+  i36:  1<23>8          ; bit 8
+  i38:  1<23>9          ; bit 9
+  i43:  8.2020<12       ; bit 1 + bit 7
+  i37:  0               ; saved link
+
+  i50=i44-i42
+  i51=i42-i44
+  i52=i44-i46
+  i12=i39-i31
+  i14=i45-i33
+z.                      ;
+e.                      ; end of magtape;
+        h26=g3          ; goto result 5;
+        h12=h26 ; note: ; magtape1
+
+m.                monitor text 5 included

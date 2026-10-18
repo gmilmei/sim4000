@@ -1,0 +1,99 @@
+Sim4000 maintained-monitor profiles
+
+The distribution contains three profiles. Runtime media use a flat layout:
+  UNIT0             MONITOR             RC4000.cfg
+  UNIT0.protected   MONITOR.protected   RC4000.protected.cfg
+  UNIT0.mipsts      UNIT1.mipsts        RC4000.mipsts.cfg
+
+Compatibility remains the default:
+  ./sim4000 -a
+  ./sim4000 -a -c RC4000.compat.cfg
+
+To select the source-built protected monitor:
+  ./sim4000 -a -c RC4000.protected.cfg
+
+RC4000.compat.cfg is an explicit copy of the default RC4000.cfg. It uses the
+root MONITOR, UNIT0 and exchange directory. The protected configuration uses
+MONITOR.protected, UNIT0.protected and the shared exchange directory. Move the entire
+distribution together; paths are resolved relative to each configuration.
+No Python, guest rebuilding, V2 monitor or installation is required to run it.
+
+Every maintained monitor includes printer (RC610), device 7 / interrupt 10.
+The configs automatically append to printer.txt, printer.protected.txt or
+printer.mipsts.txt; existing output survives restart. A source-tree DFC403
+profile uses printer.dfc403.txt. show media reports printer state and counts.
+CLI detach 7 closes output; attach 7 FILE creates a new file exclusively,
+or attach 7 FILE append preserves an existing regular file. Each completed
+print is flushed immediately, including CR/VT/FF without LF. Sequential PRIMO
+transports to printer are checked in MIPS/TS, including repeated jobs and
+restart append. See the manual and examples/primo_print.alg for the bounded
+administrative recipe. A waiting transport submitted with detached output can
+resume after append reattachment and PRIMO start printer. Two outstanding
+transports work with one blocking waiter and one status-polling client; the
+second blocking wait receives missing resources. Arbitrary queue capacity and
+general host-write/paper-error recovery remain unverified.
+
+Start either profile, initialize the date and use guest attention as described
+in doc/usermanual.pdf. Both use CLASSIC terminals and IX. The protected profile
+enforces RC4000 storage keys, code-entry/write checks and privileged operations.
+It is not a host-security sandbox or a complete RC8000 implementation.
+
+In protected FP sessions, use rcin/rcout instead of fromhost/tohost:
+  sample=rcin input
+  output=rcout sample
+
+Place the host file input in exchange before importing. The exported
+file output is created there. Use conv.bin as with the corresponding standard
+tools for binary transfers. Exports refuse existing files. Protected Algol and
+SLANG workflows have bounded tests, but not every installed program is verified.
+The original fromhost/tohost remain installed and are incompatible with strict
+RC4000 protection because they contain newer-machine instructions. The protected
+disk uses an older system-scoped tofrom binding and separately linked rcin/rcout;
+it is not interchangeable with the compatibility disk.
+
+The installed text comparator cmp is also unusable in the protected profile:
+the checked identical-text call pauses with break 0 tofrom1. Use compatibility
+for guest cmp, or export protected text with rcout to distinct unused host
+names and compare on the host. Copy, rename and concatenation work in both
+profiles. This limitation is not removed by the older system tofrom binding.
+
+Both profiles discard guest disk writes on exit by default. For persistence,
+append OVERLAY=UNIT0.overlay to the compatibility DEFINE RC433X line, or
+OVERLAY=UNIT0.protected.overlay to the protected one. Keep overlays separate;
+never use an overlay with the other profile's base disk. Host exports persist
+independently of guest disk overlays. Use separate workspaces for concurrent
+sessions and back up wanted guest work deliberately.
+
+To return to compatibility, select RC4000.compat.cfg. Do not copy one profile's
+monitor over the other or reuse its disk/overlay. The protected profile is an
+optional alternative, not a replacement for the working compatibility system.
+
+MIPS/TS (compatibility monitor, protection OFF):
+  ./sim4000 -a -c RC4000.mipsts.cfg
+
+UNIT0.mipsts automatically mounts UNIT1.mipsts and starts TEM, PRIMO and SOS.
+The boot date is fixed to 30 September 1986; no date prompt is presented.
+Wait for sos started, then connect from another host terminal:
+  telnet 127.0.0.1 4004
+Press Ctrl-A, enter sos, then run test pass test. Try message hello and
+lookup fp. Enter finis to log out. Ctrl-E in the emulator terminal followed
+by quit stops the emulator after logout. Reconnection to the same running
+instance is checked for an idle FP and fully echoed, known partial input:
+the existing job resumes without a new login. Unknown pending input,
+interrupted commands/output, terminal hard errors and crash recovery remain
+outside that scope. Follow the User Manual's bounded reconnect procedure;
+use finis when you intend to log out. Reconnection is not a fresh
+authentication boundary: another local client can resume the existing job.
+
+The one provisioned account is test/test with a small storage quota. Telnet
+is unencrypted and the listener binds to loopback. Do not expose this
+profile to a network. This is a bounded demonstration, not certification of
+arbitrary accounts, applications, printers or protection.
+
+MIPS/TS retains writes by default in UNIT0.mipsts.overlay and
+UNIT1.mipsts.overlay. Preserve both with their matching bases when resuming
+or backing up; stop the emulator before copying. Removing both sidecars
+together while stopped resets the guest and loses all subsequent changes.
+Do not relabel UNIT1.mipsts: its disc1 catalog is already initialized.
+No Python or guest rebuilding is required to run the prepared profile.
+See the MIPS/TS chapter of the User Manual for the operating guide.

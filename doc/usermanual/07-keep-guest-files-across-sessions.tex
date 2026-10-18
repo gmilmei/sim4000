@@ -1,0 +1,425 @@
+\chapter{Keep guest files across sessions}\label{keep-guest-files-across-sessions}
+\index{File retention}
+\index{Catalog}
+
+Saving inside the guest and saving the host disk are two separate operations. The workflow below is tested with the default monitor and RC433X interface, using a verified complete working copy of the native image. It does not change the shipped images and does not require an overlay file.
+
+Separate overlay-based restart checks also pass with both maintained-monitor
+profiles. Text and binary files promoted with \texttt{scope user} survive normal
+FP exit and simulator restart with identical contents and complete lookup
+metadata. The protected profile uses \texttt{rcin}/\texttt{rcout} and its own
+disk/overlay; never reuse the compatibility sidecar for it. Both directions of
+cross-profile overlay reuse are rejected. This verifies clean restarts, not
+power-loss recovery or concurrent writers. See
+\manualref{choose-a-maintained-monitor-profile}{Choose a maintained-monitor profile}
+for profile selection and
+\manualref{choose-how-rc433x-disk-writes-survive}{Choose how RC433X disk writes survive}
+for overlay configuration. The write-through recipe below remains a separate
+compatibility-profile procedure.
+
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+Guest entry
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Host disk mode
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+What survives
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\passthrough{\lstinline!temp!} & Any mode & The guest can reclaim the entry when its process is removed, even if its sectors have been written to the host filesystem. \\
+\passthrough{\lstinline!user!} & Default volatile overlay & The entry survives process removal in the same machine session, but is lost when the emulator exits. \\
+\passthrough{\lstinline!user!} & Writable working copy & The entry survives process removal and emulator restart on that copy. \\
+\end{longtable}
+
+\section{Prepare a writable working copy}\label{prepare-a-writable-working-copy}
+
+This is a separate fresh-session recipe. Export any wanted results and quit
+an existing emulator before changing its disk mode. In a host shell in your
+runtime directory (either \texttt{build/} or your copied working directory),
+create a new disk copy and explicitly select it:
+
+\begin{commandexample}[language=sh]{Host shell: create and boot a writable working copy}
+mkdir -p work
+cp -i UNIT0 work/UNIT0.saved
+./sim4000 -a --disk work/UNIT0.saved --disk-write-through
+\end{commandexample}
+
+Choose a destination that does not already exist. If \texttt{cp -i} asks whether
+to overwrite one, answer no and reuse that existing disk only if it is the
+working copy you intended; otherwise choose another name and adjust the launch
+command. For later sessions, do not repeat the copy: start with the saved disk.
+Never select the shipped \texttt{UNIT0} or \texttt{UNIT0.original} for write-through
+mode. Copy only a stopped, complete image. See
+\manualref{configuration-and-disk-persistence}{Configuration and disk persistence}
+for persistent overlays instead; the guest retention steps are the same.
+
+Put a small ASCII text file named \passthrough{\lstinline!input!} in the host directory \passthrough{\lstinline!exchange!} before importing it. A convenient existing text sample can be copied there from the tutorial bundle with \passthrough{\lstinline!cp examples/hello.alg exchange/input!}. Complete the usual date initialization, then press Escape and select \passthrough{\lstinline!s!}.
+
+\section{Allocate resources and promote a file}\label{allocate-resources-and-promote-a-file}
+\index{scope}
+
+Enter this system command in a fresh session:
+
+\begin{commandexample}{Guest system process s: create keeper with bounded disk claims}
+new keeper size 100000 temp disc 200 10 perm disc 200 10 run
+\end{commandexample}
+
+\passthrough{\lstinline!temp disc 200 10!} provides temporary space; \passthrough{\lstinline!perm disc 200 10!} provides a permanent claim of 200 segments and ten entries. These are resource claims, not file-creation commands. Use explicit, bounded claims rather than an unrestricted administrative \passthrough{\lstinline!all!} process for ordinary work.
+
+In the new FP process, enter:
+
+\begin{commandexample}{Guest FP in keeper: import and retain the example file}
+saved=fromhost input
+lookup saved
+scope user saved
+lookup saved
+\end{commandexample}
+
+The first lookup reports \passthrough{\lstinline!; temp!}, with permanence key 0. The second reports \passthrough{\lstinline!; user!}, with permanence key 3. With the supplied default process intervals, the final two base values are both \passthrough{\lstinline!8388605!}. This \passthrough{\lstinline!scope user!} operation is the tested promotion from a disposable import to a retained guest file; no separate \passthrough{\lstinline!permanent!} command is required in this workflow.
+
+Here \passthrough{\lstinline!user!} is a guest catalog scope, not a host login name and not the process name \passthrough{\lstinline!keeper!}. A new process with the same default catalog interval can find the entry. Custom base/login ranges and other scopes can change visibility; the example does not establish access rules for those cases. This is not host or guest security isolation.
+
+Allocation and catalog errors must be resolved before ending the process. Do not infer a successful promotion from a quiet terminal: check the lookup descriptor. Also avoid reusing a name that already describes a retained file. The small imported file can occupy 36 RC segments even when its text is much shorter; permanent resource claims must accommodate the allocated area.
+
+\section{End the process and read the retained file}\label{end-the-process-and-read-the-retained-file}
+
+Enter \passthrough{\lstinline!finis!} in FP and wait for \passthrough{\lstinline!pause keeper finis fp!}. Select \passthrough{\lstinline!s!} again with Escape and create a different process:
+
+\begin{commandexample}{Guest system process s: create reader after keeper has ended}
+new reader size 100000 temp disc 200 10 perm disc 200 10 run
+\end{commandexample}
+
+In its FP session:
+
+\begin{commandexample}{Guest FP in reader: check and export the retained file}
+lookup saved
+afterproc=tohost saved
+finis
+\end{commandexample}
+
+The lookup still reports \passthrough{\lstinline!user!}. The host file \passthrough{\lstinline!exchange/afterproc!} contains the original input text. A temporary entry left in \passthrough{\lstinline!keeper!}, by contrast, is reclaimed when that process is removed.
+
+After \passthrough{\lstinline!pause reader finis fp!}, press Control-E and enter \passthrough{\lstinline!quit!} at the simulator prompt. Start a new emulator with the same working copy:
+
+\begin{commandexample}[language=sh]{Host shell: restart on the same writable working copy}
+./sim4000 -a --disk work/UNIT0.saved --disk-write-through
+\end{commandexample}
+
+Initialize the date again, select \passthrough{\lstinline!s!}, and create \passthrough{\lstinline!reader!} with the same resource command. In FP, enter:
+
+\begin{commandexample}{Guest FP in reader: check and export after restart}
+lookup saved
+rebooted=tohost saved
+\end{commandexample}
+
+The saved entry is still available, and \passthrough{\lstinline!exchange/rebooted!} contains the same text. Use unused host output names: \passthrough{\lstinline!tohost!} refuses to overwrite an existing export. A repeated session may therefore need a different output name even though reading the guest file succeeds.
+
+\section{Reclaim the example file deliberately}\label{reclaim-the-example-file-deliberately}
+
+\begin{operationnote}{This cleanup changes the persistent working copy}
+Skip this section if you want to keep \passthrough{\lstinline!saved!}.
+Demoting the file to temporary scope and ending its process makes the
+monitor reclaim it; the write-through copy records that change too. Export
+or back up wanted contents before following this cleanup. The command
+names below refer only to the example file, not installed system software.
+\end{operationnote}
+
+After exporting any wanted result, demote only the example entry:
+
+\begin{commandexample}{Guest FP in reader: deliberately release the retained file}
+scope temp saved
+lookup saved
+finis
+\end{commandexample}
+
+The lookup now reports \passthrough{\lstinline!temp!}, with permanence key 0. Normal process removal then reclaims the entry. This deletion is persistent on the writable working copy; keep a backup or host export if you may want the file later. Do not demote installed utilities or shared libraries as part of this cleanup.
+
+\section{Inspect catalog information}\label{inspect-catalog-information}
+
+The protected profile also passes bounded checks of \texttt{catstat},
+\texttt{cata}, bare \texttt{show} and \texttt{claim}, including the allocation/
+reclamation example below. Use \texttt{rcin}/\texttt{rcout} for its host-file
+transfers. Compare \texttt{catstat} with a catalog export from that same guest
+session: startup can remove old temporary entries and create console entries,
+so an offline listing of the base image need not have the identical temporary
+contents. These checks do not establish every argument or catalog scope.
+
+Both profiles also pass the \texttt{search} and \texttt{catsort} scope examples
+below, including exported reports, temporary-to-user promotion and cleanup.
+The compatibility image has 414 ordinary system entries; the protected image
+has 416, including \texttt{rcin} and \texttt{rcout}. Counts and report totals
+quoted below refer to the compatibility image unless stated otherwise. In
+protected sessions replace \texttt{fromhost}/\texttt{tohost} with
+\texttt{rcin}/\texttt{rcout}; the other demonstrated commands are unchanged.
+
+The following are separate tasks, not one script to run after removing
+\passthrough{\lstinline!saved!}. Use a live ordinary FP with unused report
+names. Examples referring to \passthrough{\lstinline!keeper!} need the
+temporary and permanent claims described earlier; examples reading
+\passthrough{\lstinline!saved!} require that entry still to exist and be
+visible in the process's catalog interval. Do not repeat an import over an
+existing retained entry merely to follow the next example.
+
+\begin{longtable}{@{}>{\raggedright\arraybackslash}p{0.46\linewidth-\tabcolsep}
+  >{\raggedright\arraybackslash}p{0.54\linewidth-\tabcolsep}@{}}
+\toprule
+Question & Context and tool \\
+\midrule
+\endhead
+\bottomrule
+\endlastfoot
+Inspect a known guest name & Guest FP: \texttt{lookup} \textit{name}. \\
+List currently visible retained files & Guest FP: \texttt{search user}. \\
+List installed names alphabetically & Guest FP: \texttt{catsort scope.system}; inspect the special \texttt{catalog} entry separately. \\
+Check free guest disk allocation & Guest FP: bare \texttt{show}. \\
+Check free main-catalog slots & Guest FP: bare \texttt{cata}; this is not free disk space. \\
+Inspect the process's resource counters & Guest FP: bare \texttt{claim}; see its version-specific limitations in \manualref{inspect-resources-with-guest-claim}{the resource example}. \\
+Inspect stored main-catalog occupancy & Guest FP: bare \texttt{catstat}, with IX enabled. This is not a live file-access check. \\
+Inspect an image without booting it & host shell: \texttt{--list-catalog} or \texttt{--list-main-catalog} options to \texttt{sim4000}; stop the writer first. \\
+\end{longtable}
+
+The names \texttt{show} and \texttt{claim} above are guest programs, not
+simulator commands. The offline listers read stored disk records, not the
+running guest's visible namespace. Choose the tool for the question rather
+than treating these reports as interchangeable directory listings.
+
+FP \passthrough{\lstinline!lookup saved algol slang!} is the tested way to inspect several named entries in the running guest. To retain that report as guest text and export it, use these also-tested FP commands:
+
+\begin{commandexample}{Guest FP: inspect named entries and export the report}
+details=lookup saved algol slang
+detailsout=tohost details
+\end{commandexample}
+
+\passthrough{\lstinline!details!} is a temporary text result, not a live catalog database. Its host export \passthrough{\lstinline!exchange/detailsout!} is readable without a binary decoder. It lists only the names requested, not every file on disk. Bare \passthrough{\lstinline!lookup!} does not provide a complete directory listing in this version.
+
+\subsection{\texorpdfstring{List a scope with \texttt{search}}{List a scope with search}}\label{list-a-scope-with-search}
+\index{search}
+
+Use \passthrough{\lstinline!search!}, another entry point in \passthrough{\lstinline!utility!}, to list entries without knowing their names in advance. In an FP process:
+
+\begin{commandexample}{Guest FP: list one catalog scope per command}
+search temp
+search user
+search system
+\end{commandexample}
+
+These select temporary entries, retained user entries, and installed system entries respectively. They print descriptors like \passthrough{\lstinline!lookup!}, not just names. The selectors are scope names, not disk names: \passthrough{\lstinline!search disc!} is not the way to list the disk. Bare \passthrough{\lstinline!search!} gives no useful listing in the tested version. Use a separate call for each scope; \passthrough{\lstinline!search temp user system!} did not produce a combined listing in the checkpoint.
+
+The system listing is long. To collect it as text instead of scrolling the terminal, use the following workflow in the \passthrough{\lstinline!keeper!} process described above:
+
+\begin{commandexample}{Guest FP in keeper: collect and export scope reports}
+templist=search temp
+userlist=search user
+syslist=search system
+rootlist=lookup catalog
+listing=copy templist userlist syslist rootlist
+listout=tohost listing
+\end{commandexample}
+
+\passthrough{\lstinline!copy!} concatenates the input text files in the order given. The resulting host \passthrough{\lstinline!exchange/listout!} contains the reports and can be read with a host text editor. Choose unused result and export names. The checkpoint's bounded 200-segment/ten-entry temporary claim is sufficient for the supplied image and this example; larger or substantially changed images may need more space.
+
+The special \texttt{lookup catalog} descriptor ends its first line with
+\texttt{; ***}: its unusual interval has no ordinary printable scope label.
+This inline label is not a leading \texttt{***lookup} error diagnostic.
+
+The extra \passthrough{\lstinline!lookup catalog!} is intentional: this image's special \passthrough{\lstinline!catalog!} entry has an upper base of \passthrough{\lstinline!8388606!}, unlike ordinary system entries ending at \passthrough{\lstinline!8388605!}, and is not included by \passthrough{\lstinline!search system!}. The combined export has been checked against all 415 names in the shipped native catalog, including 11-character names that touch \passthrough{\lstinline!=!} without a separating space. It also contains the newly created temporary and user test entries. Labels such as \passthrough{\lstinline!system.disc!} can appear on shared-file entry points; they are descriptor labels, not additional names to type as programs.
+
+This is coverage of the supplied image in a process with the default catalog intervals, not an unrestricted directory scan under every possible base or login arrangement. The calls are separate snapshots, not an atomic combined view: a temporary report can include its own result entry and a short-lived \texttt{wrk} working entry that has already disappeared when the next command runs. Reports created later will not appear in an earlier snapshot. Do not expect alphabetical ordering. After exporting, remove the report files with:
+
+\begin{commandexample}{Guest FP: remove only the temporary listing reports}
+clear temp templist userlist syslist rootlist listing
+\end{commandexample}
+
+Normal \passthrough{\lstinline!finis!} also reclaims these temporary reports. No promotion to \passthrough{\lstinline!user!} is needed merely to export a listing.
+
+\subsection{\texorpdfstring{Alphabetical catalog reports with \texttt{catsort}}{Alphabetical catalog reports with catsort}}\label{alphabetical-catalog-reports-with-catsort}
+\index{catsort}
+
+For a compact, alphabetically sorted guest report, enter in an ordinary FP process with console output selected:
+
+\begin{commandexample}{Guest FP: print compact catalog reports}
+catsort
+catsort scope.system
+\end{commandexample}
+
+Bare \passthrough{\lstinline!catsort!} reports local catalog groups, not just temporary files. In a freshly created \passthrough{\lstinline!muser!} process with no retained user files, it lists only the temporary console entries \passthrough{\lstinline!c!} and \passthrough{\lstinline!v!}, with a total of zero segments and two entries. It is not a complete disk directory. The scope-selection example below shows what changes when a user file exists.
+
+\passthrough{\lstinline!catsort scope.system!} lists the installed system entries. On the supplied image, the tested report contains 414 different names in alphabetical order, including \passthrough{\lstinline!algol!}, \passthrough{\lstinline!fromhost!}, \passthrough{\lstinline!slang!} and \passthrough{\lstinline!tohost!}. Like \passthrough{\lstinline!search system!}, it excludes the special \passthrough{\lstinline!catalog!} entry; inspect that separately with \passthrough{\lstinline!lookup catalog!}. The report has page headings, base/scope information, entry sizes or type markers, document names and encoded descriptor metadata. For an unambiguous named descriptor, use \passthrough{\lstinline!lookup name!}; not every numeric field or type marker in the compact report is decoded here.
+
+The native-monitor report has eight numbered page headings; the tested standard-monitor variant has seven. Both use form-feed characters between pages. Neither pauses for a key at each page: use terminal scrollback or export the report as described below. The final entry total is 2,818 segments and 414 entries; a separate disk summary prints 967 slices, 2,901 segments and 414 entries. These are catalog report totals, \textbf{not free disk space} and not the process's remaining resource claim. Use \passthrough{\lstinline!show!} and \passthrough{\lstinline!claim!} for those questions.
+
+Both commands return to FP without attention, and the regression checkpoint runs them in a volatile disk overlay without changing the shipped image. Selectors beyond the examples here, custom sort keys and the \passthrough{\lstinline!cat!} alias have not been verified. \passthrough{\lstinline!cat!} is a guest entry point in \passthrough{\lstinline!catsort!}, not the host file-display command; use \passthrough{\lstinline!c=copy filename!} to display guest text.
+
+To keep the alphabetical system report as text, choose unused report and host export names and enter:
+
+\begin{commandexample}{Guest FP: save the system report, then restore console output}
+o sortreport
+catsort scope.system
+o c
+sortout=tohost sortreport
+lookup sortreport
+clear temp sortreport
+\end{commandexample}
+
+\passthrough{\lstinline!o sortreport!} selects a temporary guest text file as FP's output destination. The report goes there instead of to the console; command echoes may still appear on the console. \passthrough{\lstinline!o c!} restores console output before export or cleanup. The host file \passthrough{\lstinline!exchange/sortout!} contains all 414 names and the same descriptor rows and totals as the console report. Text export removes guest text padding and the end marker and uses LF line endings; form feeds remain page separators. The example's 200-segment/ten-entry temporary claim is sufficient for this shipped image. The report is a snapshot, not a live directory database.
+
+After export, \passthrough{\lstinline!clear temp sortreport!} removes only the guest report, not the host file. The regression checkpoint confirms that the name becomes unknown and guest free disk space returns to its pre-report value. If export fails, keep the report until the cause has been corrected; do not clear it merely because a later FP command can still run.
+
+\subsection{\texorpdfstring{Distinguish temporary and retained files in \texttt{catsort}}{Distinguish temporary and retained files in catsort}}\label{distinguish-temporary-and-retained-files-in-catsort}
+
+This scope demonstration is independent of the earlier retention-and-cleanup
+recipe. Start a fresh disposable session, initialize the date, select
+\texttt{s}, and create \texttt{keeper} with
+\texttt{new keeper size 100000 temp disc 200 10 perm disc 200 10 run}.
+Prepare a short ASCII/LF \texttt{exchange/input} file in the host working
+directory. In that idle FP, import two small files under unused names:
+
+\begin{commandexample}{Guest FP in keeper: compare temporary and retained scopes}
+saved=fromhost input
+gone=fromhost input
+catsort scope.temp
+scope user saved
+catsort
+catsort scope.temp
+catsort scope.user
+\end{commandexample}
+
+Before promotion, \passthrough{\lstinline!catsort scope.temp!} lists \passthrough{\lstinline!c!}, \passthrough{\lstinline!gone!}, \passthrough{\lstinline!saved!}, \passthrough{\lstinline!v!} in alphabetical order. After promotion it lists only \passthrough{\lstinline!c!}, \passthrough{\lstinline!gone!}, \passthrough{\lstinline!v!}: the retained \passthrough{\lstinline!saved!} entry is no longer temporary. The two imports in the checkpoint occupy 36 segments each; the temporary total drops from 72 segments/four entries to 36 segments/three entries.
+
+The other two reports are broader. Bare \passthrough{\lstinline!catsort!} first lists \passthrough{\lstinline!saved!} under a \passthrough{\lstinline!project!} heading, then \passthrough{\lstinline!c!}, \passthrough{\lstinline!gone!}, \passthrough{\lstinline!v!} under \passthrough{\lstinline!temp!}. Explicit \passthrough{\lstinline!catsort scope.user!} lists the same names, but labels the first group \passthrough{\lstinline!perm!}. Both groups have the base pair \passthrough{\lstinline!8388605 8388605!} in this supplied system. The \passthrough{\lstinline!perm!}/\passthrough{\lstinline!project!} report labels do not replace the \passthrough{\lstinline!; user!} descriptor reported by \passthrough{\lstinline!lookup saved!}. Sorting is within each group, not necessarily across the whole report.
+
+Consequently, \textbf{\passthrough{\lstinline!catsort scope.user!} is not an exact equivalent of \passthrough{\lstinline!search user!}} and is not a retained-files-only filter in this environment. Use \passthrough{\lstinline!search user!} when that distinction matters, and inspect scope headings rather than assuming every row has the scope named in the command. These observations apply to the supplied native monitor and default process intervals, not every historical \passthrough{\lstinline!catsort!} version or login arrangement.
+
+These reports do not change the two files. The checkpoint exports \passthrough{\lstinline!saved!} unchanged after process removal and after a fresh machine boot on a writable working image. The temporary \passthrough{\lstinline!gone!} is reclaimed when its process ends. Actual retention still requires a persistent overlay or writable working copy; \passthrough{\lstinline!scope user!} alone cannot preserve a volatile overlay across simulator exit. Use the earlier persistent-file workflow for deliberate removal of \passthrough{\lstinline!saved!}, and never demote installed utilities for this example.
+
+\subsection{Statistics and offline inspection}\label{statistics-and-offline-inspection}
+\index{show!guest disk space}
+\index{cata}
+\index{Catalog!free slots}
+\index{Catalog!offline inspection}
+
+At FP, the installed guest program \passthrough{\lstinline!show!} reports free disk allocation:
+
+\begin{commandexample}{Guest FP: ask for free guest disk space}
+show
+\end{commandexample}
+
+For example, in the checked session before importing files it prints:
+
+\begin{commandexample}{Guest output: free-space report (session-dependent values)}
+free disc space:
+disc        :  1025 slices,   3075 segm.
+\end{commandexample}
+
+These numbers change with the files currently allocated. The supplied \passthrough{\lstinline!disc!} uses three 768-byte RC segments per slice; a slice is therefore 2304 bytes. The report concerns guest disk space, not available host filesystem space, unused catalog entries or the current process's remaining resource claim. The example process still needs its \passthrough{\lstinline!temp disc 200 10!} claim even when \passthrough{\lstinline!show!} reports more than 200 free segments.
+
+For a bounded allocation/reclamation example, put the two-line ASCII/LF sample used by the editor in host file \passthrough{\lstinline!exchange/input!}, choose an unused guest name \passthrough{\lstinline!spacetmp!}, and enter in FP:
+
+\begin{commandexample}{Guest FP: check bounded allocation and reclamation}
+show
+spacetmp=fromhost input
+lookup spacetmp
+show
+clear temp spacetmp
+lookup spacetmp
+show
+\end{commandexample}
+
+The checked import allocates 36 segments, as its \passthrough{\lstinline!lookup!} descriptor shows. Free space decreases by 12 slices / 36 segments, not merely by the short text's byte length. After \passthrough{\lstinline!clear!}, \passthrough{\lstinline!lookup!} reports \passthrough{\lstinline!***lookup spacetmp unknown!}, and \passthrough{\lstinline!show!} returns to the original free-space counts. That unknown-name diagnostic is expected after deletion. Repeated bare \passthrough{\lstinline!show!} calls without intervening allocation give unchanged counts. This workflow returns to FP without attention or a reset and works with both supported monitor/controller configurations. Other \passthrough{\lstinline!show!} arguments, multiple disk devices and fragmentation reporting remain unverified.
+
+Do not confuse this guest command with \passthrough{\lstinline!show cpu!}, \passthrough{\lstinline!show media!} and the other simulator commands at \passthrough{\lstinline!sim4000>!}. In particular, do not add a filename to bare guest \passthrough{\lstinline!show!} expecting to print its contents.
+
+The existing \passthrough{\lstinline!cata!} program runs without arguments and prints Danish catalog statistics, including:
+
+\begin{itemize}
+\tightlist
+\item
+  \passthrough{\lstinline!antal segmenter!}: number of segments;
+\item
+  \passthrough{\lstinline!indgange ialt!}: total entry slots;
+\item
+  \passthrough{\lstinline!frie indgange!}: free entry slots.
+\end{itemize}
+
+It also prints occupancy/key-frequency distributions. It is not a file-name lister. These figures describe the monitor's main catalog area \passthrough{\lstinline!catalog!}, not the device catalog \passthrough{\lstinline!catdisc!}. The two stored layers in native \passthrough{\lstinline!UNIT0!} differ:
+
+\begin{longtable}[]{@{}lrrl@{}}
+\toprule\noalign{}
+Layer & Segments & Occupied entries & Offline command \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+Device catalog \passthrough{\lstinline!catdisc!} & 36 & 415 & \passthrough{\lstinline!--list-catalog!} \\
+Monitor main catalog \passthrough{\lstinline!catalog!} & 72 & 418 & \passthrough{\lstinline!--list-main-catalog!} \\
+\end{longtable}
+
+Both use 15 entry slots per segment: 1080 main-catalog slots versus 540 device slots. The pristine main area contains the same names plus \passthrough{\lstinline!c!}, \passthrough{\lstinline!v!}, and \passthrough{\lstinline!catdisc!}; its area document fields use \passthrough{\lstinline!disc!} where device-level records can use \passthrough{\lstinline!wrk000011!}. These are not 418 separate applications. \passthrough{\lstinline!cata!}'s free-slot report has been checked against empty records in a binary export of \passthrough{\lstinline!catalog!} during the same session. It is not a free-disk-space report.
+
+For a complete read-only name and metadata list after leaving the writable session, run in the host shell:
+
+\begin{commandexample}[language=sh]{Host shell: inspect a stopped session's working disk image}
+./sim4000 --list-catalog work/UNIT0.saved
+./sim4000 --list-main-catalog work/UNIT0.saved
+\end{commandexample}
+
+These commands see stored image records, not a running emulator's volatile overlay or in-memory catalog state. The main area can contain obsolete temporary descriptors: the checked working image still contained \passthrough{\lstinline!gone!} there after its file had disappeared from the device catalog. A listed descriptor is not proof of accessible backing storage. Use guest \passthrough{\lstinline!search!}/\passthrough{\lstinline!lookup!} for the running session; neither offline command is a complete consistency checker. Do not read during guest writes.
+
+\subsection{Stored catalog occupancy with optional IX}\label{stored-catalog-occupancy-with-optional-ix}
+\index{IX}
+\index{catstat}
+
+The supplied \passthrough{\lstinline!catstat!} program needs the IX index instruction, which is enabled by default. Start the emulator with \passthrough{\lstinline!./sim4000 -a!}, then enter this FP command:
+
+\begin{commandexample}{Guest FP with IX enabled: report stored catalog occupancy}
+catstat
+\end{commandexample}
+
+This bare invocation lists names and occupied-entry counts for all 72 stored main-catalog segments (418 stored records in the supplied image), then returns normally to FP with \passthrough{\lstinline!end 18!}. The output agrees with the offline main-catalog listing, including duplicate names and their segment positions. Stored records are not necessarily accessible files: this is not a live namespace check or a free-capacity report. Use guest \passthrough{\lstinline!search!}/\passthrough{\lstinline!lookup!} to check current accessibility. Other \passthrough{\lstinline!catstat!} argument forms have not been validated with IX enabled.
+
+IX is enabled by default, also when the configuration omits \passthrough{\lstinline!CPU IX!}. \passthrough{\lstinline!CPU IX=NO!} disables it; \passthrough{\lstinline!--no-ix!} overrides an enabling configuration; \passthrough{\lstinline!show cpu!} reports the selected capability. This is a narrow compatibility extension, not a complete RC8000 CPU profile or a replacement monitor. IX follows Henrik Jacobsen's newer emulator source; its precise historical hardware-model assignment has not yet been verified. It is an instruction, not an emulated CPU flag. \passthrough{\lstinline!CPU IX=YES!} is the emulator's capability switch.
+
+\begin{operationnote}{IX-disabled diagnostics are not the normal workflow}
+With IX enabled (the default), the tested bare \texttt{catstat} completes.
+The specific recovery example below deliberately disabled IX; it is not
+part of default startup or normal catalog inspection.
+There is no need to provoke a guest break merely to inspect the catalog.
+\end{operationnote}
+
+Leave IX enabled when using \texttt{catstat}. With IX disabled it pauses with
+\texttt{break 0 line 18-19}; changing the input file is not a working workaround.
+Use \texttt{search} or \texttt{catsort} instead if that extension is deliberately
+disabled.
+
+\subsection{Recover FP after this guest program break}\label{recover-fp-after-this-guest-program-break}
+\index{Error recovery!IX-disabled catstat}
+
+The failed \passthrough{\lstinline!catstat sortreport!} investigation with
+IX disabled produces the following output. This is a recovery example for
+that specific paused process, not a required step in normal catalog inspection:
+
+\begin{commandexample}{Guest output: the investigated IX-disabled program break}
+break        0  line  18-19
+
+from s
+pause muser break fp
+\end{commandexample}
+
+The simulator is still running; it is the guest process that has paused. For this tested case, press bare Escape, select \passthrough{\lstinline!s!} at \passthrough{\lstinline!att!}, then enter:
+
+\begin{commandexample}{Guest system process s: reinitialize the paused FP}
+proc muser start
+\end{commandexample}
+
+Replace \passthrough{\lstinline!muser!} with the actual paused process name. The supplied system prints \passthrough{\lstinline!***fp reinitialized!} and accepts FP commands again. This is a reinitialization of the file processor, not a continuation of the failed \passthrough{\lstinline!catstat!} computation. A complete emulator restart is not needed here.
+
+After this specific recovery, use lookup to inspect any wanted files and export them under unused host names before cleanup. Export important files before deleting or removing their process; do not use this example as a reason to assume all resources survive every kind of guest failure.
+
+The recovery is checked with both supplied monitor/controller variants for this specific break. Other traps, damaged FP state and interrupted command files have not been validated. A guest Algol \passthrough{\lstinline!break!} message is distinct from the simulator's execution breakpoints and its Ctrl-E operator prompt.

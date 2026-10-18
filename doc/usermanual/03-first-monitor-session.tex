@@ -1,0 +1,71 @@
+\chapter{First monitor session}\label{first-monitor-session}
+\index{Date!initialization}
+\index{Command contexts}
+
+The preceding build-and-start procedure has already started the emulator.
+If you are using a copied working directory instead, run \texttt{./sim4000 -a}
+there once. The following steps are guest input, not host shell commands.
+
+The supplied monitor normally prints messages including:
+
+\begin{commandexample}{Guest output: startup messages}
+from s
+disc         mounted on 015
+ready  **date not initialized
+
+from startproc
+
+initialize date:
+\end{commandexample}
+
+Enter six two-digit fields, followed by Return:
+
+\begin{commandexample}{Guest input: answer the date question}
+86 09 30 08 00 00
+\end{commandexample}
+
+The fields are year, month, day, hour, minute, and second. The monitor accepts years 1982 through 1999. Alt-D can insert the translated host date; the default \passthrough{\lstinline!DATE YEAROFFSET=-40!} maps 2026 to 1986. If your terminal intercepts Alt-D, press Control-E, enter \passthrough{\lstinline!send-date!} at \passthrough{\lstinline!sim4000>!}, and enter \passthrough{\lstinline!continue!}. A manually entered date avoids dependency on host-date settings.
+
+After \passthrough{\lstinline!pause startproc finis fp!}, press bare Escape. At \passthrough{\lstinline!att!}, type \passthrough{\lstinline!s!} and press Return to select the system process. You can now enter a system command such as \passthrough{\lstinline!new!}. If Escape is inconvenient, use the simulator commands instead:
+
+\begin{commandexample}{Key press, then commands at the simulator prompt}
+<Control-E>
+attention
+continue
+\end{commandexample}
+
+Then type \passthrough{\lstinline!s!} and Return in the RC terminal, not at \passthrough{\lstinline!sim4000>!}.
+
+Create an ordinary user process before running programs or transferring files:
+
+\begin{commandexample}{Guest system process s: create a user FP}
+new work size 100000 run
+\end{commandexample}
+
+Wait for \passthrough{\lstinline!to work!}, then enter the program name in FP:
+
+\begin{commandexample}{Guest FP in work: start the demonstration}
+geo
+\end{commandexample}
+
+The example program asks \passthrough{\lstinline!dansk/English ?!}; enter \passthrough{\lstinline!e!} to select English. This demonstrates that the disk-resident program is running. Only enter \passthrough{\lstinline!geo!} when you actually want that program; the \passthrough{\lstinline!new!} command alone leaves the new process ready for other FP commands.
+
+To suspend execution, press Control-E. Use \passthrough{\lstinline!continue!} (or \passthrough{\lstinline!c!}) to return to the RC session without resetting it. Use \passthrough{\lstinline!quit!} (or \passthrough{\lstinline!q!}) at the simulator prompt to exit. Quitting does not preserve a volatile disk overlay.
+
+\section{Startup and terminal recovery}\label{startup-and-terminal-recovery}
+\index{Startup!recovery}
+
+Run from the build or working directory so the default configuration is found. Configured paths are relative to the configuration file; command-line overrides and runtime attachment paths are relative to the current directory.
+
+If startup reports a missing \passthrough{\lstinline!HOSTFILES!} root, create the configured \passthrough{\lstinline!exchange!} directory. It must already exist when the emulator starts.
+
+If a date is rejected, check the year range and configured year offset. Use a known valid historical date manually when necessary. If the terminal is left in an unusable state after a host crash or forced termination, run \passthrough{\lstinline!stty sane!} in the host shell.
+
+Telnet attention selects an RC process; it does not open the simulator prompt. A process already attached to another terminal must first be released there, as explained in \manualref{telnet-consoles}{Telnet consoles}.
+
+For the file tutorials, start a fresh disposable session and follow
+\manualref{create-and-inspect-a-process}{Create and inspect a process}.
+Do not enter their FP commands while \texttt{geo} is waiting for an answer.
+If you only tried the demonstration, Control-E followed by \texttt{quit}
+ends this disposable session; start \texttt{./sim4000 -a} again in the host
+shell and initialize its date before the next tutorial.

@@ -1,0 +1,4 @@
+# Keep monitor sources LF-terminated while retaining historical whitespace.
+monsrc/* text eol=lf
+monsrc/h* whitespace=-blank-at-eol
+monsrc/m* whitespace=-blank-at-eol

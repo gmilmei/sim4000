@@ -1,0 +1,59 @@
+\chapter{Paper-tape files}\label{paper-tape-files}
+\index{Paper tape}
+\index{Reader}
+\index{Punch}
+
+\section{Mount and inspect a reader tape}\label{mount-and-inspect-a-reader-tape}
+\index{Paper tape!reader attachment}
+
+The configured RC2000-compatible paper-tape reader uses device 0. Its media is managed at the suspended simulator prompt, not from guest FP. The following shows media-control syntax; no guest reading occurs between these commands:
+
+\begin{commandexample}{Simulator prompt: reader media controls}
+attach 0 bootstrap.pt
+show media
+rewind 0
+detach 0
+\end{commandexample}
+
+The reader must already be declared in the selected configuration. \passthrough{\lstinline!attach!} opens a host file, \passthrough{\lstinline!rewind!} resets the mounted reader position, and \passthrough{\lstinline!detach!} removes the media. Runtime file arguments are relative to the emulator's current directory. Mounting does not execute the tape or install guest software. Do not replace or rewind media while guest software still expects its current position.
+
+Reader files are raw 8-bit paper-tape bytes, not text translations. Each byte contains the data holes and its parity bit; zero bytes represent blank feed and are skipped. Odd-, even-, and general-input modifiers retain the behavior of Henrik Jacobsen's original reader implementation. Autoload requires odd parity and combines the low six bits of four successive nonzero bytes into one RC4000 word. End of file produces the RC2000 end-of-paper status and leaves the reader empty. Mount, completed input, end of paper, and rewind request the configured reader interrupt.
+
+For a tape mounted at startup, add a path to the configuration. Paths in the configuration are resolved relative to \passthrough{\lstinline!RC4000.cfg!}:
+
+\begin{commandexample}{RC4000.cfg contents: mount a reader tape at startup}
+DEFINE READER DEVNO=0 INTNO=9 FILE=bootstrap.pt
+\end{commandexample}
+
+\section{Distinguish paper-tape autoload from disc startup}\label{distinguish-paper-tape-autoload-from-disc-startup}
+\index{Paper tape!autoload}
+
+The simulator's \passthrough{\lstinline!autoload!} command requires the CPU's reset state and a reader mounted on device 0. It reads the initial word and enters the tape bootstrap; it is not the same operation as \passthrough{\lstinline!-a!}, which starts the supplied disc-based monitor session. Suspending execution alone does not put the CPU in reset state. See \manualref{simulator-commands-and-aliases}{the simulator command reference} before using hardware reset/start controls.
+
+The repository does not include a historical system paper-tape image. The reader and control-panel autoload path are nevertheless covered by a generated bootstrap tape in the deterministic tests.
+
+\section{Create and close punch output}\label{create-and-close-punch-output}
+\index{Paper tape!punch output}
+\index{Paper tape!explicit replacement}
+
+The RC150-compatible paper-tape punch uses device 1. It produces the same raw 8-bit tape format accepted by the reader. Its device must already be configured. These media controls create and close a file; guest output must occur while it is attached if the file is to contain punched data:
+
+\begin{commandexample}{Simulator prompt: punch media controls}
+attach 1 output.pt
+show media
+detach 1
+\end{commandexample}
+
+Odd- and even-parity output modes generate the parity bit from the low seven bits of each character. General output writes all eight bits unchanged. Every completed character requests interrupt 12 in the shipped configuration. Sense reports timer status while no output tape is mounted. Detach flushes and synchronizes the output before closing it and refuses to detach if that fails.
+
+For safety, \passthrough{\lstinline!attach 1 output.pt!} creates a new file and refuses an existing path. Destructive replacement must be explicit:
+
+\begin{operationnote}{Replacement destroys the previous tape contents}
+The \passthrough{\lstinline!replace!} form below truncates an existing output file. It is an alternative to the safe create-new form, not the next step in the ordinary workflow. Preserve wanted output first; do not use replacement to retry without checking the destination.
+\end{operationnote}
+
+\begin{commandexample}{Simulator prompt: explicitly replace a punch output file}
+attach 1 output.pt replace
+\end{commandexample}
+
+A \passthrough{\lstinline!FILE=output.pt!} parameter on \passthrough{\lstinline!DEFINE PUNCH!} can create and mount a new output file at startup. It uses the same no-replacement rule, and paths are resolved relative to the configuration file.

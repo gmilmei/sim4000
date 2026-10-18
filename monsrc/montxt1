@@ -1,0 +1,1158 @@
+
+b.
+m.  monitor 3 version 10.11.77  12.00.00
+m.                monitor text 0
+; rc date
+
+; rc 4000 system tape
+; per brinch hansen
+;     this tape is an autoload version of the rc 4000 multiprogramming
+; system. it is written in the slang 3 language and consists of
+; 10 segments surrounded by a global block:
+;
+; global block, definitions:
+;     a names define system constants;
+;     b names define entries in the monitor table;
+; segment 1; start monitor segment 10:
+;     contains a jump to segment 10;
+; segment 2, monitor:
+;     contains interrupt response code and monitor procedures;
+; segment 3, external processes:
+;     contains send message and code for input/output;
+; segment 4, process descriptions:
+;     contains name table, process descriptions, and message buffers;
+; segment 5, initialize monitor:
+;     executed and removed immediately after loading;
+; segment 6, process functions:
+;     contains code for catalog administration and the
+;     creation and removal of processes;
+; segment 7, initialize process functions:
+;     executed and removed immediately after loading;
+; segment 8, operating system s:
+;     contains code which allows the operators to
+;     create and control new process from consoles;
+; segment 9, initialize catalog
+;     starts the multiprogramming system and is
+;     itself immediately executed as a part of the
+;     process s; it can initialize the backing store
+;     with catalog entries and binary programs
+;     input from paper tape or magnetic tape;
+; segment 10: move monitor:
+;     allocates segment 2 - 9 after autoloading
+
+
+; global block, definitions
+
+   a199,b136
+
+; size options:
+; a1 = no of area processes
+; a3 = no of internal processes
+; a5 = no of message buffers
+; a7 = no of pseudoprocesses
+; a87 = inspection interval
+; a109 = min aux-cat key
+; a110 = max cat key
+; a111 = min key for entries between standard and max interval
+; a112 = no. of bs-devices
+; a113 = no. of drum chains
+; a114 = size of drum chains
+; a115 = no. of disc chains
+; a116 = size of disc chains
+; a117 = no of messagebuffers assigned to consoles
+; a118 = update aux cat 
+
+; monitor option table:
+w.
+a2=k           ; startaddr(mon opt table)
+
+     0         ; q6+ 0  addr(opt. list start);
+     0         ; q6+ 2  addr(opt. list top)=addr(int. list);
+     0         ; q6+ 4  addr(int. list top)= addr(s console table);
+     0         ; q6+ 6  addr(s console table top)= addr(s device list);
+     0         ; q6+ 8  addr(s device list top);
+     0         ; q6+10  addr(bs-table)
+     0         ; q6+12  top addr(bs-table)
+     0         ; q6+14  addr(fp base);
+     0         ; q6+16  addr(slang base);
+     0         ; q6+18  addr(slang return);
+     0         ; q6+20  start addr(name table);
+     0         ; q6+22  top addr(name table);
+     0         ; q6+24  start addr(final proc desc area);
+     0         ; q6+26  start addr(final addr std proc desc's),
+               ;            top addr(final proc desc area);
+     0         ; q6+28  start addr(temp proc desc area), start addr(bs-catalog);
+     0         ; q6+30  top addr(temp proc desc area),top addr(bs-catalog);
+
+b.c24 w.
+; predefinition of option variables:
+a130=00 00 00  ; date of options,
+a131=00 00 00  ;  time:=undefined
+a132=2         ; monitor release
+a1=0           ;
+a3=0           ;
+a5=0           ;
+a9=0           ; number of subdevices
+a80=0
+a81=0          ;
+a85=256        ; max time slice in 0.1 ms
+a89=8.4777 7777; standard interrupt mask
+a91=0          ;
+a92=1<21  ;
+a93=1<23       ;
+a109=2         ;
+a110=3         ;
+a111=3         ;
+a114=0         ;
+a116=0         ;
+a128=2.1       ; a128=0 : std monitor gen.
+               ;     >0 : option gen.
+               ;  a128 o. 1<1 : read special s size options in segment 6
+               ;  a128 o. 1<2 : rc 6000 monitor
+a140=1<23      ; convert small letters to capitol letters in tmx
+a141=7496500   ; name of monitor <:rc4000:>
+a142=3158064   ;
+a143=0         ;
+a144=0         ;
+
+; predefinition of s size options:
+c3=3           ; no of own work areas
+c12=11500      ; standard process size
+c13=50         ; standard work entry claim
+c14=500        ; standard segment claim
+c16=50         ; standard main cat entry claim
+c23=-1         ; systemoptions
+
+; here the options are inserted:
+a4=k           ; start(option text)
+t.
+
+a6=k           ; top(option text)
+
+a120=c3, a121=c12, a122=c13, a123=c14, a124=c16, a125=c23
+
+e.
+
+c.-a128 m.                monitor size options included
+z.
+
+c.a128-1  ; if option gen then:
+
+; global block, defn
+b.n10,q10 w.
+
+m.                option1 - start
+
+; this block reads the option text and transfers them into a suitable
+; form.
+; item structure:
+;  <delimiter><item-lenght>
+;  >param1>
+;  <param2>
+;  etc.
+;
+; the delimiters are:
+n0=0   ;  line no
+n1=2   ;  type
+n2=4   ;  device number
+n3=6   ;  repeats
+n4=8   ;  interrupt number
+n5=10  ;  expander devno
+n6=12  ;  name
+n7=14  ;  all
+n8=16  ;  special parameters
+n10=18 ;  catalog size definition
+n9=20  ;  finis
+
+; local block,defn.
+b.b30,c40,d10,e20,g10,i20,m10 w.
+c22=a6   ; top(option text)
+
+c15=95   ; max type no;
+
+; param area:
+i0:  0         ;  get pointer(in option text);
+i1:  0         ;  char pointer;
+i4:  0         ;  item out-pointer;
+i5:  0         ;  param out-pointer;
+i6:  10        ;  used for multiplying;
+i7:  0         ;  save addr for links;
+i8:  0         ;  save words;
+i9:  0         ;  current line no;
+
+; delimiter table:
+i2:  10,  jl.   g0.    ;  nl
+     116, jl.   g5.    ;  't'
+     100, jl.   g2.    ;  'd'
+     114, jl.   g2.    ;  'r'
+     105, jl.   g2.    ;  'i'
+     101, jl.   g2.    ;  'e'
+     110, jl.   g3.    ;  'n'
+     97,  jl.   g2.    ;  'a'
+     112, jl.   g2.    ;  'p'
+     99,  jl.   g2.    ;  'c'
+     102, jl.   g4.    ;  'f'
+     32,  jl.   g0.    ;  sp
+i3:  59,  jl.   g1.    ;  ';'
+
+
+; procedure get char. the procedure fetches the next char(<>0 and 127)
+; from the option area, and counts the number of lines.
+;        call:          return:
+;  w0                   char
+;  w1                   destroyed
+;  w2                   unchanged
+;  w3    link           unchanged
+b.j0 w.
+e0:  rl. w0 (i0.)      ;  load word(get pointer);
+     rl. w1  i1.       ;  load char-pointer;
+     ls  w0  x1        ;  mask off the char;
+     ls  w0  -16       ;
+     al  w1  x1+8      ;  char-pointer:=char-pointer+8;
+     se  w1  24        ;  if char-pointer=24 then
+     jl.     j0.       ;   begin
+     rl. w1  i0.       ;    get-pointer:=getpointer+2;
+     al  w1  x1+2      ;    char-pointer:=0;
+     rs. w1  i0.       ;   end;
+     sl. w1  c22.      ;  if get-pointer>addr(last word in optiontext) then
+     jl.     e10.      ;    goto error;
+     al  w1  0         ;
+j0:  rs. w1  i1.       ;  save char-pointer;
+     se  w0  0         ;  if char=0 or 127 then
+     sn  w0  127       ;    skip char and
+     jl.     e0.       ;    get next char;
+     rl. w1  i9.       ;  if char='nl' then
+     al  w1  x1+1      ;    line no:=line no+1;
+     sn  w0  10        ;  
+     rs. w1  i9.       ;
+     jl      x3        ; exit: return;
+e.
+
+; procedure read parameters. the procedure reads parameters from the option
+; text and inserts them in options.
+b.j3,i0 w.
+i0:          0         ;  save sign
+e1:  rs. w3  i7.       ;  save link;
+j2:  al  w2  0         ;  number:=0;
+j0:  jl. w3  e0.       ;  get char;
+     se  w0  45        ;  if char='-' then
+     jl.     j3.       ;   begin
+     rs. w0  i0.       ;    sign:=45;
+     jl.     j0.       ;    goto get char; end;
+j3:  sl  w0  48        ;  if 47<char<58 then
+     sl  w0  58        ;   begin
+     jl.     j1.       ;    
+     wm. w2  i6.       ;    number:=number*10;
+     wa  w2  0         ;    number:=number+char-48;
+     al  w2  x2-48     ;   end;
+     jl.     j0.       ;
+j1:  al  w1  0         ;
+     rx. w1  i0.       ;
+     se  w1  0         ;  if sign='-' then
+     ac  w2  x2        ;    number:=-number;
+     rl. w1  i5.       ;
+     al  w1  x1+2      ;  update out-pointer;
+     rs. w1  i5.       ;
+     rs  w2  x1        ;  store parameter;
+     sn  w0  46        ;  if char='.' then
+     jl.     j2.       ;    goto next param;
+     al  w1  x1+2      ;  pointer:=pointer(next item);
+     al  w2  x1        ;
+     ws. w2  i4.       ;  w2:=rel. out-pointer;
+     rs. w1  i5.       ;
+     rx. w1  i4.       ;  item out-addr:=next item-addr;
+     hs  w2  x1+1      ;  store item lenght;
+     se  w0  10        ;
+     sn  w0  32        ;  if char='sp' or 'nl' then
+     jl.    (i7.)      ; exit: return;
+     jl. w3  e11.      ; error: write error mess;
+     jl.     g6.       ;  goto skip until next sp or nl;
+e.
+
+; procedure save delimiter. the procedure skips chars until it meats '.',
+; and saves the delimiter in the option area.
+;        call:         return:
+;  w0                  destroyed
+;  w1                  destroyed
+;  w2    delimiter<1   destroyed
+;  w3    link          destroyed
+e2:  rs. w3  i7.       ;  save link;
+     ls  w2  -1        ;  delimiter:=w2/2;
+     hs. w2 (i4.)      ;  save delimiter;
+     jl. w3  e0.       ;  get char;
+     se  w0  46        ;  skip until '.';
+     jl.     e0.       ;
+     jl.    (i7.)      ; exit:  return;
+
+; error handling.
+; the procedure outputs an error message on current output zone. if the
+; error is 'no end delimiter' the procedure jumps to finis else returns.
+;         call:        return:
+; w0                   destroyed
+; w1                   destroyed
+; w2                   destroyed
+; w3      link         destroyed
+b.j12 w.
+d.p.<:fpnames:>
+l.
+j0:  <:no end statement<0>:>
+j1:  <:illegal parameter<0>:>
+j2:  <:unknown statement<0>:>
+j3:  <:name too long<0>:>
+j4:  <:process too small<0>:>
+j5:  <:type undefined<0>:>
+j6:  <:interruptnumber illegal<0>:>
+j7:  <:identerror<0>:>
+j8:  <:no option text<0>:>
+j9:  <:too many parameters<0>:>
+j10: <:  ***option1  <0>:>
+j11: 0                 ; text-addr
+j12: 0                 ; link
+e10: am      j0-j1     ;
+e11: am      j1-j2     ;
+e12: am      j2-j3     ;
+e13: am      j3-j4     ;
+e14: am      j4-j5     ;
+e15: am      j5-j6     ;
+e16: am      j6-j7     ;
+e17: am      j7-j8     ;
+e18: am      j8-j9     ;
+e19: al. w2  j9.       ; load error text-addr;
+     ds. w3  j12.      ;  save text-addr, link;
+     al  w2  10        ;  char:='nl';
+     rl. w3 (d5.)      ;
+     jl  w3  x3+h26-2  ;  outchar on current out;
+     rl. w0  m2.       ;  load line no;
+     rl. w2 (d5.)      ;  load fp-base;
+     jl  w3  x2+h32-2  ;  outinteger on current out;
+     32<12+3           ;    format;
+     al. w0  j10.      ;  load addr(head);
+     jl  w3  x2+h31-2  ;  outtext on current out;
+     rl. w0  j11.      ;  load text-addr;
+     jl  w3  x2+h31-2  ;  outtext on current out;
+     al  w1  1         ;  status:=error;
+     rs. w1  c8.       ;
+     sn. w0  j1.       ;  if error=no end delimiter then
+     jl.     g4.       ;    goto finis;
+     jl.    (j12.)     ; exit: return;
+e.e.
+
+; search item. the subprogram searches the next item. when the
+; delimiter is found the procedure jumps to the service rutine.
+;        call:         return:
+;  w0                  char
+;  w1                  unchanged
+;  w2                  delimiter<1
+;  w3                  destroyed
+b.j0 w.
+g0:  jl. w3  e0.       ;  get char;
+     al  w2  -4        ;  index:=-4;
+j0:  al  w2  x2+4      ; compare: index:=index+4;
+     sn. w0 (x2+i2.)   ;  if char=char(table) then
+     jl.     x2+i2.+2  ;    goto service rutine;
+     se  w2  i3-i2     ;  if not last item in table then
+     jl.     j0.       ;    goto compare;
+     jl. w3  e12.      ; error: write error mess;
+     jl.     g6.       ;  goto skip until next sp or nl;
+e.
+
+; skip comment. the subprogram skips chars until the first 'nl'.
+g1:  jl. w3  e0.       ;  get char;
+     se  w0  10        ;  if char<>'nl' then
+     jl.     e0.       ;    get char;
+     jl.     g0.       ; exit: goto search item;
+
+; transfer parameter. the subprogram transfers a parameter
+; to the option area.
+g2:  jl. w3  e2.       ;  save delimiter;
+     jl. w3  e1.       ;  read parameters;
+     jl.     g0.       ; exit: goto search item;
+
+; read name.
+; the subprogram reads a string terminated by <sp> or <nl> and
+; packs it into a 4-word-item.
+b.j5 w.
+g3:  jl. w3  e2.       ;  save delim. and skip until '.';
+     rl. w2  i4.       ;  load item-addr;
+     al  w0  0         ;
+     al  w1  0         ;    zeroes in
+     ds  w1  x2+4      ;    name-area;
+     ds  w1  x2+8      ;
+     al  w1  10        ;  insert lenght of
+     hs  w1  x2+1      ;    item in description;
+     al  w2  x2+10     ;  
+     rs. w2  i4.       ;  item-addr:=next item-addr;
+j0:  al  w2  0         ;  index:=0;
+     rs. w2  i8.       ;  save word:=0;
+j1:  al  w2  x2+2      ;  index:=index+2;
+     jl. w3  e0.       ;  get char(index);
+     se  w0  10        ;
+     sn  w0  32        ;  if char='nl' or 'sp' then
+     jl.     j3.       ;    goto end;
+     jl.     x2        ;  case index:
+     am      8         ;    word:=char<16+word;
+     ls  w0  8         ;    word:=char< 8+word;
+     wa. w0  i8.       ;    word:=char   +word;
+     rs. w0  i8.       ;  save word;
+     se  w2  6         ;  if index<>6 then
+     jl.     j1.       ;    get next char;
+     rl. w1  i5.       ;  load pointer;
+     al  w1  x1+2      ;  pointer:=pointer+2;
+     rs. w1  i5.       ;  save pointer;
+     rs  w0  x1        ;  save word;
+     se. w1 (i4.)      ;  if pointer<>addr(next item) then
+     jl.     j0.       ;    goto next loop;
+     jl. w3  e13.      ;  write error;
+     jl.     g6.       ;  goto skip until sp or nl;
+j3:  rl. w1  i4.       ;
+     rx. w1  i5.       ;  out-pointer:=addr of next item;
+     al  w1  x1+2      ;
+     rl. w2  i8.       ;  load word;
+     rs  w2  x1        ;  save word;
+     se. w1 (i4.)      ;  if pointer<>addr(next item) then
+     jl.     j4.       ;    write error;
+     rs. w0  i8.       ;
+     jl. w3  e13.      ;
+     rl. w0  i8.       ;
+j4:  jl.     g0.       ; exit: goto search item;
+e.
+
+; finis.
+g4:  al  w1  n9        ;  insert delimiter;
+     ls  w1  12        ;
+     rl. w2  i4.       ;  load out-pointer;
+     rs  w1  x2        ;
+     al  w2  x2+2      ;
+     rs. w2  i4.       ;
+     rl. w1 (d6.)      ;  load addr(slang base);
+     sl  w2 (x1+2)     ;  if end(option-store area)>=stack top then
+     jl. w3  e14.      ;    goto error;
+     jl.     g10.      ;
+
+; insert type item and line item.
+g5:  jl. w3  e2.       ; save delim;
+     jl. w3  e1.       ;  read param;
+     al  w0  4         ; line item:= 0,4;
+     rl. w1  i9.       ;  load current line no;
+     rs. w1  m2.       ;  save line no;
+     rl. w2  i4.       ;  load pointer;
+     ds  w1  x2+2      ;  insert delim,item-lenght and line no;
+     al  w2  x2+4      ;
+     rs. w2  i4.       ;
+     rs. w2  i5.       ;
+     jl.     g0.       ;
+
+; skip until sp or nl.
+g6:  jl. w3  e0.       ; loop: get char;
+     se  w0  10        ;  if char='nl' or'sp' then
+     sn  w0  32        ;   exit: goto search item;
+     jl.     g0.       ;
+     jl.     e0.       ;  goto loop;
+
+; start: initiate.
+b.j0 w.
+g9:  rs. w1  0         ; start:
+     al. w1  d0.       ;
+j0:  al  w0  x1        ;  calculate absolute
+     wa  w0  x1        ;  adresses of
+     rs  w0  x1        ;   monitor option
+     al  w1  x1+2      ;  table;
+     sh. w1  d9.       ;
+     jl.     j0.       ;
+     rl. w1  g9.       ;
+     ds. w3 (d7.)      ;  save return-addr to slang;
+     rs. w1 (d5.)      ;  save fp-base;
+     al. w1  c20.      ;
+     wa. w1  c20.      ;
+     rs. w1  c20.      ;
+     rs. w1 (d0.)      ;    option-start-addr:=
+     rs. w1  i0.       ;    init value(get-pointer);
+     rs. w1  c10.      ;
+     al. w1  c21.      ;
+     rs. w1  i4.       ;  save item-out-pointer
+     rs. w1  i5.       ;    and param-out-pointer;
+     rl. w1  c20.      ;
+     se. w1  c22.      ;  if option-start<>option-top then
+     jl.     g0.       ;    goto search item;
+     jl. w3  e18.      ; error: write error mess;
+     jl.     b2.       ;  goto finis;
+e.
+
+
+; end of translation of option-text. move options
+b.j0 w.
+g10: rl. w1  i4.       ;  load top of option-store area;
+     rl. w2  c20.      ;  load start of option-final addr;
+     al. w3  c21.      ;  load start of option-store area;
+j0:  rl  w0  x3        ;  transfer word from
+     rs  w0  x2        ;    store- to final-area;
+     al  w2  x2+2      ;  addr:=addr(next word);
+     al  w3  x3+2      ;
+     sh  w3  x1-1      ;  if addr(word)<top(store area) then
+     jl.     j0.       ;    goto `next word`;
+; the options are now placed in final area.
+     rs. w2 (d1.)      ;  save top(final area);
+     rs. w2  c11.      ;  spointer(expdevlist):=top(of final area);
+     jl.     b0.       ;  goto read parameters;
+e.
+
+c24:  <:<10><10>end of option1 - sorry<0>:>
+c25:  <:<10>                            end of option1 - ok<0>:>
+
+d0:  a2.+0    ;
+d1:  a2.+2    ;
+d2:  a2.+4    ;
+d3:  a2.+6    ;
+d4:  a2.+8    ;
+d5:  a2.+14   ;
+d6:  a2.+16   ;
+d7:  a2.+18   ;
+d8:  a2.+10   ;
+d9:  a2.+12   ;
+
+
+; the following rutines read the options and insert the
+; proper value in the condition-word,finds the highest device
+; number, find the number of drums and discs, etc.
+
+; parameter-area:
+
+c0:          0         ;  max devno+1
+c1:          0         ;  no of drums
+c2:          0         ;  no of discs
+c3:          a9        ;  no of consoles
+c4:          0         ;  no of interrupt expanders
+c5:          a9        ;  no of devices
+c6:          0         ;  condition-word1
+             0         ;  condition-word2
+             0         ;  condition-word3
+             0         ;  condition-word4
+c8:          0         ;  ok or sorry;
+c9:          0         ;  link;
+c10:         0         ;  pointer in options
+c11:         0         ;  pointer(expdevlist);
+c12:         10000     ;  inspection interval;
+c16:         24        ;
+c17:         2         ;
+c18:         10        ;
+c20:         a4.       ;  start(option text)
+c26:  113<12+6         ; q6
+c27:  113<12+7         ; q7
+c34:  113<12+8         ; q8
+c35:  113<12+9         ; q9
+c38:  113<12+10        ; q10
+c37:   97<12+87        ; a87
+c28:   97<12+113       ; a113
+c29:   97<12+115       ; a115
+c36:   97<12+117       ; a117
+c30:  113<12+0         ; q0
+c31:  113<12+1         ; q1
+c32:  113<12+2         ; q2
+c33:  113<12+3         ; q3
+
+; option area.
+m2:   0    ; line no
+m3:  -1    ; type
+m4:   0    ; devno
+m5:   1    ; repeats
+m6:  -1    ; int1
+     -1    ; int2
+m9:  -1    ; exp1
+     -1    ; exp2
+m7:  -1    ; name1
+     -1    ; name2
+     -1    ; name3
+     -1    ; name4
+m8:
+h.  m3-m2+4,m2-m3  ; line no
+    m4-m3+4,m3-m3  ; type
+    m5-m4+4,m4-m3  ; devno
+    m6-m5+4,m5-m3  ; repeats
+    m9-m6+4,m6-m3  ; int1
+    m7-m9+4,m9-m3  ; exp1
+    m8-m7+4,m7-m3  ; name1
+w.
+
+; main program.
+b0:  jl. w3  b1.       ;start: read options;
+     jl. w3  b7.       ; test interrupt;
+     jl. w3  b6.       ;  test for special action;
+     jl. w3  b5.       ;  account;
+     jl.     b0.       ;  goto start;
+
+; procedure: unpack options.
+; the procedure reads the options starting with t. and inserts the
+; values in m3-m7. the procedure terminates when meting t.,p.,a. or f.
+;          call:        return:
+; w0                    destroyed
+; w1                    delimiter
+; w2                    destroyed
+; w3       link         destroyed
+b.j6 w.
+b1:   rs.  w3   c9.     ; save link;
+      al   w0   -1      ;
+      al   w1   -1      ;
+      ds.  w1   m6.+2   ; int1:=int2:=-1;
+      ds.  w1   m9.+2   ; exp1:=exp2:=-1;
+      al   w0   1       ;
+      rs.  w0   m5.     ; repeats:=1;
+      rl.  w3   c10.    ; load option pointer;
+j3:   bz   w1   x3      ; delim:=delim(item);
+      sl   w1   n9      ; if delim>='finis' (=>finis or error)then
+      jl.       b2.     ;   goto end of options;
+      sn   w1   n1      ; if delim='type' then
+      jl.       j5.     ;   goto insert param;
+      ba   w3   x3+1    ; option-pointer:=addr(next item);
+      jl.       j3.     ; goto next delim;
+j1:   rl.  w3   c10.    ; load item-pointer;
+      bz   w1   x3      ; load delim;
+      se   w1   n1      ; if delim ='type'
+      sl   w1   n7      ;   or >'name' then
+      jl.      (c9.)    ; exit: return;
+j5:   bz   w2   x3+1    ; load item-length;
+      bl.  w0   x1+m8.  ;
+      sl   w2  (0)      ; if item-lenght>=max lenght(item) then
+      jl.       j6.     ;    goto error;
+      wa   w2   6       ; w2:=item pointer:= addr(next item);
+      rs.  w2   c10.    ; w3:= item pointer(item);
+      bl.  w1   x1+m8.+1; load first param save-addr;
+j2:   al   w3   x3+2    ; get other:= get addr + 2;
+      rl   w0   x3      ; get param;
+      rs.  w0   x1+m3.  ; store param;
+      al   w1   x1+2    ; save addr:= save addr + 2;
+      se   w3   x2-2    ; if get addr = addr(next item) + 2 then
+      jl.       j2.     ;   goto next param;
+      jl.       j1.     ; end of item unpacking: goto next item;
+j6:   wa   w2   6       ; error:
+      rs.  w2   c10.    ;
+      jl.  w3   e19.    ; write error mess;
+      jl.       j1.     ; goto next item;
+e.
+
+;  finis.
+b. j1 w.
+b2:  rl. w1 (d1.)      ;  load top(options);
+     al  w1  x1+50     ;
+     rs. w1 (d2.)      ;  save top(mon. interrupt table);
+     rl. w0  c3.       ;  load no of consoles;
+     ls  w0  2         ;  console-mask area:  4 bytes per console;
+     wa  w1  0         ;
+     rs. w1 (d3.)      ;  save top(console masks);
+     wa. w1  c5.       ;
+     sz  w1  2.1       ;  if top addr s dev list is unequel then
+     al  w1  x1+1      ;    top addr:=top addr+1;
+     rs. w1 (d4.)      ;  save top(s dev list);
+     rs. w1 (d8.)      ;  save start(bs-table);
+     rl. w0  c1.       ;  number:=
+     wa. w0  c2.       ;    number of drums, discs and privat entries;
+     wm. w0  c17.      ;
+     wa  w1  0         ;
+     rs. w1 (d9.)      ;  save top addr(bs-table);
+     am.    (d6.)      ;  savetop(option area):=program top;
+     rs  w1 (0)        ;
+     al  w0  0         ;
+j0:  al  w1  x1-2      ;  insert zeroes in
+     rs  w0  x1        ;     bs-table, s console table
+     se. w1 (c11.)     ;     s dev list and int table up to top(expdevlist);
+     jl.     j0.       ;
+     rl. w0  c8.       ;
+     se  w0  0         ;  if status=sorry then
+     jl.     j1.       ;    goto end;
+     al. w0 (d0.)      ;
+     rl. w1  c26.      ;
+     jl. w3  b20.      ;  q6:=addr(mon opt table);
+     rl. w0  c0.       ;
+     rl. w1  c27.      ;
+     jl. w3  b20.      ;  q7:=maxdevno;
+     rl. w0  c4.       ;
+     rl. w1  c34.      ;
+     jl. w3  b20.      ;  q8:=no of interrupt expanders;
+     rl. w0  c5.       ;
+     rl. w1  c35.      ;
+     jl. w3  b20.      ;  q9:=no of devices;
+     rl. w0  c3.       ;
+     rl. w1  c38.      ;
+     jl. w3  b20.      ;  q10:=no of consoles;
+     rl. w0  c12.      ;
+     rl. w1  c37.      ;
+     jl. w3  b20.      ;  a87:= test interval;
+     rl. w0  c1.       ;
+     rl. w1  c28.      ;
+     jl. w3  b20.      ;  a113:=no of drums;
+     rl. w0  c2.       ;
+     rl. w1  c29.      ;
+     jl. w3  b20.      ;  a115:=no of discs;
+     rl. w0  c3.       ;
+     rl. w1  c36.      ;
+     jl. w3  b20.      ;  a117:=no of console buffers;
+     rl. w0  c6.       ;
+     rl. w1  c30.      ;
+     jl. w3  b20.      ;  q0:=condition-word1;
+     rl. w0  c6.+2     ;
+     rl. w1  c31.      ;
+     jl. w3  b20.      ;  q1:=condition-word2;
+     rl. w0  c6.+4     ;
+     rl. w1  c32.      ;
+     jl. w3  b20.      ;  q2:=condition-word3;
+     rl. w0  c6.+6     ;
+     rl. w1  c33.      ;
+     jl. w3  b20.      ;  q3:=condition-word4;
+j1:  rl. w2  c8.       ;  load ok or sorry;
+     se  w2  0         ;  if sorry then
+     am      c24-c25   ;    text:=<sorry>;
+     al. w0  c25.      ;  else text:=<ok>;
+     rl. w3 (d7.)      ;
+     jl      x3        ; exit: return to slang;
+e.
+
+; procedure lookup 'p'.
+;        call:         return:
+; w0                   terminating delim
+; w1                   addr(item)
+; w2                   param(term delim)
+; w3     link          unchanged
+b.j1 w.
+b3:  rl. w1  c10.      ;  load item-pointer;
+j0:  bz  w0  x1        ; next: load delim;
+     sn  w0  n8        ;  if delim='p' then
+     jl.     j1.       ;    goto end;
+     se  w0  n1        ;
+     sn  w0  n9        ;  if delim='t' or 'f' then
+     jl.     j1.       ;    goto end;
+     ba  w1  x1+1      ;  item:=next item;
+     jl.     j0.       ;  goto next;
+j1:  rl  w2  x1+2      ; end: load param;
+     jl      x3        ; exit: return;
+e.
+
+; procedure  account.
+;        call:         return:
+; w0                   destroyed
+; w1                   destroyed
+; w2                   destroyed
+; w3     link          unchanged
+b5:  rl. w1  m4.       ;  load devno;
+     wa. w1  m5.       ;  devno:=devno+repeats;
+     rs. w1  m4.       ;  save devno(next dev);
+     sl. w1 (c0.)      ;  if devno=<maxdevno then
+     rs. w1  c0.       ;    maxdevno:=devno;
+     rl. w1  c5.       ;  load no of devices;
+     wa. w1  m5.       ;  no of devices:=no of devices+repeats;
+     rs. w1  c5.       ;
+     al  w1  0         ;
+     rl. w2  m3.       ;  load type;
+     wd. w2  c16.      ;  shift(type):=type mod 24;
+     al  w0  1         ;  no:=type//24;
+     ls  w0  x1        ;  condition:=1 shift shift(type);
+     ls  w2  1         ;  no:=no*2;
+     lo. w0  x2+c6.    ;  conditionword(no):=conditionword(no) o. condition;
+     rs. w0  x2+c6.    ;
+     jl      x3        ; exit: return;
+
+; procedure test for special action.
+; if typeno is contained in the exception table or if the typeno is one
+; reserved for privat use, the procedure jumps the adjecent procedure.
+;        call:         return:
+; w0                   destroyed
+; w1                   destroyed
+; w2                   destroyed
+; w3     link          destroyed
+b.j1 w.
+b6:  rl. w2  m3.       ;  load type;
+     sl  w2  c15+1     ;  if type>maxtype then
+     jl.     j1.       ;    goto error;
+     sl  w2  72        ;  if type>max-std-type then
+     jl.     b4.       ;    goto privat proc desc;
+     al. w1  c13.      ;  index:=table start addr;
+j0:  sn  w2 (x1)       ; loop: if type=type(index) then
+     jl      x1+2      ;    goto special action;
+     al  w1  x1+4      ;  index:=index+4;
+     sh. w1  c14.      ;  if index=<addr table end then
+     jl.     j0.       ;    goto loop;
+     jl      x3        ; exit: return;
+j1:  rs. w3  c9.       ; error:
+     jl. w3  e15.      ;  write error mess;
+     jl.    (c9.)      ; errorexit: return;
+e.
+
+; procedure test interrupt.
+b.j2 w.
+b7:  rs. w3  c9.       ;  save link;
+     al  w1  2         ;  no:=2;
+j0:  rl. w0  x1+m6.    ; test: int(no);
+     rl. w2  x1+m9.    ;  exp:=exp(no);
+     sn  w0  -1        ;  if no interrupt then
+     jl.     j1.       ;    goto next;
+     se  w2  -1        ;  if no expander then
+     am      -3        ;    low:=3;
+     al  w2  2         ;  else low:=0;
+     sh  w0  x2        ;  if int<low or
+     jl.     j2.       ;     int+repeats>=25 then
+     wa. w0  m5.       ;     goto error;
+     sl  w0  25        ;
+     jl.     j2.       ;
+j1:  al  w1  x1-2      ; next: no:=no-1;
+     sl  w1  0         ;  if no>=0 then 
+     jl.     j0.       ;    goto test;
+     jl.    (c9.)      ; exit: return;
+j2:  jl. w3  e16.      ; error: write error mess;
+     jl.    (c9.)      ; exit: return;
+e.
+
+; exception table.
+c13:  2,  jl.   b11.   ;  clock
+4, jl. b10.
+      6,  jl.   b8.    ;  drum
+      7,  jl.   b9.    ;  disc(small)
+      8,  jl.   b9.    ;  disc(big)
+     21,  jl.   b10.   ;  typewriter
+     22,  jl.   b10.   ;  olivetti terminal, teletype
+     23,  jl.   b10.   ;  telex
+     29,  jl.   b12.   ;  tmx(16+4)
+     30,  jl.   b12.   ;  tmx(24)
+c14: 32,  jl.   b13.   ;  int. expander
+
+; privat proc desc.
+b.j2 w.
+b4:  rs. w3  c9.       ;  save link;
+     jl. w3  b3.       ;  lookup 'p';
+     se  w0  n8        ;  if delim<>'p' then
+     jl.     j0.       ;    goto exit;
+     al  w1  0         ;
+     wd. w2  c18.      ;
+     al  w1  0         ;  
+     wd. w2  c18.      ;
+     al  w1  0         ;
+     wd. w2  c18.      ;
+     sn  w1  0         ;
+     jl.     j1.       ;
+     se  w1  1         ;
+     jl.     j2.       ;
+     wa. w1  c1.       ;
+     rs. w1  c1.       ;
+     jl.     j1.       ;
+j2:  al  w1  1         ;
+     wa. w1  c2.       ;
+     rs. w1  c2.       ;
+j1:  wa. w2  c3.       ;  update no of consoles;
+     rs. w2  c3.       ;
+j0:  jl.    (c9.)      ; exit: return;
+e.
+
+; drum
+b8:  rl. w1  c1.       ;  no of drums:=
+     wa. w1  m5.       ;    no of drums+repeats;
+     rs. w1  c1.       ;
+     jl      x3        ;
+
+; disc
+b9:  rl. w1  c2.       ;  no of discs:=
+     wa. w1  m5.       ;    no of discs+repeats;
+     rs. w1  c2.       ;
+     jl      x3        ;
+
+; typewriter, terminal etc.
+b10: rl. w1  c3.       ;  no of consoles:=
+     wa. w1  m5.       ;    no of consoles+repeats;
+     rs. w1  c3.       ;
+     jl      x3        ;
+
+; clock.
+b11: rs. w3  c9.       ;  save link;
+     jl. w3  b3.       ;  lookup 'p';
+     sn  w0  n8        ;  if delim='p' then
+     rs. w2  c12.      ;    testinterval:=param;
+     jl.    (c9.)      ; exit: return;
+
+; tmx
+b12: al  w1  2         ;  repeats:=1;
+     rs. w1  m5.       ;
+     jl      x3        ;
+
+; interruptexpander.
+b13: rl. w1  c4.       ;
+     al  w1  x1+1      ;  no of intexpanders:=
+     rs. w1  c4.       ;   no of expanders+1;
+     rl. w1  c11.      ;
+     rl. w2  m4.       ; insert devno(exp) in expander dev list;
+     rs  w2  x1        ;
+     al  w1  x1+2      ;
+     rs. w1  c11.      ;
+     rl. w1  m9.       ;  load exp1;
+     al  w2  31        ;
+     sn  w1  -1        ;   if exp1=-1 (=> expander is of 2. level) then
+     rs. w2  m3.       ;    type:=31;
+     jl      x3        ;
+
+; procedure insert identifier.
+;      call:                 return:
+; w0   value                 destroyed
+; w1   id letter<12+id index destroyed
+; w2                         destroyed
+; w3   link                  destroyed
+b20: rl. w2 (d6.)      ;
+     rs. w3  c9.       ;  save link;
+     jl  w3  x2+10     ;  insert identifier(=slang procedure);
+     jl. w3  e17.      ;  if error then write error;
+     jl.    (c9.)      ; exit: return;
+
+c21: jl.     g9.       ;  goto start;
+
+e.
+j.
+
+
+c.(:q0>3 a.1:)-1, a81=a81 o. 1<18                   z. ;  3 epu 401
+c.(:q0>8 a.1:)-1, a81=a81 o. 1<21                   z. ;  8 disc rc4818
+c.(:q0>10a.1:)-1,                  a91=a91 o. 1<18  z. ; 10 magtape rc747
+c.(:q0>11a.1:)-1,                  a91=a91 o. 1<18  z. ; 11 magtape rc749
+c.(:q0>12a.1:)-1,                  a91=a91 o. 1<5   z. ; 12 magtape rc4739
+c.(:q0>15a.1:)-1,                  a91=a91 o. 1<22  z. ; 15 reader rc2000
+c.(:q0>16a.1:)-1,                  a91=a91 o. 1<21  z. ; 16 punch rc150
+c.(:q0>17a.1:)-1,                  a91=a91 o. 1<21  z. ; 17 plotter
+c.(:q0>18a.1:)-1,                  a91=a91 o. 1<20  z. ; 18 printer rc610
+c.(:q0>19a.1:)-1,                  a91=a91 o. 1<19  z. ; 19 punched cardreader rc405
+c.(:q0>20a.1:)-1,                  a91=a91 o. 1<19  z. ; 20 punched and mark sense cardreader rc1500
+c.(:q0>22a.1:)-1,                  a91=a91 o. 1<23  z. ; 22 olivetti,teletype
+c.(:q0>23a.1:)-1, a81=a81 o. 1<23, a91=a91 o. 1<23  z. ; 23 telex
+c.(:q1>0 a.1:)-1,                  a91=a91 o. 1<12  z. ; 24 alphanumeric display rc608
+c.(:q1>1 a.1:)-1,                  a91=a91 o. 1<11  z. ; 25 graphic display rc4195
+c.(:q1>2 a.1:)-1,                  a91=a91 o. 1<1   z. ; 26 medium speed rc4124
+c.(:q1>3 a.1:)-1, a81=a81 o. 1<20                   z. ; 27 remote batch station
+c.(:q1>8 a.1:)-1,                  a91=a91 o. 1<2   z. ; 32 interrupt expander of 2. or further level 
+c.(:q1>9 a.1:)-1,                  a91=a91 o. 1<16  z. ; 33 interrupt register ixp401
+c.(:q1>10a.1:)-1,                  a91=a91 o. 1<16  z. ; 34 interrupt key
+c.(:q1>11a.1:)-1,                  a91=a91 o. 1<15  z. ; 35 interrupt counter ixp401
+c.(:q1>16a.1:)-1,                  a91=a91 o. 1<13  z. ; 40 analog input aic401
+c.(:q1>17a.1:)-1,                  a91=a91 o. 1<13  z. ; 41 analog input aic402
+c.(:q1>18a.1:)-1,                  a91=a91 o. 1<14  z. ; 42 analog output aoc401
+c.(:q1>19a.1:)-1,                  a91=a91 o. 1<14  z. ; 43 digital output dot401
+c.(:q1>20a.1:)-1,                  a91=a91 o. 1<14  z. ; 44 digital output dot402
+c.(:q1>21a.1:)-1,                  a91=a91 o. 1<17  z. ; 45 digital sense register dst401
+c.(:q1>22a.1:)-1,                  a91=a91 o. 1<3   z. ; 46 binary counter bct401
+c.(:q1>23a.1:)-1,                  a91=a91 o. 1<10  z. ; 47 set point terminal spt401
+c.(:q2>0 a.1:)-1,                  a91=a91 o. 1<4   z. ; 48 wdt401
+
+
+; redefinition of numbers of area processes, internal processes and message buffers:
+; total number of areas:= free areas+areas used of bs-devices+areas used of s:
+a1 = a1 + a113 + a115 + 1
+; total number of internals:=free internals+one used of proc func+one used of s
+a3 = a3 + 1 + 1
+; total number of buffers:=free buffers+one used of proc func+buffers used of s+buffers used of consoles
+a5 = a5 + 1 + a120 + a117
+
+k=0
+z.
+
+; a2 = size of area process description
+; a4 = size of internal process description
+; a6 = size of message buffer
+; a8 = size of pseudoprocesses
+
+   a112 = a113 + a115
+;  a2 = 32, a4 = 84 + (:a110 + a110 + 2:) * a112, a6 = 24, a8 = 0
+   a2 = 32, a4 = 84 + (:a110 + a110 + 2:) * a112, a6 = 26, a8 = 0 ; 93-06-26 18:19 HJ 
+   a118 = a112-2,  a119 = a118
+
+; a88 = size of catalog entry
+; a89 = standard interrupt mask
+; a85 = max time slice in 0.1 msec
+; a107 = min lower limit in bases
+; a108 = max upper limit in bases
+
+   a88=34, a107=8.4000 0001, a108=8.3777 7776
+
+; process options:
+; process options determine whether code is included
+; for a given kind of external process. they are defined
+; by bits in the identifier a91 as follows:
+;   rc 315  typewriter:              always included
+;           teletypewriter:
+;           olivetti terminal:       a91=a91 o. 1<23
+;   rc 2000 paper tape reader:       a91=a91 o. 1<22
+;   rc 150  paper tape punch:        a91=a91 o. 1<21
+;   rc 610  line printer:            a91=a91 o. 1<20
+;   rc 1500 punched and mark sensed cardreader:
+;   rc 405  punched card reader:     a91=a91 o. 1<19
+;   rc 747  magnetic tape:
+;   rc 749  magnetic tape:           a91=a91 o. 1<18
+;   dst 401 sense register:          a91=a91 o. 1<17
+;   ixp 401 interrupt register:
+;           interrupt key:           a91=a91 o. 1<16
+;   ixp 401 interrupt counter:       a91=a91 o. 1<15
+;   aoc 401 analog output:
+;   dot 401 static digital output:
+;   dot 402 pulsed digital output:   a91=a91 o. 1<14
+;   aic 401 analog input:
+;   aic 402 analog input:            a91=a91 o. 1<13
+;   rc 806  alphanumeric display:    a91=a91 o. 1<12
+;   rc 4195 graphic display:         a91=a91 o. 1<11
+;   spt 401 set-point terminal:      a91=a91 o. 1<10
+;   dct 2000:                        a91=a91 o. 1<9
+;   rc 4739 magnetic tape:           a91=a91 o. 1<5
+;   wdt 401 watch dog timer:         a91=a91 o. 1<4
+;   bct 401 12-bit binary counter:   a91=a91 o. 1<3
+;   external multiple interrupt for second level:
+;                                    a91=a91 o. 1<2
+;   rc 4124 telemultiplexer          a91=a91 o. 1<1
+;
+;   telex          a91=a91 o. 1<23   a81=a81 o. 1<23
+;   typewriter, blocked                a81=a81 o. 1<22
+c.-a128  t.m.                monitor process options included
+z.
+
+
+; testoptions:
+; testoptions are used during debugging of the system.
+; they are defined by bits in the identifier a92 as follows:
+;    testcase i               a92=a92 o. 1<i   0<=i<=17
+;    teststatus               a92=a92 o. 1<18
+;    testcall                 a92=a92 o. 1<19
+;    testoutput               a92=a92 o. 1<20
+;    print w, type w
+;    procfunc interrupt       a92=a92 o. 1<21
+; testoptions in s are defined by bits in the identifier a93
+; as explained in s.
+
+c.-a128  t.m.                monitor test options included
+z.
+
+
+; format of internal process description:
+a48 = -4, a49 = -2 ; <interval>
+
+a10 =  0           ; <kind>
+a11 =  2           ; <name>
+a12 = 10, a13 = 11 ; <stop count><state>
+a14 = 12           ; <identification bit>
+a15 = 14           ; <next event>
+                   ; <last event>
+a16 = 18           ; <next process>
+                   ; <last process>
+a17 = 22           ; <first address>
+a18 = 24           ; <top address>
+a19 = 26, a20 = 27 ; <buffer claim><area claim>
+a21 = 28, a22 = 29 ; <internal claim><function mask>
+a23 = 30           ; <pseudoprocess claim>
+a24 = 32, a25 = 33 ; <protection register><protection key>
+a26 = 34           ; <interrupt mask>
+a27 = 36           ; <interrupt address>
+a28 = 38           ; <working register 0>
+a29 = 40           ; <working register 1>
+a30 = 42           ; <working register 2>
+a31 = 44           ; <working register 3>
+a32 = 46           ; <exception register>
+a33 = 48           ; <instruction counter>
+a34 = 50           ; <parent description address>
+a35 = 52           ; <quantum>
+a36 = 54           ; <run time>
+a38 = 58           ; <start run>
+a39 = 62           ; <start wait>
+a40 = 66           ; <wait address>
+a42 = 68, a43 = 70 ; <catalog base>
+a44 = 74           ; <max interval>
+a45 = 78           ; <standard interval>
+a46 = 80           ; <bs claims start>
+a23 = 27           ; use area processes as pseudoprocesses
+
+; internal process states:
+
+; actual bitpatterns are relevant to process functions only
+a95 = 2.01001000 ; running
+a96 = 2.00001000 ; running after error
+a97 = 2.10110000 ; waiting for stop by parent
+a98 = 2.10100000 ; waiting for stop by ancestor
+a99 = 2.10111000 ; waiting for start by parent
+a100= 2.10101000 ; waiting for start by ancestor
+a101= 2.11001100 ; waiting for process function
+a102= 2.10001101 ; waiting for message
+a103= 2.10001110 ; waiting for answer
+a104= 2.10001111 ; waiting for event
+
+
+; bit patterns used to test or change the above states:
+a105 = 2.00100000; waiting for stop or start
+a106 = 2.00001000; waiting for start
+
+; format of area process description:
+a48 = -4, a49 = -2  ; <interval>
+
+a10 =  0            ; <kind>
+a11 =  2            ; <name>
+a50 = 10, a51 = 11  ; <process descr addr of bs device>
+a52 = 12            ; <reserved>
+a53 = 14            ; <users>
+a60 = 16            ; <first slice>
+a61 = 18            ; <number of segments>
+a62 = 20            ; <document name>
+
+; format of pseudo process
+a48 = -4, a49 = -2  ; <interval>
+a10 =  0            ; <kind>
+a11 =  2            ; <name>
+a50 = 10            ; <main process>
+
+
+; format of peripheral process description:
+a48 = -4, a49 = -2  ; <interval>
+
+a10 = 0  ; <kind>
+a11 = 2  ; <name>
+a50 = 10 ; <device number*64>
+a52 = 12 ; <reserved>
+a53 = 14 ; <users>
+a54 = 16 ; <next message>
+a55 = 18 ; <last message>
+a56 = 20 ; <interrupt address>
+
+; optional parameters for peripheral devices:
+a70 = 22 ; <parameter 0>
+a71 = 24 ; <parameter 1>
+a72 = 26 ; <parameter 2>
+a73 = 28 ; <parameter 3>
+a74 = 30 ; <parameter 4>
+a75 = 32 ; <parameter 5>
+a76 = 34 ; <parameter 6>
+a77 = 36 ; <parameter 7>
+a78 = 38 ; <parameter 8>
+
+; parameters used in connection with subprocesses:
+a63 = a70+14
+a64 = a63+2
+
+; format of message buffer:
+
+;     relative address:     message:
+;             0             <next buffer>
+;             2             <last buffer>
+;             4             <receiver>
+;             6             <sender>
+;
+;             8-22          <message>
+;
+; standard i/o message and answer:
+;             8     <operation><mode>          <status word>
+;            10     <first storage address>    <number of bytes>
+;            12     <last storage address>     <number of characters>
+;            14     <first segment no>
+
+; message buffer states:
+
+; the possible states of a message buffer are defined by the
+; values of the sender and receiver parameters:
+;
+; sender param:  receiver param:  state:
+;       0               0         buffer available
+; sender descr   receiver descr   message pending from existing sender
+; sender descr  -receiver descr   message received from existing sender
+;-sender descr   receiver descr   regretted message pending
+;-sender descr  -receiver descr   regretted message received
+; sender descr          1         normal answer pending
+; sender descr          2         dummy answer pending (message rejected)
+; sender descr          3         dummy answer pending (message unintelligible)
+; sender descr          4         dummy answer pending (receiver malfunction)
+; sender descr          5         dummy answer pending (receiver does not exist)
+
+m.                monitor text 0 included
+

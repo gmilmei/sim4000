@@ -1,0 +1,52 @@
+\chapter{Optional V2 terminal protocol}\label{optional-v2-terminal-protocol}
+\index{Terminal protocol!V2}
+
+\section{Keep classic operation as the normal profile}\label{keep-classic-operation-as-the-normal-profile}
+\index{Terminal protocol!monitor compatibility}
+
+The existing terminal behavior remains the default (\passthrough{\lstinline!PROTOCOL=CLASSIC!}). An experimental protocol based on Jacobsen's V2 terminal code can be enabled independently on a \passthrough{\lstinline!CONSOLE!} or \passthrough{\lstinline!RC851!} declaration in a separate test configuration, for example:
+
+\begin{commandexample}{Separate test configuration: an additional V2 endpoint}
+DEFINE CONSOLE DEVNO=7 INTNO=14,13 PROTOCOL=V2
+TELNET DEVNO=7 ADDRESS=127.0.0.1 PORT=4007 ATTENTION=CTRL-A
+\end{commandexample}
+
+This snippet belongs to a separate test configuration. It creates another device/endpoint; it is not a runtime command or a replacement for the primary console. Configuring the endpoint does not install a V2 monitor or a matching guest driver.
+
+\begin{operationnote}{V2 is a guest-device protocol, not a Telnet upgrade}
+Choose free device and interrupt numbers; these are free in the shipped default configuration when its other optional terminal lines are inactive. \passthrough{\lstinline!show devices!} and \passthrough{\lstinline!--check-config!} identify the selected V2 protocol. Do not change the primary terminal of the supplied monitor to V2 just to obtain more terminal features: its existing driver expects the classic protocol. V2 requires guest software/monitor drivers that understand it. For example, a classic read returns CR as 13; V2 table 1 returns terminating LF with status bit 20 (\passthrough{\lstinline!0x10000a!}). The supplied typewriter driver performs direct character comparisons and its own editing/conversion, so these are not interchangeable results even if ordinary printing still works.
+\end{operationnote}
+
+\section{Understand input tables and frontend policies}\label{understand-v2-input-tables-and-frontend-policies}
+\index{Terminal protocol!input tables}
+
+In V2 mode the guest can set/query terminal type and prompt, suppress input echo for blind reads, suppress only backspace echo, and write the configured prompt character. There are three input tables:
+
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+Type
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Intended use
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Control-character handling
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+0 & RC4000 console & CR becomes terminating LF; backspace, cancel and attention are flagged. \\
+1 & DTU data entry (initial selection) & Most control keys terminate input without echo; backspace/cancel retain special handling. \\
+2 & Screen editor & Most control keys terminate input without echo; DEL is returned as 127. \\
+\end{longtable}
+
+The initial prompt is BEL (7), as in the V2 source. Type selection is a guest attribute, not ANSI/VT100 terminal detection. Input echo occurs once when the guest senses a completed read. Existing keyboard/date shortcuts, DEL mapping, Telnet framing and ANSI filtering remain frontend policies: they apply before the device's input table. Use \passthrough{\lstinline!INPUT DEL=NONE!} if the V2 table must receive a literal DEL, and avoid reserving a Telnet attention key needed by the guest.
+
+\section{Observe the experimental compatibility boundary}\label{observe-the-v2-experimental-compatibility-boundary}
+
+This block does not implement interrupt expanders, guest-controlled Telnet disconnect, DOS serial/multiport hardware or the V2 host-file protocol. The RC851 output translation remains the existing ANSI/VT100 subset; enabling V2 does not certify full-screen editor compatibility. Tests cover synthetic guest I/O and mixed classic/V2 configurations, not booting the V2 monitor.
+
+For ordinary monitor sessions, use the classic-profile instructions in \manualref{telnet-consoles}{the Telnet chapter}. The type-2 table's screen-editor intent does not establish that the installed historical editor is compatible; retain the manual's inventory-only boundary for unverified screen-editor operation.

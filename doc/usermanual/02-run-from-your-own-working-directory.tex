@@ -1,0 +1,99 @@
+\chapter{Run from your own working directory}\label{run-from-your-own-working-directory}
+\index{Runtime files}
+\index{Working directory}
+
+This is an alternative to running from \texttt{build/}, not a step to perform
+inside an already running emulator. If you followed the first-session guide,
+export any wanted results and quit at \texttt{sim4000>} before starting this
+separate session. Enter the commands below in a host shell at the repository
+root.
+
+No installation is necessary. For the default compatibility profile, copy
+these four files to a new working directory after building; the source tree,
+CMake, compiler, Python, and generation tools are not needed to run it:
+
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+File
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Purpose
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\passthrough{\lstinline!sim4000!} & Executable; retain its executable permission. \\
+\passthrough{\lstinline!RC4000.cfg!} & Default configuration, found in the current directory. \\
+\passthrough{\lstinline!MONITOR!} & Monitor image selected by the configuration. \\
+\passthrough{\lstinline!UNIT0!} & Base system disk selected by the configuration. \\
+\end{longtable}
+
+The executable must match the destination host's operating system and architecture. The host must provide a compatible dynamic loader and shared libraries, including GNU Readline. Copying the executable does not make it independent of those runtime libraries or portable across operating systems. No build dependencies are needed on that host.
+
+For example, from the repository root after the build above:
+
+\begin{commandexample}[language=sh]{Host shell: create a working directory}
+run_dir=$(mktemp -d ./sim4000-work.XXXXXX)
+cp build/sim4000 build/RC4000.cfg build/MONITOR build/UNIT0 "$run_dir"/
+mkdir "$run_dir/exchange"
+cp -R doc/usermanual/examples "$run_dir"/
+cd "$run_dir"
+./sim4000 -a
+\end{commandexample}
+
+Create \passthrough{\lstinline!exchange/!} for the supplied configuration's host-file exchange device. It holds host input files and newly exported files, not guest catalog files. If you do not want host-file exchange, comment out \passthrough{\lstinline!DEFINE HOSTFILES!} in your copy of the configuration; the directory is then unnecessary. The default configuration needs no mounted reader or punch files and enables no Telnet listener.
+
+The optional \texttt{examples/} directory copied above contains the tutorial
+inputs. It is not required to boot the emulator. In later procedures,
+\texttt{examples/} and \texttt{exchange/} refer to directories beneath your
+working directory. Review FP command files before running them; they are guest
+commands, not host scripts.
+
+After starting, follow \manualref{first-monitor-session}{First monitor session}.
+Do not start another emulator on the same writable image or overlay.
+
+Other optional files depend on the configuration you choose:
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{RC4000.compat.cfg}: an explicit alias of the default configuration.
+  For protection, copy \texttt{RC4000.protected.cfg},
+  \texttt{MONITOR.protected}, \texttt{UNIT0.protected} and \texttt{PROFILES.txt} from the build tree
+  beside the executable. Do not substitute the default disk or monitor. See
+  \manualref{choose-a-maintained-monitor-profile}{Choose a maintained-monitor profile}
+  for transfer names and software limits. Both profiles are already included
+  in the binary archive. For the separate MIPS/TS environment, copy
+  \texttt{UNIT0.mipsts}, \texttt{UNIT1.mipsts} and \texttt{RC4000.mipsts.cfg}
+  alongside the compatibility \texttt{MONITOR}; see
+  \manualref{mips-ts}{MIPS/TS} for startup, login and its persistent overlays.
+\item
+  \passthrough{\lstinline!UNIT0.original!}: the unchanged historical disk, only needed if selected.
+\item
+  \passthrough{\lstinline!RC4000.dfc403.cfg!} and \passthrough{\lstinline!STDMON!}: the supplied optional historical controller setup. Copy both with \passthrough{\lstinline!UNIT0!}; no generation tool is needed.
+\item
+  Paper-tape input/output files: only needed when mounted or configured.
+\item
+  \passthrough{\lstinline!UNIT0.overlay!}: created when persistent overlays are enabled. Preserve it together with its matching base \passthrough{\lstinline!UNIT0!} and configuration when moving or backing up your work. Stop the emulator before copying this set.
+\item
+  This manual: useful for reference, but not used by the executable.
+\end{itemize}
+
+To retain guest disk changes, replace the active disk definition in your copied \passthrough{\lstinline!RC4000.cfg!} with:
+
+\begin{commandexample}{Configuration file: copied RC4000.cfg}
+DEFINE RC433X DEVNO=15 FILE=UNIT0 OVERLAY=UNIT0.overlay
+\end{commandexample}
+
+Without this change (or \passthrough{\lstinline!--disk-overlay!}), disk writes disappear on exit. Guest temporary files can also be removed by the monitor: use \passthrough{\lstinline!scope user!} as described in \manualref{keep-guest-files-across-sessions}{Keep guest files across sessions}. The base disk is read-only in both overlay modes.
+
+Run \passthrough{\lstinline!./sim4000 -a!} inside the working directory. From a different directory, select the configuration explicitly, for example:
+
+\begin{commandexample}[language=sh]{Host shell: select a configuration}
+./work/sim4000 -a -c work/RC4000.cfg
+\end{commandexample}
+
+Configured monitor, disk, overlay, and host-exchange paths remain relative to the configuration file. Command-line path overrides are instead relative to the current working directory. Renaming or moving files therefore requires adjusting the selected configuration or providing the appropriate overrides.

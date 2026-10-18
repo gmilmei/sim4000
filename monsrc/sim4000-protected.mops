@@ -1,0 +1,24 @@
+; Protected entry: one outer FP input file plus the shared build at depth two.
+; Only the temporary ptxt10 is edited; the original guest input is restored.
+; Keep generation commands, options and printer support in sim4000.mops.
+head cpu
+mode list.yes
+o pkeditlog
+; Compact padded imports to leave room within the existing 2000-segment claim.
+pkcompact=copy montxt10
+clear temp montxt10
+rename pkcompact.montxt10
+pkcompact=copy mcommon
+clear temp mcommon
+rename pkcompact.mcommon
+ptxt10=edit montxt10
+l./e22:/
+l./     jl       x2               ; 94-06-01 21:03 HJ , skip set pk action/
+d0
+f
+o c
+rename montxt10.pkoriginal
+rename ptxt10.montxt10
+i mcommon
+rename montxt10.ptxt10
+rename pkoriginal.montxt10

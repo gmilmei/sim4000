@@ -1,0 +1,162 @@
+\chapter{RC610 line printer}\label{rc610-line-printer}
+\index{RC610}\index{Printer}
+
+All supplied monitor profiles include the external process \texttt{printer},
+on device 7, interrupt 10. This applies to compatibility, protected, MIPS/TS
+and DFC403 operation. There is no printer-free maintained monitor variant.
+The native emulator writes to an ordinary host file; it does not submit jobs
+to a host printing service.
+
+\section{Automatic output and file selection}
+
+The supplied configurations open output automatically in append mode:
+
+\begin{center}
+\begin{tabular}{ll}
+\textbf{Configuration} & \textbf{Output file} \\
+\texttt{RC4000.cfg} & \texttt{printer.txt} \\
+\texttt{RC4000.protected.cfg} & \texttt{printer.protected.txt} \\
+\texttt{RC4000.mipsts.cfg} & \texttt{printer.mipsts.txt} \\
+\texttt{RC4000.dfc403.cfg} & \texttt{printer.dfc403.txt} \\
+\end{tabular}
+\end{center}
+
+Paths are relative to the configuration file. Existing contents survive
+restarts; the emulator appends new prints and never truncates an output file.
+Each profile has its own output file. Use separate working directories for
+concurrent sessions; appending does not provide guest job scheduling or keep
+two emulators' jobs separate.
+The DFC403 configuration is an additional source/build-tree profile; the
+binary archive supplies the other three configurations.
+
+\begin{commandexample}{Configuration: automatic append-mode printer}
+DEFINE RC610 DEVNO=7 INTNO=10 FILE=printer.txt APPEND=YES
+\end{commandexample}
+
+\texttt{APPEND=NO}, or omitting \texttt{APPEND}, requires a nonexistent output
+file. Omitting \texttt{FILE} leaves the device installed but offline until an
+output file is attached. Only regular files are accepted; symbolic links,
+FIFOs and device files are rejected. New files have private host permissions.
+
+To change the destination, suspend execution with Control-E and enter:
+
+\begin{commandexample}{Emulator CLI: choose a new exclusive output file}
+show media
+detach 7
+attach 7 session-print.txt
+continue
+\end{commandexample}
+
+For an existing file use \texttt{attach 7 session-print.txt append}. Bare
+\texttt{attach} never overwrites an existing file. These CLI paths are relative
+to the emulator's working directory, unlike configuration paths.
+\texttt{show media} reports printer status, counts and its output path.
+
+Wait for guest output to finish before detaching. An active hardware print
+cannot be detached: resume execution, let it complete, then try again.
+An incomplete line without a printing control is discarded and counted on
+close, not retroactively printed. CPU reset preserves the device and file.
+Normal shutdown completes an already accepted hardware print and closes output;
+abnormal termination is not crash-safe spooling.
+
+\section{A first print from s}
+
+After date initialization, request RC attention and select \texttt{s}.
+The following bounded memory dump prints only the monitor's IRQ-0 vector:
+
+\begin{commandexample}{Guest system process s: print a known monitor word}
+print 16 16
+\end{commandexample}
+
+Wait for \texttt{ready}. The host printer file gains one formatted line.
+Repeating the command prints another line; the values depend on the monitor
+build. This has been checked with compatibility and protected monitors and
+with the DFC403 monitor. It is a memory-dump command, not file printing.
+Do not substitute an arbitrary user-memory range and expect a source listing.
+
+\section{Print an installed Algol source}
+
+The supplied disk contains \texttt{cpuregtest}, the Algol source used by
+\texttt{regnetest}. The tutorial example \texttt{examples/print\_source.alg}
+opens that guest file for input and the external printer for output, copies
+characters up to the guest text end marker, and closes both zones. It prints
+the source; it does not compile or execute the numerical test itself.
+
+Copy the example into the configured \texttt{exchange} directory as
+\texttt{print\_source.alg}. In \texttt{s}, allocate a temporary FP:
+
+\begin{commandexample}{Guest system process s: create a printing session}
+new ptest size 100000 temp disc 200 10 run
+\end{commandexample}
+
+\begin{commandexample}{Guest FP, compatibility profile: compile and print}
+psrc=fromhost "print_source.alg"
+ptext=algol psrc connect.no
+ptext
+\end{commandexample}
+
+For the protected profile, start with \texttt{RC4000.protected.cfg} and its
+matching monitor/disk pair. Use the same example and \texttt{s} allocation,
+but import through the protected profile's transfer program:
+
+\begin{commandexample}{Guest FP, protected profile: compile and print}
+psrc=rcin "print_source.alg"
+ptext=algol psrc connect.no
+ptext
+\end{commandexample}
+
+Both checked profiles print 630 lines/printing operations and 17,309
+bytes, beginning with the MPROFILE header. The output is visible before closing
+the emulator. The tiny program uses \texttt{open(source,4,...)} for the disk
+area and \texttt{open(printer,0,...)} for the physical printer; selecting a
+disk output called \texttt{printer} is not the same operation.
+The FP recipes \texttt{o printer} and \texttt{printer=copy cpuregtest} are
+not accepted substitutes: exploratory runs did not drive the hardware printer.
+
+Both runs match an independent whole-source guest export: \texttt{tohost} in
+compatibility mode, \texttt{rcout} in protected mode. The protected check keeps
+\texttt{PROTECTION MODE=RC4000} enabled and observes keyed task instructions
+during execution of the printing program, not merely during boot. It uses
+the existing protected libraries without changes to the example or images.
+Enter \texttt{finis} after printing and wait for \texttt{pause ptest finis fp}.
+Normal return to \texttt{s} and a subsequent \texttt{list} are also checked.
+
+\section{Text mapping, visibility and limits}
+
+The host file is a print-operation stream, not a rendered paper image. A
+printing control emits the buffered line followed by its original control:
+
+\begin{center}
+\begin{tabular}{lll}
+\textbf{Guest control} & \textbf{Host byte} & \textbf{Meaning} \\
+NL (10) & LF & Begin the next line. \\
+VT (11) & VT & Retain vertical-tab motion. \\
+FF (12) & FF & Retain the form/page separator. \\
+CR (13) & CR & Return on the same line for overprinting. \\
+\end{tabular}
+\end{center}
+
+No LF is inserted after CR. VT/FF remain literal controls; no physical
+format tape is emulated. Text viewers may therefore display overprints and
+page controls differently. The buffer has 132 columns; excess graphics are
+lost and counted. Unsupported standard-character-set codes and optional
+HT/SO/SI/CAN/ESC functions are ignored. National RC character positions remain
+raw seven-bit bytes, not UTF-8 Danish letters.
+
+Every completed print calls \texttt{fflush} before its completion interrupt,
+including CR, VT and FF. Output does not wait for a full host buffer or emulator
+exit. A guest program can still buffer text before sending it to the printer.
+There is no per-line \texttt{fsync} durability guarantee. Host write/flush errors
+are latched as virtual offline/paper-out status, not silently ignored or
+replayed; choose a healthy new output after resolving the host error.
+
+The timing model is deterministic, not mechanically accurate. A print completes
+on the next positive device advance. The supplied MIPS/TS profile supports
+PRIMO transports to the real external process \texttt{printer}; see
+\manualref{mips-ts-primo-printing}{Print through PRIMO}. Repeated jobs,
+signoff and restart append are checked. Recovery of a transport submitted while
+output is detached is described in
+\manualref{mips-ts-printer-recovery}{Recover a job submitted with output detached}.
+General host-write failure recovery and arbitrary queue capacity remain separate
+tasks. The MIPS/TS chapter records the bounded two-client check and its second
+blocking-wait restriction.

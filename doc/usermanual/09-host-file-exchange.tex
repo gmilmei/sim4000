@@ -1,0 +1,89 @@
+\chapter{Host file exchange}\label{host-file-exchange}
+\index{Host file exchange}
+
+This chapter's recipes use the default compatibility profile. With
+\texttt{RC4000.protected.cfg}, use \texttt{rcin}/\texttt{rcout} in place of
+\texttt{fromhost}/\texttt{tohost}. Both profiles use \texttt{exchange/}.
+The original transfer binaries are not compatible with
+strict protection; see
+\manualref{choose-a-maintained-monitor-profile}{Choose a maintained-monitor profile}.
+\index{fromhost}
+\index{tohost}
+\index{Binary transfer}
+\index{Text transfer}
+
+\section{Choose the native disk image}\label{choose-the-native-disk-image}
+
+The default \passthrough{\lstinline!src/disks/UNIT0!} image contains rebuilt Algol programs named \passthrough{\lstinline!fromhost!} and \passthrough{\lstinline!tohost!}. The unchanged historical image is retained as \passthrough{\lstinline!src/disks/UNIT0.original!}, containing \passthrough{\lstinline!fromdos!} and \passthrough{\lstinline!todos!}. Normal CMake builds copy both images, and \passthrough{\lstinline!RC4000.cfg!} selects the native one:
+
+\begin{commandexample}[language=sh]{Host shell: start the native image from the build directory}
+cd build
+./sim4000 -a
+\end{commandexample}
+
+An ordinary build uses the shipped native image; no guest compilation or image rebuilding is required. Keep the supplied image unchanged and use a separate working copy or persistent overlay for guest file changes; see \manualref{configuration-and-disk-persistence}{Configuration and disk persistence}.
+
+In an FP user process on that image, the basic text-transfer form is:
+
+\begin{commandexample}{Guest FP: import text and export it under a new host name}
+hfsource=fromhost hfinput
+hfoutput=tohost hfsource
+\end{commandexample}
+
+The native programs default to text mode 2 and accept \passthrough{\lstinline!conv.text!}, \passthrough{\lstinline!conv.iso!}, and \passthrough{\lstinline!conv.bin!} (also \passthrough{\lstinline!conv.no!}). Their diagnostics use host terminology. They still address the historical monitor process \passthrough{\lstinline!dos!}; leave that guest endpoint name unchanged. The old command names no longer exist in \passthrough{\lstinline!UNIT0!}. If you separately have \passthrough{\lstinline!UNIT0.original!}, explicitly select it with \passthrough{\lstinline!--disk UNIT0.original!} to run the original programs instead.
+
+\section{Configure the exchange directory}\label{configure-the-exchange-directory}
+\index{HOSTFILES!exchange directory}
+\index{Host file exchange!path restrictions}
+
+The shipped configuration enables the following declaration. CMake creates \passthrough{\lstinline!exchange!} beside the runtime \passthrough{\lstinline!RC4000.cfg!}; create that directory yourself when arranging runtime files outside a CMake build tree:
+
+\begin{commandexample}{RC4000.cfg contents: enable host file exchange}
+DEFINE HOSTFILES DEVNO=63 INTNO=21 ROOT=exchange
+\end{commandexample}
+
+A relative \passthrough{\lstinline!ROOT!} is resolved against the selected configuration file's directory, not against the guest catalog. The root must already exist. Guest filenames are case-sensitive relative Unix paths beneath it; existing subdirectories are supported. Absolute paths, \passthrough{\lstinline!.!}/\passthrough{\lstinline!..!} components, backslashes, drive prefixes, and symlinks are rejected. Exports create new regular files with mode 0600 and never replace existing files. The service is disabled unless declared. \passthrough{\lstinline!show devices!} reports the configured root and whether a guest file is open.
+
+\section{Import and export text}\label{import-and-export-text}
+\index{fromhost!text import}
+\index{tohost!text export}
+
+For a tested text workflow, put an ASCII file named \passthrough{\lstinline!hfinput!} in \passthrough{\lstinline!exchange!}, boot the monitor, and create or select an FP user process with a temporary disk resource claim as described in \manualref{files-catalog-entries-and-algol-programs}{the file-work examples}. Choose an unused guest name \passthrough{\lstinline!hfsource!} and ensure that the host destination \passthrough{\lstinline!exchange/hfoutput!} does not exist. In that process:
+
+\begin{commandexample}{Guest FP: run the text-transfer example}
+hfsource=fromhost hfinput
+hfoutput=tohost hfsource
+\end{commandexample}
+
+In \passthrough{\lstinline!hfsource=fromhost hfinput!}, \passthrough{\lstinline!hfsource!} names the new guest catalog entry and \passthrough{\lstinline!hfinput!} names a host file beneath the exchange root. In \passthrough{\lstinline!hfoutput=tohost hfsource!}, the left-hand name instead selects the host export destination; it does not create another guest catalog entry. No host shell is involved in either FP call.
+
+The exported file is \passthrough{\lstinline!exchange/hfoutput!}. Each utility reports a byte count when it finishes. Those counts describe RC transfers and may include padding or catalog allocation; they are not necessarily the host file size.
+
+\section{Choose text or binary transfer}\label{choose-text-or-binary-transfer}
+For a checked text-comparison workflow using protected exports and ordinary
+host \texttt{cmp}/\texttt{diff}, see
+\manualref{compare-protected-text-on-host}{Compare protected guest text on the host}.
+Those host tools are distinct from the incompatible protected guest \texttt{cmp}.
+
+\index{Host file exchange!conversion modes}
+
+The native default text mode 2 passes character bytes through without a PC code-page translation. Imports skip NUL and CR and append the RC end marker (25); exports skip NUL and CR and stop at that marker. Host text exchanged in this mode uses LF. ASCII source files are supported; UTF-8 and Danish character conversion are not implemented yet. In the rebuilt native utilities, \passthrough{\lstinline!conv.text!} and \passthrough{\lstinline!conv.iso!} select the same mode 2; \passthrough{\lstinline!iso!} does not provide an additional encoding conversion. \passthrough{\lstinline!conv.bin!} mode 0 preserves all transferred bytes, including control characters and high bytes; RC files may still contain word/segment padding. For a separate binary example, use fresh guest and host names (or keep this example in a separate session with a different host destination):
+
+\begin{commandexample}{Guest FP: transfer binary data without text filtering}
+hfsource=fromhost conv.bin hfinput
+hfoutput=tohost conv.bin hfsource
+\end{commandexample}
+
+\begin{operationnote}{Text transfer is not a byte-for-byte archive}
+Text mode filters control bytes and uses an end marker. Use \passthrough{\lstinline!conv.bin!} (equivalently \passthrough{\lstinline!conv.no!}) on both import and export when those bytes matter. Binary export preserves transferred data, but it does not remove guest allocation padding or recover an original host length automatically. Do not apply the text example to an executable or a binary backup.
+\end{operationnote}
+
+\section{Protect host files and interpret failures}\label{protect-host-files-and-interpret-failures}
+\index{Host file exchange!non-overwrite protection}
+\index{Host file exchange!file permissions}
+
+Before retrying a failed transfer, check the utility's final diagnostic, the selected FP process, available temporary resources, the input filename and the exchange-root configuration. An existing export destination is deliberately refused: choose another host name rather than deleting a wanted file. Path components must name existing directories; the service does not create a directory tree. \passthrough{\lstinline!show devices!} is an emulator command, not an FP command; suspend execution before using it.
+
+Host exports have their own lifetime: ending FP, removing a guest catalog entry or discarding a guest disk overlay does not remove a file already exported to the host. Keep wanted exports separately and inspect an interrupted or failed export before treating it as a complete result. The 0600 creation mode limits access to the host owner; it is intentional, not a sign of a failed transfer.
+
+Inside the supplied monitor the historical endpoint remains process \passthrough{\lstinline!dos!} on device 63. The host service is called \passthrough{\lstinline!HOSTFILES!}; that guest process name remains necessary for compatibility with that monitor. Place files intentionally in the exchange root: it is a filesystem boundary, not a separate permission domain for files or hard links created there by the host user.

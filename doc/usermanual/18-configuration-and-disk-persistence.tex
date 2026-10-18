@@ -1,0 +1,233 @@
+\chapter{Configuration and disk persistence}\label{configuration-and-disk-persistence}
+\index{Configuration}
+\index{Disk persistence}
+\index{Overlays}
+\index{Write-through}
+
+\section{Select CPU and device capabilities}\label{select-cpu-and-device-capabilities}
+\index{Configuration!CPU and core size}
+
+The examples in this chapter are independent choices, not one shell script. Configuration snippets replace the corresponding active declaration; do not add a second device with the same number. Restart the emulator to use a changed configuration. The normal startup options are summarized in \manualref{command-line-options}{the command-line reference}.
+
+\passthrough{\lstinline!CPU IX=YES!} enables the narrow index-instruction extension needed by the supplied bare \passthrough{\lstinline!catstat!}; this is also the default if the line is omitted. \passthrough{\lstinline!CPU IX=NO!} restores the baseline unassigned-opcode-61 behavior. The setting is fixed for the session and retained by \passthrough{\lstinline!reset!}; it is not stored in a core image. Command-line \passthrough{\lstinline!--ix!}/\passthrough{\lstinline!--no-ix!} take precedence.
+
+Storage protection defaults to off when the directive is omitted, equivalent
+to \passthrough{\lstinline!PROTECTION MODE=OFF!}. Select
+\passthrough{\lstinline!PROTECTION MODE=RC4000!} to enable storage
+key, instruction-fetch and privilege checks. This is a separate, session-fixed
+setting, not an RC8000 mode or an IX option. It requires a separately rebuilt
+monitor and compatible software bindings; simply enabling it with the supplied
+MONITOR and transfer utilities is not a supported ordinary-use configuration.
+Use the matching protected configuration and initially keep disk writes disposable.
+
+\passthrough{\lstinline!CORESIZE=minimum,maximum!} counts RC bytes (12-bit halfwords), not host bytes. The default is 1,048,576 RC bytes, stored in about 2 MiB of host data memory plus 0.5 MiB for word keys. The configured minimum is raised to 16,384; the maximum is capped at 8,388,607, and a minimum above that cap is rejected. This retained runtime limit is smaller than the CPU's unsigned 24-bit address space. Keep the default for the supplied monitor; changing memory size is not needed for normal use.
+
+Startup rejects the recognized but unimplemented \passthrough{\lstinline!RC433XRAM!} device type before loading the monitor or opening media. RC433XRAM is intentionally out of scope: use the default volatile RC433X copy-on-write mode for nonpersistent writes instead. \passthrough{\lstinline!--check-config!} checks configuration syntax only, not runtime device support. Physical \passthrough{\lstinline!RC433!} is not a recognized configuration type; \passthrough{\lstinline!RC433X!} is the implemented emulator-specific disk interface.
+
+\section{Choose a maintained-monitor profile}\label{choose-a-maintained-monitor-profile}
+\index{Protection!monitor profile}
+\index{Configuration!compatibility and protection}
+
+The build directory and binary distribution include the compatibility,
+protected and MIPS/TS profiles ready to run. Compatibility remains the default; select it explicitly
+with \texttt{./sim4000 -a -c RC4000.compat.cfg}. Select the protected alternative
+with \texttt{./sim4000 -a -c RC4000.protected.cfg}. Keep its matching
+\texttt{MONITOR.protected} and \texttt{UNIT0.protected} files together.
+All profiles use the shared \texttt{exchange/} directory, CLASSIC terminals and IX. In
+protected FP sessions use \texttt{rcin}/\texttt{rcout} instead of
+\texttt{fromhost}/\texttt{tohost}. Some installed programs use newer-machine
+instructions and remain incompatible with strict RC4000 protection. The
+supplied \texttt{PROFILES.txt} explains the profile-specific software and
+persistence boundaries; switching profiles does not require replacing files.
+The installed \texttt{cmp} also pauses in \texttt{tofrom1} under protection;
+use compatibility for guest text comparison or export with \texttt{rcout} and
+compare the resulting host files. See
+\manualref{compare-text-files-inside-the-guest}{Compare text files inside the guest}.
+
+Process lifecycle, nested delegation, denied cross-process writes/code entry,
+privileged-operation faults, selected Algol/SLANG work and independent local/
+Telnet sessions have bounded protected-profile tests. This does not certify
+every editor, numerical workload or optional subsystem on the disk, and it is
+not a host-security sandbox. Ordinary data reads across storage keys remain
+allowed by the RC4000 architecture.
+
+Compatibility and protection default to volatile disk writes. MIPS/TS uses
+two persistent overlays by default; see \manualref{mips-ts}{MIPS/TS} for its
+automatic startup and login procedure. To retain protected disk writes,
+replace its active disk declaration with:
+
+\begin{commandexample}{Protected configuration: replace the disk declaration}
+DEFINE RC433X DEVNO=15 FILE=UNIT0.protected OVERLAY=UNIT0.protected.overlay
+\end{commandexample}
+
+Never exchange base disks or overlays between profiles. To recover the
+compatibility environment, select \texttt{RC4000.compat.cfg}, rather than
+replacing its files with protected ones.
+
+\section{Add a second RC433X disk}\label{add-a-second-rc433x-disk}
+\index{Disks!additional RC433X disk}
+\index{kitlabel}
+\index{kiton}
+
+This procedure has been checked with a fresh compatibility-profile session.
+It does not apply to the DFC403 profile. Work in a private runtime directory
+and use an unused device number; the example uses device 16, which the supplied
+maintained monitor supports as \texttt{disc1}.
+
+First create a new starter image with
+\manualref{create-a-blank-disk-image}{the integrated disk-creation command}:
+
+\begin{commandexample}[language=sh]{Host shell, private runtime directory}
+./sim4000 --mkdisc UNIT1
+\end{commandexample}
+
+Keep the existing device-15 declaration and add this line to your private
+configuration. The persistent sidecar retains all writes without changing
+the blank base file:
+
+\begin{commandexample}{Private configuration: additional disk}
+DEFINE RC433X DEVNO=16 FILE=UNIT1 OVERLAY=UNIT1.overlay
+\end{commandexample}
+
+Boot normally and initialize the date. At attention, select \texttt{s}, then
+enter \texttt{all big run}. This creates an administrative FP named
+\texttt{big}; it is not the same as creating an ordinary user FP with a broad
+base interval. In that FP enter:
+
+\begin{commandexample}{Administrative FP: initialize a newly created disk only}
+kitlabel 16 disc1 catdisc1 slow 36 9 2030
+kiton devno.16
+show
+finis
+\end{commandexample}
+
+\begin{operationnote}{Labelling initializes the selected guest disk}
+Run \texttt{kitlabel} only for the new blank disk on device 16. Do not use it
+to mount an existing disk: it can destroy the disk's guest catalog and files.
+The host-side overwrite refusal in \texttt{mkdisc} does not protect a guest
+disk from a later \texttt{kitlabel} command.
+\end{operationnote}
+
+The mount report names \texttt{disc1} on device 16. Initially \texttt{show}
+reports 2025 free slices, or 18225 segments, on that disk. Its usable capacity
+is therefore larger than the starter file; the persistent overlay grows as
+sectors are written. Retained guest files must still have an appropriate
+scope and be allocated on \texttt{disc1}, not merely on the original
+\texttt{disc}.
+
+On later boots, create an administrative FP and use only
+\texttt{kiton devno.16}; do not repeat \texttt{kitlabel}. Keep \texttt{UNIT1}
+and its matching \texttt{UNIT1.overlay} together. A 207-segment retained text
+file has been checked byte for byte, with unchanged catalog metadata, after a
+complete emulator restart and remount. Automatic mounting and use by MIPS/TS
+are not part of this procedure.
+
+The historical startup command \texttt{kit 16} is not available in \texttt{s}
+after its initialization-only catalog code has been removed when the first
+internal process is created. The installed FP utility uses the explicit
+\texttt{devno.16} form shown above.
+
+\section{Select the optional historical disk interface}\label{select-the-optional-historical-disk-interface}
+\index{DFC403}
+\index{RC4819}
+
+For the historical DFC403/RC4819 interface, use the supplied \texttt{STDMON}
+and \texttt{RC4000.dfc403.cfg}. Both are copied to the build directory by an
+ordinary build. Include them in your runtime directory if you want this
+optional profile; no monitor-generation script or Python installation is needed.
+
+\begin{commandexample}[language=sh]{Host shell, runtime directory: start the standard monitor}
+./sim4000 -a -c RC4000.dfc403.cfg
+\end{commandexample}
+
+The supplied standard monitor was exported from disk-resident \texttt{stdmonitor}
+and checked by booting DFC403/RC4819 and exercising text/binary host transfers.
+Its regeneration is a developer workflow, not a runtime prerequisite.
+The ordinary configuration still uses RC433X.
+
+DFC403 provides separate data and head-positioning interrupts; RC4819 uses 406 cylinders, 20 heads, and 9 sectors per track. Drive declarations use \passthrough{\lstinline!DFC!} and \passthrough{\lstinline!UNITNO!} after their controller, rather than a separate \passthrough{\lstinline!DEVNO!}. RC4819 images use volatile copy-on-write only; \passthrough{\lstinline!--disk!} can override the first image, but persistence options, runtime attach/detach, and geometry editing are not yet available for this interface. Optional \passthrough{\lstinline!RC4819RAM!} drives have a fixed capacity of 1..406 cylinders. \passthrough{\lstinline!show devices!} and \passthrough{\lstinline!show media!} include controller/unit identities. This models the historical command protocol, not physical seek/rotation timing or overlapped transfers.
+
+\section{Select runtime files and override paths}\label{select-runtime-files-and-override-paths}
+\index{Configuration!relative paths}
+
+The normal runner reads \passthrough{\lstinline!RC4000.cfg!}. The configuration selects \passthrough{\lstinline!MONITOR!} and \passthrough{\lstinline!UNIT0!} relative to the configuration file:
+
+\begin{commandexample}[language=sh]{Host shell, build directory: bounded run with configured paths}
+./sim4000 --run --config RC4000.cfg \
+  --steps 1000000 --set-disc-load-flag
+\end{commandexample}
+
+The monitor and disk paths can be overridden independently:
+
+\begin{commandexample}[language=sh]{Host shell, build directory: override monitor and first disk paths}
+./sim4000 --run --config RC4000.cfg \
+  --monitor MONITOR --disk UNIT0 --steps 200000
+\end{commandexample}
+
+\section{Choose how RC433X disk writes survive}\label{choose-how-rc433x-disk-writes-survive}
+\index{Disk persistence!mode choice}
+
+Host persistence and guest file lifetime are independent. Even on a writable persistent disk, a temporary guest entry may be removed when its FP process ends. Use \manualref{keep-guest-files-across-sessions}{the guest retention procedure} for wanted files; disk persistence alone does not promote them.
+
+Disk writes normally remain in the volatile in-memory overlay. To retain them across restarts without modifying the base image, select a sidecar explicitly:
+
+\begin{commandexample}[language=sh]{Host shell, build directory: select persistent RC433X writes}
+./sim4000 -a --disk-overlay UNIT0.overlay
+\end{commandexample}
+
+The equivalent configuration replaces the RC433X declaration with:
+
+\begin{commandexample}{RC4000.cfg contents: replace the disk declaration for persistence}
+DEFINE RC433X DEVNO=15 FILE=UNIT0 OVERLAY=UNIT0.overlay
+\end{commandexample}
+
+The base image is still opened read-only. The sidecar records its size and FNV-1a checksum, so it is rejected if used with another base image. Each sector record has its own checksum. Updates are written to a temporary file, flushed, and atomically renamed after every accepted RC disk-write operation. The emulator rejects truncated files, damaged records, duplicate sectors, and an overlay path that refers to the base image.
+
+\begin{operationnote}{Keep an overlay with its matching base image}
+Stop the emulator before copying a persistent base/sidecar pair. Keep the selected configuration with the pair and preserve the original base unchanged; the sidecar is not a complete disk or a machine-session snapshot. To return to the pristine disk state, stop the emulator and preferably move the wanted sidecar aside rather than delete it. Remove only the selected \passthrough{\lstinline!.overlay!} file. Never replace \passthrough{\lstinline!UNIT0!} with the sidecar: it is a versioned sparse change file, not a complete RC433X image.
+\end{operationnote}
+
+\section{Use an explicit complete working copy}\label{use-an-explicit-complete-working-copy}
+\index{Write-through!working copy}
+
+For a complete writable disk rather than an overlay, copy the stopped base
+image to a new name and explicitly select write-through mode. This works
+in a standalone runtime directory and does not need Python:
+
+\begin{commandexample}[language=sh]{Host shell, runtime directory: create and select a working copy}
+mkdir -p work
+cp -i UNIT0 work/UNIT0.test
+./sim4000 -a --disk work/UNIT0.test --disk-write-through
+\end{commandexample}
+
+\begin{operationnote}{Direct disk writes modify the working copy immediately}
+\passthrough{\lstinline!--disk-write-through!} requires an explicit \passthrough{\lstinline!--disk!} argument and conflicts with \passthrough{\lstinline!--disk-overlay!}. It may modify and extend that file immediately. Create a separate working copy before starting; see \manualref{prepare-a-writable-working-copy}{Prepare a writable working copy}. The supplied \passthrough{\lstinline!UNIT0!} must never be a write-through target. Do not copy a disk while the emulator is writing it, and do not run two emulators writing the same disk or sidecar. A working copy preserves the original image, not the temporary guest entries or the live process state.
+
+Keep an untouched backup before trying unfamiliar guest commands. To abandon
+an experiment, stop the emulator, preserve any wanted host exports, and use a
+new copy of that backup. Do not replace a disk image beneath a running
+emulator, and do not reuse an overlay with a different base image.
+\end{operationnote}
+
+For GNU-style startup syntax, aliases and mode restrictions, use \manualref{command-line-options}{the command-line reference}. Runtime RC433X \passthrough{\lstinline!attach!} choices, including direct-write \passthrough{\lstinline!writable!}, are described in \manualref{inspect-and-change-disk-attachments}{disk attachment controls}.
+
+\section{Inspect stored catalog records and runtime limits}\label{inspect-stored-catalog-records-and-runtime-limits}
+\index{Catalog!stored records}
+
+Diagnostic commands are also available as independent host-shell calls. They do not start the guest:
+
+\begin{commandexample}[language=sh]{Host shell, build directory: independent offline checks}
+./sim4000 --check-config RC4000.cfg
+./sim4000 --inspect-monitor MONITOR
+./sim4000 --inspect-image UNIT0
+./sim4000 --list-catalog UNIT0
+./sim4000 --list-main-catalog UNIT0
+\end{commandexample}
+
+\passthrough{\lstinline!--list-catalog!} follows the catalog and chain-table slice links rather than searching the image for printable strings. It prints the catalog identity and one row for every occupied entry. Positive sizes are reported as \passthrough{\lstinline!area!}; zero and negative sizes are reported conservatively as \passthrough{\lstinline!non-area!}. Tail fields whose higher-level meaning depends on the entry contents are retained as numeric \passthrough{\lstinline!SHORTCL!}, \passthrough{\lstinline!FILE!}, \passthrough{\lstinline!BLOCK!}, \passthrough{\lstinline!CONT!}, \passthrough{\lstinline!ENTRY!}, and \passthrough{\lstinline!TAIL!} columns. The command never writes the image and rejects malformed headers, out-of-range links, premature chains, and chain cycles. \passthrough{\lstinline!--list-main-catalog!} locates the positive-sized \passthrough{\lstinline!catalog!} area through the device catalog and follows its slice chain with the device's chain table. It requires the same document; arbitrary main-catalog names, other devices and auxiliary-catalog selection are not implemented. Its columns have the same format, but show stored main records, not a live namespace or a backing-file accessibility check.
+
+The bounded \passthrough{\lstinline!--run!} runner remains available for reproducible tests. It attaches configured clock devices and basic consoles, sends the first console's output to standard output, reads its input from standard input, and advances deterministic device time once per 10,000 interpreter calls. On a terminal, input is character-at-a-time with local echo disabled; Escape acts as the historical operator key. Newline from a pipe is translated to RC Return. The original terminal settings are restored after a normal exit and after handled SIGINT or SIGTERM. Configured basic-console Telnet endpoints are serviced at the same deterministic intervals. Multiple local virtual-console screens remain deferred.
+
+The runner resolves configured RC433X and overlay paths relative to the configuration file and opens the base image read-only. Without \passthrough{\lstinline!OVERLAY!}, disk writes are visible to later emulated reads through a sparse in-memory copy-on-write overlay and are discarded when the process exits.
+
+The default and overlay modes do not modify the monitor or base disk image; explicit write-through mode does modify its selected working copy. For an end-to-end retained-file example, see \manualref{keep-guest-files-across-sessions}{Keep guest files across sessions}.

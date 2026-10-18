@@ -1,0 +1,194 @@
+\chapter{Processes and command contexts}\label{processes-and-command-contexts}
+\index{Processes}
+\index{FP}
+
+These examples apply to the supplied monitor and native disk image. Except for the default-profile-only shared-terminal procedure at the end, they have also been checked with the optional standard monitor and DFC403 disk configuration. Historical manuals describe other versions; their command syntax is not always interchangeable with this system.
+
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+Context
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+How to reach it
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Examples
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+host shell & Before starting the simulator, or another host terminal & \passthrough{\lstinline!mkdir!}, \passthrough{\lstinline!cp!} \\
+Simulator, \passthrough{\lstinline!sim4000>!} & Control-E, unless configured differently & \passthrough{\lstinline!continue!}, \passthrough{\lstinline!quit!}, \passthrough{\lstinline!attention!} \\
+RC system process, \passthrough{\lstinline!s!} & Escape, then \passthrough{\lstinline!s!} and Return at \passthrough{\lstinline!att!} & \passthrough{\lstinline!list!}, \passthrough{\lstinline!max!}, \passthrough{\lstinline!new!}, \passthrough{\lstinline!proc!}, \passthrough{\lstinline!date!} \\
+FP in a user process & Create it with \passthrough{\lstinline!new ... run!}, or select its name at \passthrough{\lstinline!att!} & \passthrough{\lstinline!lookup!}, \passthrough{\lstinline!copy!}, \passthrough{\lstinline!rename!}, \passthrough{\lstinline!clear!}, program names \\
+\end{longtable}
+
+Escape requests attention from the guest; Control-E suspends the machine and opens the simulator interface. They do different jobs. After each completed \passthrough{\lstinline!s!} command, use Escape and \passthrough{\lstinline!s!} again for the next system command. FP accepts successive command lines without this extra step. Return submits a line; an idle FP process does not necessarily show a conventional prompt.
+
+\section{Create and inspect a process}\label{create-and-inspect-a-process}
+\index{new}
+
+Start from a freshly booted session, after date initialization. At \passthrough{\lstinline!att!}, select \passthrough{\lstinline!s!}, then enter:
+
+\begin{commandexample}{Guest system process s: list user processes}
+list
+\end{commandexample}
+
+This lists ordinary user processes; initially there may be none. Select \passthrough{\lstinline!s!} again and enter \passthrough{\lstinline!max!} to see the currently available process resources. Select \passthrough{\lstinline!s!} once more and create the process used below:
+
+\begin{commandexample}{Guest system process s: allocate and start muser}
+new muser size 100000 temp disc 200 10 run
+\end{commandexample}
+
+\passthrough{\lstinline!size 100000!} reserves 100000 RC address units (12-bit units, not host bytes). \passthrough{\lstinline!temp disc 200 10!} requests a temporary disk claim of 200 segments and ten catalog entries. \passthrough{\lstinline!run!} starts FP and attaches the terminal to it; the monitor reports \passthrough{\lstinline!to muser!}. Use a fresh session for these examples so that the process and file names do not already exist. If allocation fails, check \passthrough{\lstinline!list!} and \passthrough{\lstinline!max!} before requesting a smaller process or releasing an unused one.
+
+\begin{operationnote}{No storage protection in the default profile}
+The supplied compatibility profile leaves storage protection disabled. Process resource claims are not a security boundary. Optional experimental protection requires an explicitly selected, separately prepared monitor and software profile; enabling it is not part of this tutorial.
+\end{operationnote}
+
+\section{\texorpdfstring{Inspect resources with guest \texttt{claim}}{Inspect resources with guest claim}}\label{inspect-resources-with-guest-claim}
+\index{claim}
+
+Inside an ordinary FP process, enter bare \passthrough{\lstinline!claim!} to inspect the guest's resource report. This is not a simulator command and does not create a file. In the checked \passthrough{\lstinline!muser!} session it prints:
+
+\begin{commandexample}{Guest output: resource report from claim}
+area 5   buf 7   size 100000   first core 44842
+
+disc: 3 segm/slice
+  temp      1002 segm     334 slices      28 entr
+  login      801 segm     267 slices      20 entr
+  perm       801 segm     267 slices      20 entr
+\end{commandexample}
+
+The report includes \passthrough{\lstinline!area!}/\passthrough{\lstinline!buf!} resource counters, the process's core size and starting address, and disk counters labelled \passthrough{\lstinline!temp!}, \passthrough{\lstinline!login!} and \passthrough{\lstinline!perm!}. The tested \passthrough{\lstinline!size!} and \passthrough{\lstinline!first core!} agree with the process entry in \passthrough{\lstinline!s!}'s \passthrough{\lstinline!list!}. Exact values depend on the session; they are not universal defaults.
+
+The following allocation exercise is optional. Before it, put a short ASCII/LF
+sample in \texttt{exchange/input} from a second host terminal in the emulator's
+working directory; you can copy \texttt{examples/hello.alg} there. Skip this
+exercise if you want to go directly to the file tutorial. With that host file
+and an unused guest name \texttt{spacetmp}, enter:
+
+\begin{commandexample}{Guest FP in muser: inspect allocation and release}
+claim
+spacetmp=fromhost input
+lookup spacetmp
+claim
+clear temp spacetmp
+claim
+\end{commandexample}
+
+The import's descriptor reports 36 allocated segments. The \passthrough{\lstinline!temp!} line decreases by 36 segments, 12 slices and one entry; \passthrough{\lstinline!login!} and \passthrough{\lstinline!perm!} stay unchanged. Clearing the file restores the original counters. Repeated bare \passthrough{\lstinline!claim!} calls without intervening allocation give unchanged reports. The example is tested with both supported monitor/controller configurations.
+
+There is an important version-specific limitation: the displayed \passthrough{\lstinline!temp!} counters are \textbf{not} simply the literal \passthrough{\lstinline!200 10!} requested in \passthrough{\lstinline!new muser!}. The complete relationship between these reported counters, inherited claims and enforcement in this modified monitor has not been established. Do not treat this report as proof of an isolated, hard 200-segment quota, or infer that unused permanent counters authorize changing installed system files. Only bare reporting and the bounded temporary allocation above are verified; other \passthrough{\lstinline!claim!} arguments and resource-limit changes remain untested.
+
+Use \passthrough{\lstinline!max!} in \passthrough{\lstinline!s!} for its process-resource report, \passthrough{\lstinline!show!} in FP for free disk allocation, and \passthrough{\lstinline!cata!} in FP for main-catalog slots. They are different views, not interchangeable ways to count remaining resources.
+
+\section{Stop, resume, and remove a process}\label{stop-resume-and-remove-a-process}
+\index{remove}
+\index{finis}
+
+This is an optional process-control exercise. If you want to continue directly
+with \manualref{files-catalog-entries-and-algol-programs}{the file tutorial},
+leave \texttt{muser} running and skip this section for now. Ending or removing
+it discards its execution state; export wanted files before proceeding.
+
+With \passthrough{\lstinline!muser!} running, press Escape, select \passthrough{\lstinline!s!}, and enter:
+
+\begin{commandexample}{Guest system process s: stop muser}
+proc muser stop
+\end{commandexample}
+
+Wait for the system reply \passthrough{\lstinline!from s!} / \passthrough{\lstinline!ready!}; an earlier \passthrough{\lstinline!to muser!} message does not by itself mean the system operation has finished. Select \passthrough{\lstinline!s!} again and issue \passthrough{\lstinline!list!}. The row for \passthrough{\lstinline!muser!} now ends in \passthrough{\lstinline!stop s!}. Its columns are name, core address, size, protection key, stop count, state, and parent. Addresses and available resources vary with the monitor variant and session.
+
+Select \passthrough{\lstinline!s!} again and resume FP:
+
+\begin{commandexample}{Guest system process s: start muser}
+proc muser start
+\end{commandexample}
+
+Wait for the completed system reply. Before entering any FP command,
+request attention and select \passthrough{\lstinline!muser!} at
+\passthrough{\lstinline!att!}; selecting \passthrough{\lstinline!s!}
+for process control does not make subsequent input an FP command.
+
+To end this FP session normally, enter \passthrough{\lstinline!finis!} in the user process. The supplied system process reports \passthrough{\lstinline!pause muser finis fp!} and removes the process; a subsequent completed system \passthrough{\lstinline!list!} no longer contains it. The pause notice itself can be printed before removal finishes; do not use that partial output as the boundary for an immediate raw-memory check. Do not interpret this message as meaning that the process remains available for \passthrough{\lstinline!start!}.
+
+An explicit removal also works: create \passthrough{\lstinline!new mremove size 100000 run!} in \passthrough{\lstinline!s!}, select \passthrough{\lstinline!s!} again, and enter \passthrough{\lstinline!proc mremove remove!}. Wait for \passthrough{\lstinline!ready!}; \passthrough{\lstinline!list!} then no longer contains \passthrough{\lstinline!mremove!}.
+
+\begin{operationnote}{Before ending or removing a process}
+Removal discards its execution state. Export wanted files first, or complete
+the retained-file procedure in
+\manualref{keep-guest-files-across-sessions}{Keep guest files across sessions}.
+Do not rely on direct \texttt{proc name remove} to clean up every temporary
+catalog entry: entries can remain visible after removal. For predictable
+cleanup, use \texttt{clear temp} with the relevant file names inside FP before
+removal, or end the idle FP normally with \texttt{finis}. A persistent disk
+overlay is not a substitute for deliberate guest file retention or cleanup.
+\end{operationnote}
+
+\begin{procedureblock}
+\section{Set the monitor date later}\label{set-the-monitor-date-later}
+\index{Date!setting}
+
+Select \passthrough{\lstinline!s!} and supply all six fields:
+
+\begin{commandexample}{Guest system process s: set the date}
+date 86 09 30 08 00 00
+\end{commandexample}
+
+\begin{operationnote}{Historical date commands are different}
+The historical \textit{RC 4000 Software: Multiprogramming System},
+Sections 17.28--17.29, describes \passthrough{\lstinline!newdate!} for
+setting a day-first date and bare \passthrough{\lstinline!date!} for
+displaying it. Do not copy those commands into this session: the delivered
+system uses \passthrough{\lstinline!date!} with six year-first fields to
+set the clock, and bare \passthrough{\lstinline!date!} is not a date inquiry.
+The startup year restrictions and host-date translation described above
+still apply.
+\end{operationnote}
+\end{procedureblock}
+
+\section{Troubleshooting terminal routing}
+
+\subsection{A queued FP read can delay a system reply}\label{a-queued-fp-read-can-delay-a-system-reply}
+
+Selecting \passthrough{\lstinline!s!} does not make every outstanding terminal request disappear. The following bounded case is checked with both supported monitor profiles: an ordinary FP named \passthrough{\lstinline!mtest!} is idle after a completed command, attention is requested, \passthrough{\lstinline!s!} is selected, and \passthrough{\lstinline!list!} is entered. Instead of immediately printing the system report, the terminal first prints \passthrough{\lstinline!to mtest!} and waits for input. This is not evidence that \passthrough{\lstinline!list!} was interpreted by FP.
+
+In this specific situation, press Return once to supply an empty line to the idle FP. The queued report then appears:
+
+\begin{commandexample}{Guest output: delayed system list (bracketed line is an instruction)}
+to mtest
+                         [press Return once here]
+from s
+mtest         ...        200000   ...   0    wait   s
+ready
+\end{commandexample}
+
+The ellipses stand for session-dependent fields; the bracketed instruction is not text to enter. The checked row's name, core address and size agree with the earlier descriptor inspection. Wait for \passthrough{\lstinline!from s!} and the final \passthrough{\lstinline!ready!} before sending another system command. Sending that command at the interim \passthrough{\lstinline!to mtest!} read can instead give it to FP and produce \passthrough{\lstinline!***fp name ...!}. Attention followed by \passthrough{\lstinline!mtest!} and Return selects the user process again; a subsequent \passthrough{\lstinline!lookup montest!} is verified to work normally.
+
+This empty-line procedure is checked only for an idle ordinary FP at its command input. Do not apply it blindly to a compiler, editor, montest dialog or other program: a blank line can have a different meaning there. This is a terminal-request ordering example, not a general error-recovery rule or a verified multi-process creation/removal recipe.
+
+\subsection{Two idle FPs sharing one terminal}\label{two-idle-fps-sharing-one-terminal}
+\index{Processes!shared terminal}
+
+Two ordinary FPs can share the local console with the default MONITOR/RC433X
+profile, but input must be directed explicitly to the intended process.
+For independent interactive work, prefer one local terminal and a Telnet
+terminal. The shared-console procedure is not established for STDMON/DFC403.
+
+This is an interactive turn-taking procedure, not a pasteable script. Before \emph{every} system command, request attention and select \passthrough{\lstinline!s!} again. The checked test uses the explicit local simulator sequence: configured escape key, \passthrough{\lstinline!attention!}, \passthrough{\lstinline!continue!}, then \passthrough{\lstinline!s!} and Return at \passthrough{\lstinline!att!}. After a system reply's \passthrough{\lstinline!ready!}, the terminal can immediately print \passthrough{\lstinline!to one!} or \passthrough{\lstinline!to two!}; a following system command without reselection would then belong to FP.
+
+The queued-read issue can occur repeatedly, including during another process's output. In the checked case, an explicit \passthrough{\lstinline!to one!} or \passthrough{\lstinline!to two!} requesting an idle FP command is served with an empty Return. Wait for the pending system command's \passthrough{\lstinline!ready!}, or the complete requested utility report, rather than treating an isolated BEL or the first report line as completion. Repeated requests may require repeated empty lines; do not send them speculatively before observing the input context.
+
+\begin{operationnote}{Prefer separate terminals for independent interactive work}
+Use this only with ordinary FPs idle at command input and short utility
+reports. It is not a recipe for rapid pasted commands, long shared-console
+reports or arbitrary interactive programs. A blank line can be meaningful
+to another tool. For everyday independent sessions use
+\manualref{keep-local-and-remote-fp-processes-independent}{separate local and
+Telnet terminals}. Removing a process discards its execution state; handle
+wanted files and temporary-file cleanup first.
+\end{operationnote}

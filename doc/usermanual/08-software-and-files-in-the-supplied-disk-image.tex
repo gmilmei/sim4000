@@ -1,0 +1,907 @@
+\chapter{Software and files in the supplied disk image}\label{software-and-files-in-the-supplied-disk-image}
+\index{Software inventory}
+
+Henrik Jacobsen describes most basic software on UNIT0, apart from the monitor, as later RC8000/RC9000-10 versions. This is a mixed historical software environment, not a pristine 1969 RC4000 installation. That lineage does not imply RC8000/RC9000-10 hardware emulation; the descriptions below distinguish identified entries from workflows actually tested here.
+
+The native \passthrough{\lstinline!UNIT0!} is a historical working system, not an empty disk or a collection of 415 independent applications. Its 415 occupied catalog entries include programs, text and data, libraries, device descriptions, and named entry points into shared files. This section describes the entries most relevant to an operator or someone writing guest programs. It is not a promise that every installed package works with the native emulator.
+
+The development examples use the optional \texttt{examples/} directory beside
+the runtime files. All host copy commands below are entered in a second host
+terminal in that same working directory. See
+\manualref{run-from-your-own-working-directory}{Runtime files and tutorial inputs}
+if the directory is missing. These are separate recipes: begin each with an idle
+FP, unused guest names and unused host export names. Cleanup for one recipe
+must not remove inputs you still need for another.
+
+The descriptions use three evidence levels:
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{Tested:} the stated workflow has run successfully in Sim4000. This does not certify every option of that program.
+\item
+  \textbf{Documented:} historical sources or inspected file contents establish the role; the complete workflow has not been tested here.
+\item
+  \textbf{Inventory only:} the entry exists, but its exact operation is not yet established. A suggestive name is not a verified interface.
+\end{itemize}
+
+Unless stated otherwise, program calls belong in FP inside an ordinary user process, not at \passthrough{\lstinline!sim4000>!} or directly in \passthrough{\lstinline!s!}. Start with the process and temporary disk claim described in \manualref{processes-and-command-contexts}{Processes and command contexts}. Use lower-case names as shown in the catalog.
+
+\section{Everyday commands and development tools}\label{everyday-commands-and-development-tools}
+
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+Entry
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Purpose and use
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Evidence
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\passthrough{\lstinline!fp!} & File processor: the guest command interpreter started in an ordinary process. It dispatches utility and program calls. Normally use it through \passthrough{\lstinline!new ... run!}, not by typing \passthrough{\lstinline!fp!} again. & Tested \\
+\passthrough{\lstinline!lookup!} & Inspect named catalog entries, for example \passthrough{\lstinline!lookup algol slang!}. & Tested \\
+\passthrough{\lstinline!copy!} & Copy or concatenate text into a result entry, or display it with \passthrough{\lstinline!c=copy source!}; see the file examples above. & Tested text copy, concatenation and console display \\
+\passthrough{\lstinline!rename!} & Rename an entry with \passthrough{\lstinline!rename old.new!}; the dot is significant. & Tested \\
+\passthrough{\lstinline!clear!} & Remove named entries, for example \passthrough{\lstinline!clear temp duplicate!}. Do not use installed global utility names as cleanup targets. & Tested for named temporary entries \\
+\passthrough{\lstinline!scope!} & Promote a named temporary file to \passthrough{\lstinline!user!}, or demote it to \passthrough{\lstinline!temp!}; see the persistent-file workflow above. & Tested for these two scopes \\
+\passthrough{\lstinline!search!} & List descriptors by scope, for example \passthrough{\lstinline!search user!}. Separate calls for \passthrough{\lstinline!temp!}, \passthrough{\lstinline!user!}, and \passthrough{\lstinline!system!} can be collected as text. & Tested for default intervals \\
+\passthrough{\lstinline!catsort!} & Compact catalog reports, sorted within scope groups: \passthrough{\lstinline!scope.temp!} for temporary entries, \passthrough{\lstinline!scope.system!} for installed entries; bare and \passthrough{\lstinline!scope.user!} can include several groups. & Tested local scope groups, complete system-name coverage, totals and export \\
+\passthrough{\lstinline!cata!} & Print main-catalog slot statistics, not a name listing or free disk capacity. Stored-record limitations are described above. & Tested slot accounting \\
+\passthrough{\lstinline!show!} & Report free guest disk space in slices and RC segments. This is not the simulator's \passthrough{\lstinline!show!} command. & Tested bare call, allocation decrease and reclamation \\
+\passthrough{\lstinline!claim!} & Report guest process/core and disk resource counters; see the version-specific limitations above. & Tested bare report and bounded temporary allocation/release \\
+\passthrough{\lstinline!edit!} & Command-driven text editor, called as \passthrough{\lstinline!result=edit source!}; see the examples below. & Tested search/replacement, line movement, deletion, insertion and completion \\
+\passthrough{\lstinline!cmp!} & Compare two text entries with \passthrough{\lstinline!cmp first second!}; report identical text or line differences. & Compatibility: identical text, replacement and export tested; protected: tofrom1 break \\
+\passthrough{\lstinline!fromhost!}, \passthrough{\lstinline!tohost!} & Import from and export to the configured host exchange directory. Text and binary transfer are supported. & Tested \\
+\passthrough{\lstinline!algol!} & Compile Algol source into a guest executable, for example \passthrough{\lstinline!program=algol source connect.no!}. See the small program above. & Tested \\
+\passthrough{\lstinline!slang!} & SLANG assembler, called as \passthrough{\lstinline!program=slang source!}. It assembles RC machine code inside the guest. & Tested \\
+\passthrough{\lstinline!i!}, \passthrough{\lstinline!o!} & Read FP commands from a text entry and select FP's output destination. \passthrough{\lstinline!o c!} restores console output; see the command-file example below. & Tested for one input file and listing output \\
+\passthrough{\lstinline!if!} & Conditionally execute the next command or parenthesized group using \passthrough{\lstinline!if ok.yes!} / \passthrough{\lstinline!if ok.no!}. & Tested after successful and failed \passthrough{\lstinline!lookup!}, including grouped commands \\
+\passthrough{\lstinline!finis!} & End FP normally. In the supplied system this also causes \passthrough{\lstinline!s!} to remove the ordinary user process and reclaim its temporary resources. & Tested \\
+\end{longtable}
+
+Several of these names, including \passthrough{\lstinline!edit!}, \passthrough{\lstinline!lookup!}, and \passthrough{\lstinline!copy!}, are entry points in the shared \passthrough{\lstinline!utility!} file, not separate allocated program files. Keep \passthrough{\lstinline!utility!} even if you mainly use the compiler. The historical distribution identifies this System Utility as an RC8000 version from 1987: this image contains software from several periods, not just the original 1969 system.
+
+\section{Edit a text file inside the guest}\label{edit-a-text-file-inside-the-guest}
+\index{Editor}
+
+The command-driven \texttt{edit} operations below have also been checked in the
+protected profile: replacement, insertion/deletion, truncation and reopening an
+edited guest file all produce the expected exported bytes without changing the
+originals. For that profile substitute \texttt{rcin}/\texttt{rcout} for
+\texttt{fromhost}/\texttt{tohost}, and use \texttt{exchange/} for host
+files. This is not a full-screen editor or a test of every historical editor
+operation; see
+\manualref{choose-a-maintained-monitor-profile}{Choose a maintained-monitor profile}.
+
+\begin{operationnote}{The editor has its own input language}
+Enter \texttt{result=edit source} in FP; subsequent editing commands go to
+\texttt{edit}, not FP. Its \texttt{f} operation completes the result and
+returns to FP. It is not \texttt{finis}, which ends the FP process.
+Only export or clear the result after the editor has finished. Control-E
+suspends the emulator; it does not finish or save an unfinished edit.
+\end{operationnote}
+
+After importing a file with \passthrough{\lstinline!msrc=fromhost input!}, where the first line contains \passthrough{\lstinline!Monitor manual sample.!}, enter:
+
+\begin{commandexample}{Guest FP: open the source in edit}
+medit=edit msrc
+\end{commandexample}
+
+\begin{commandexample}{Guest editor: locate, replace and finish}
+l./Monitor/,r/Monitor/Edited/,f
+\end{commandexample}
+
+\begin{commandexample}{Guest FP, after the editor finishes: export the result}
+edited=tohost medit
+\end{commandexample}
+
+The second line is an editor command line, not an FP command. \passthrough{\lstinline!l./Monitor/!} locates the text, \passthrough{\lstinline!r/Monitor/Edited/!} replaces it, and \passthrough{\lstinline!f!} finishes the edit and copies the remaining input to the result. Commas separate editor operations. The resulting host \passthrough{\lstinline!exchange/edited!} contains \passthrough{\lstinline!Edited manual sample.!} on its first line and preserves the remaining text. Choose a host destination that does not already exist.
+
+This creates a separate temporary result; it does not overwrite \passthrough{\lstinline!msrc!}. Keep \passthrough{\lstinline!medit!} for the comparison example that follows.
+After that example, \passthrough{\lstinline!clear temp medit!} removes the result. Do not interrupt an unfinished edit and assume it has been saved. This editor has no modern full-screen cursor interface, and ordinary terminal editing shortcuts are not a substitute for its command language.
+
+For a tested multiline example, copy \passthrough{\lstinline!examples/editor\_lines.txt!} to host file \passthrough{\lstinline!exchange/edinput!}. From the emulator's working directory this is:
+
+\begin{commandexample}[language=sh]{Host shell: copy the multiline input from the emulator's working directory}
+cp examples/editor_lines.txt exchange/edinput
+\end{commandexample}
+
+The input contains four lines: \passthrough{\lstinline!First line.!}, \passthrough{\lstinline!Keep this line.!}, \passthrough{\lstinline!Remove this line.!}, and \passthrough{\lstinline!Last line.!}. Enter the following in FP, including the standalone \passthrough{\lstinline"!"} line:
+
+\begin{commandexample}{Guest FP: import and start the multiline edit}
+mlines=fromhost edinput
+mpatch=edit mlines
+\end{commandexample}
+
+\begin{commandexample}{Guest editor: move, delete, insert text and finish}
+l1,l1,d0,i!
+Inserted line.
+Literal comma, slash / preserved.
+!
+f
+\end{commandexample}
+
+\begin{commandexample}{Guest FP, after the editor finishes: export the result}
+edops=tohost mpatch
+\end{commandexample}
+
+In this example, each \passthrough{\lstinline!l1!} advances one line, retaining the passed text. After two advances, \passthrough{\lstinline!d0!} deletes the current \passthrough{\lstinline!Remove this line.!} line. \passthrough{\lstinline"i!"} begins insertion; \passthrough{\lstinline"!"} is the chosen closing delimiter and must not occur in the inserted text. While insertion is active, the comma and slash above are literal text, not editor operations. \passthrough{\lstinline!f!} completes the result, including the untouched last line. The host file \passthrough{\lstinline!exchange/edops!} contains:
+
+\begin{commandexample}{Host text file: exchange/edops (expected output)}
+First line.
+Keep this line.
+Inserted line.
+Literal comma, slash / preserved.
+Last line.
+\end{commandexample}
+
+Deletion counts are easy to misread: the tested \passthrough{\lstinline!l2,d1,f!} sequence on the same four-line input retains only the first two lines, deleting both the current third line and the following fourth line. Use \passthrough{\lstinline!d0!}, not \passthrough{\lstinline!d1!}, for the single-line deletion shown above. These positive movements and deletions are tested; arbitrary backward movement and search-based deletion ranges are not covered by these examples.
+
+The original \passthrough{\lstinline!mlines!} remains byte-for-byte unchanged. Keep/export any wanted result before cleaning up with \passthrough{\lstinline!clear temp mlines mpatch!}. The example works with both supported monitor/controller configurations and does not require changing the shipped image. Historical monitor build scripts in \passthrough{\lstinline!monsrc/hjmops!} contain further editor examples, but are not beginner command files to execute.
+
+\index{Editor!line movement}
+\index{Editor!deletion}
+\index{Editor!insertion}
+\index{Editor!finishing}
+The following is a quick reference to the operations tested above, not the
+editor's complete command language:
+
+\begin{longtable}{@{}>{\raggedright\arraybackslash}p{0.35\linewidth-\tabcolsep}
+  >{\raggedright\arraybackslash}p{0.65\linewidth-\tabcolsep}@{}}
+\toprule
+Editor input & Meaning in the checked example \\
+\midrule
+\endhead
+\bottomrule
+\endlastfoot
+\texttt{l./Monitor/} & Locate the matching text for replacement. \\
+\texttt{r/Monitor/Edited/} & Replace that text in the separate result. \\
+\texttt{l1} & Advance one line while retaining the passed text. \\
+\texttt{d0} & Delete the current line; \texttt{d1} also deletes the following line in the tested four-line input. \\
+\texttt{i!}, text, then \texttt{!} & Insert text using the chosen closing delimiter. Enter the closing \texttt{!} on its own line as shown; commas and slashes within insertion are literal text. \\
+\texttt{f} & Finish, copy the remaining input and return to FP. \\
+\end{longtable}
+
+The separate historical \textbf{Screen Editor} should not be confused with \passthrough{\lstinline!edit!}: the original emulator's distribution notes say it could not run because the guest terminal process lacked required facilities. Its operation in Sim4000 has not been established. An ANSI/VT100 connection alone does not establish that compatibility.
+
+\section{Compare text files inside the guest}\label{compare-text-files-inside-the-guest}
+\index{cmp!guest text comparison}
+
+\begin{operationnote}{Use the compatibility profile for guest cmp}
+The installed \texttt{cmp} does not work in the protected profile: the tested
+identical-text call pauses with \texttt{break 0 tofrom1}. The successful
+comparison examples below apply to the compatibility profile only. To compare
+protected guest text, export each entry with \texttt{rcout} under different
+unused host names and use a host text-comparison tool. Text display, copying,
+renaming and concatenation have been checked in both profiles.
+
+For this specific protected \texttt{cmp} break, Escape, \texttt{s}, then
+\texttt{proc} \textit{processname} \texttt{start} reinitializes FP; substitute
+the paused FP's actual name. The checked recovery preserves the compared
+entries for export, but does not resume \texttt{cmp}. Inspect and export wanted
+files before cleanup. Do not assume this recovers every guest fault.
+\end{operationnote}
+
+After the file-copy tutorial and the preceding editing example, the original is \passthrough{\lstinline!msrc!}, its unchanged renamed copy is \passthrough{\lstinline!moved!}, and the edited result is \passthrough{\lstinline!medit!}. Run this comparison before their cleanup commands. If those entries have already been removed, recreate them in an FP process with unused names:
+
+\begin{commandexample}{Guest FP: prepare the comparison files and start edit}
+msrc=fromhost input
+mcopy=copy msrc
+rename mcopy.moved
+medit=edit msrc
+\end{commandexample}
+
+\begin{commandexample}{Guest editor: replace text and finish the result}
+l./Monitor/,r/Monitor/Edited/,f
+\end{commandexample}
+
+For the exact output shown here, host \passthrough{\lstinline!exchange/input!} must contain this ASCII/LF text, including the final newline:
+
+\begin{commandexample}{Host text file: exchange/input (not a command)}
+Monitor manual sample.
+Second line.
+\end{commandexample}
+
+At FP, enter:
+
+\begin{commandexample}{Guest FP: compare original, copied and edited text}
+cmp msrc moved
+cmp msrc medit
+\end{commandexample}
+
+The first call prints \passthrough{\lstinline!files are identical!}. The second reports:
+
+\begin{commandexample}{Guest output: text comparison report}
+DISCREPANCY NO. 1  msrc line 1, medit line 1  TEXT REPLACED
+=========>> msrc:
+Monitor manual sample.
+=========>> medit:
+Edited manual sample.
+ 1 discrepancy found
+\end{commandexample}
+
+Both calls return to FP without attention, a reset or a new process. A reported difference is a comparison result, not a failed FP command. The calls leave all three text entries unchanged.
+
+To save the report instead of displaying it, choose unused guest and host names and use FP output redirection:
+
+\begin{commandexample}{Guest FP: save the comparison report and restore console output}
+o cmpreport
+cmp msrc medit
+o c
+cmpout=tohost cmpreport
+clear temp cmpreport
+\end{commandexample}
+
+The exported ASCII/LF file is \passthrough{\lstinline!exchange/cmpout!} with the default host-files configuration. \passthrough{\lstinline!o c!} restores console output before the export. The cleanup removes only the guest report, not the compared files or the host export.
+
+This is a guest \textbf{text} comparison, not a byte-for-byte disk-area or binary comparison: identical text was verified even when the imported source and its copied result had different allocated segment counts. Binary comparison, additional options and more complex difference alignment remain unverified. Use host \passthrough{\lstinline!cmp!} on binary host exports when exact bytes matter.
+
+\subsection{Compare protected guest text on the host}\label{compare-protected-text-on-host}
+\index{Host file exchange!text comparison}
+
+Once the three sample entries above exist, export each under a different,
+unused host name. In a protected session, prepare the original with
+\texttt{msrc=rcin input} rather than \texttt{fromhost}; the copy, rename and
+editor commands are unchanged. Then enter at FP:
+
+\begin{commandexample}{Protected FP: export the three comparison samples}
+cmporig=rcout msrc
+cmpcopy=rcout moved
+cmpedit=rcout medit
+\end{commandexample}
+
+With the supplied protected configuration, run these commands in a host shell
+from the runtime directory, not at FP or at the simulator prompt:
+
+\begin{commandexample}[language=sh]{Host shell: compare exported text}
+cmp -s exchange/cmporig exchange/cmpcopy
+echo $?
+cmp -s exchange/cmporig exchange/cmpedit
+echo $?
+diff -u exchange/cmporig exchange/cmpedit
+\end{commandexample}
+
+For the exact sample text above, the two printed status codes are 0 (equal)
+and 1 (different). The unified diff shows the first line changing from
+\texttt{Monitor manual sample.} to \texttt{Edited manual sample.}; the second
+line is unchanged. Both tools use a status greater than 1 for an error, such
+as an unreadable or missing file. Do not treat an error as an ordinary
+difference. The paths depend on \texttt{HOSTFILES ROOT}; compatibility exports
+normally live in \texttt{exchange/} instead. No Python or extra simulator tool
+is needed for this workflow.
+
+Host comparison is read-only and works after simulator exit because the
+exports are independent host files. It compares exported text, not guest
+allocation or untouched binary data. Check each transfer before comparing.
+If a destination already exists, export is deliberately refused; choose a
+new host name. The checked refusal leaves the old export's contents, identity,
+size, mode and modification time unchanged, and FP remains usable.
+
+\section{Assemble a SLANG source}\label{assemble-a-slang-source}
+\index{SLANG}
+\index{Binary export!SLANG}
+
+Copy \passthrough{\lstinline!examples/slang\_integer.sl!} to host file \passthrough{\lstinline!exchange/slinput!}, then enter in FP:
+
+\begin{commandexample}{Guest FP: assemble and export the valid SLANG example}
+slsrc=fromhost slinput
+slprog=slang slsrc
+slbinary=tohost conv.bin slprog
+\end{commandexample}
+
+This supplied example assembles instructions that add 123 and 321, then loop. It is a machine-code demonstration, not a program that returns normally. If you run it with \passthrough{\lstinline!slprog!}, use Control-E to suspend the machine afterward. The binary export must use \passthrough{\lstinline!conv.bin!}, not text conversion. Its backing-store segment contains allocation padding beyond the actual instructions; it is not a host executable. See \manualref{host-file-exchange}{Host file exchange} for conversion modes.
+
+\begin{operationnote}{Check the assembly result before using it}
+The example above uses a known-valid supplied source. For changed sources,
+inspect the final SLANG report before running or exporting the result as a
+successful program. A failed assembly can leave an entry marked executable;
+\texttt{lookup} alone is not a success check. See
+\manualref{recover-from-fp-and-assembly-errors}{assembly error recovery} and
+\manualref{guard-a-slang-binary-export-with-its-result-status}{the tested export guard}
+before automating compilation jobs.
+\end{operationnote}
+
+\section{Save an assembler listing and use an FP command file}\label{save-an-assembler-listing-and-use-an-fp-command-file}
+\index{Command files}
+\index{SLANG!listing}
+
+The listing-and-command-file workflow below is checked in both maintained
+monitor profiles. For protected operation, use \texttt{rcin}/\texttt{rcout}
+for actual transfers, including the two \texttt{=tohost} lines inside your
+copy of \texttt{slang\_commands.fp}. Keep the supplied example unchanged.
+The protected configuration normally places host files under
+\texttt{exchange/}. Both profiles preserve the source, export the
+expected listing/code and return to keyboard input. The optional execution
+recipe below also checks this sample's loop, not every SLANG option or program.
+\index{FP!output redirection}
+
+FP can read commands from a guest text entry instead of the keyboard. This is useful for repeatable compilation jobs; it is not a host shell script or a new monitor variant. The following example is tested with both the supplied monitor/RC433X and the standard monitor/DFC403 configurations.
+
+Starting in the emulator's working directory, copy both supplied examples from a host shell:
+
+\begin{commandexample}[language=sh]{Host shell: prepare source and FP command-file inputs}
+cp examples/slang_integer.sl exchange/slinput
+cp examples/slang_commands.fp exchange/cmdinput
+\end{commandexample}
+
+Use an ordinary FP process with temporary disk resources, such as the \passthrough{\lstinline!muser!} process introduced earlier. If you have already assembled the preceding example, export any wanted results and remove its temporary \passthrough{\lstinline!slsrc!}/\passthrough{\lstinline!slprog!} entries, or use a fresh process. These examples use the same guest names. Choose unused host destination names \passthrough{\lstinline!slbinary!} and \passthrough{\lstinline!sllisting!} inside the configured exchange directory; host export refuses to overwrite existing files.
+
+The command file contains these five FP lines:
+
+\begin{commandexample}{FP command-file contents: slang\_commands.fp}
+o slist
+slprog=slang slsrc list.yes
+o c
+slbinary=tohost conv.bin slprog
+sllisting=tohost slist
+\end{commandexample}
+
+Import the source and commands, then select the command input in FP:
+
+\begin{commandexample}{Guest FP: import the source and execute the command file}
+slsrc=fromhost slinput
+slcmd=fromhost cmdinput
+i slcmd
+lookup slprog
+\end{commandexample}
+
+\passthrough{\lstinline!i slcmd!} reads and executes the lines in \passthrough{\lstinline!slcmd!}; after this file ends, FP accepts keyboard commands again. It does not end the process. The subsequent \passthrough{\lstinline!lookup slprog!} is a keyboard command, not part of the file.
+
+\passthrough{\lstinline!o slist!} selects a guest text output entry. \passthrough{\lstinline!list.yes!} makes SLANG write its source listing there as well as its assembly report. \passthrough{\lstinline!o c!} restores output to the RC console before the export commands. Here \passthrough{\lstinline!c!} means the guest console, not the simulator's \passthrough{\lstinline!continue!} abbreviation. While output is redirected, a quiet console does not mean that the assembler has stopped.
+
+The host file \passthrough{\lstinline!exchange/sllisting!} contains the listed instructions and \passthrough{\lstinline!slang ok 1/12/1!}: one SLANG segment, 12 RC bytes and one backing-store segment. An RC byte is a 12-bit halfword, not an eight-bit host byte. The six-word code therefore occupies 18 host bytes at the start of the 768-byte binary export; remaining bytes are allocation padding, not additional sample instructions. \passthrough{\lstinline!lookup slprog!} reports executable content \passthrough{\lstinline!2.4!} (entry offset 4) and length 12.
+
+\subsection{Optionally run and interrupt the integer sample}\label{run-and-interrupt-slang-sample}
+\index{SLANG!execute sample}
+\index{FP!interrupt running program}
+
+Before clearing the successful \texttt{slprog}, you can enter \texttt{slprog}
+at FP. This known sample adds 123 and 321 and then loops; it never prints a
+result or returns normally. Press Control-E and, at the simulator prompt,
+enter \texttt{step 1000000}, then \texttt{show cpu}. The checked result is
+\texttt{W0=0001bc} (444) and \texttt{W1=000141} (321). The instruction counter
+points at the \texttt{jl. 0} self-loop; its absolute address depends on the
+process allocation. This bounded debugger step changes execution state, not
+just the display. With protection selected, the observed execution is in task
+mode with PR \texttt{bf} and storage key 1. This example is checked in both
+profiles, not a general test of machine-code programs.
+
+To return to FP, enter simulator \texttt{continue}, then press bare Escape,
+select guest system process \texttt{s}, and enter:
+
+\begin{commandexample}{Guest system s: interrupt the sample in muser}
+proc muser break
+\end{commandexample}
+
+Replace \texttt{muser} with the actual process name. Expect
+\texttt{***break 8} followed by the decimal loop address and
+\texttt{pause muser break fp}. Request attention again with Escape, select
+\texttt{s}, and enter \texttt{proc muser start}. The reply
+\texttt{***fp reinitialized} means FP has restarted, not that the sample loop
+has returned. A subsequent \texttt{lookup slprog} and the cleanup below work
+in the checked session. Guest \texttt{proc name break} is distinct from a
+simulator execution breakpoint, Ctrl-E suspension and \texttt{proc name stop}.
+Do not assume every arbitrary machine-code program has the same interrupt
+recovery behavior.
+
+After inspecting the exports and finishing any optional execution, remove just
+these temporary guest entries in FP:
+
+\begin{commandexample}{Guest FP: remove the assembly example entries}
+clear temp slsrc slcmd slist slprog
+\end{commandexample}
+
+Command files execute guest commands and can change guest files or processes. Review their contents first; do not execute installed subsystem startup scripts merely to inspect them. This example checks one command input file, output restoration and assembly, not arbitrary nested inputs, conditional commands or batch administration. \passthrough{\lstinline!slangxref!} is installed, but its calling convention and cross-reference workflow remain unverified (inventory only).
+
+\section{Call one command file from another}\label{call-one-command-file-from-another}
+\index{FP!nested command files}
+\index{FP!command-file input}
+\index{Output redirection!restoring the console}
+
+The listings labelled \emph{command-file contents} are file contents, not additional keyboard commands. Prepare and import the files first; type only the \emph{Guest FP} steps at the keyboard. The commands following an \passthrough{\lstinline!i!} invocation are keyboard steps after that file has reached EOF and returned input to the console.
+
+A bounded nested-input example is supplied as \passthrough{\lstinline!examples/nested\_outer.fp!} and \passthrough{\lstinline!nested\_inner.fp!}. From the emulator's working directory, copy them in a host shell:
+
+\begin{commandexample}[language=sh]{Host shell: prepare the nested input files}
+cp examples/nested_outer.fp exchange/outerinput
+cp examples/nested_inner.fp exchange/innerinput
+\end{commandexample}
+
+The outer command file contains:
+
+\begin{commandexample}{Outer command-file contents: nested\_outer.fp}
+o nestlog
+lookup fromhost
+i innercmd
+lookup algol
+o c
+nestedout=tohost nestlog
+\end{commandexample}
+
+The inner command file contains just:
+
+\begin{commandexample}{Inner command-file contents: nested\_inner.fp}
+lookup tohost
+\end{commandexample}
+
+In an ordinary FP process with the earlier temporary resource claim, choose unused guest names \passthrough{\lstinline!outercmd!}, \passthrough{\lstinline!innercmd!}, \passthrough{\lstinline!nestlog!} and an unused host export name \passthrough{\lstinline!nestedout!}. Import both files \textbf{before} starting the outer file:
+
+\begin{commandexample}{Guest FP: import both command files and start the outer file}
+outercmd=fromhost outerinput
+innercmd=fromhost innerinput
+i outercmd
+lookup slang
+\end{commandexample}
+
+At the inner file's end, FP resumes the outer file after \passthrough{\lstinline!i innercmd!} and executes \passthrough{\lstinline!lookup algol!}. The host file \passthrough{\lstinline!exchange/nestedout!} contains the three catalog descriptors in the order \passthrough{\lstinline!fromhost!}, \passthrough{\lstinline!tohost!}, \passthrough{\lstinline!algol!}. All three are in the redirected report, not on the console. The outer file explicitly restores console output with \passthrough{\lstinline!o c!} before exporting; do not rely on input-file changes to restore output automatically.
+
+At the outer file's end, keyboard input resumes without ending the process. The final \passthrough{\lstinline!lookup slang!} above is typed at the keyboard and displays its descriptor on the console. After checking the export, clean up:
+
+\begin{commandexample}{Guest FP: remove the nested-input example entries}
+clear temp outercmd innercmd nestlog
+\end{commandexample}
+
+This verifies one inner-file call and normal end-of-file returns with both supported monitor/controller configurations. It does not establish arbitrary nesting depth, recursion, early input termination, arbitrary conditional commands or general recovery from errors inside a command file. Keep command files small, review their contents, and do not use this example as a general unattended batch-job or subsystem-startup guarantee.
+
+The protected profile also passes this nested-input example and the bounded
+missing-program and conditional assembly examples below. In protected sessions,
+use \texttt{rcin} for imports and \texttt{rcout} for exports. Review command-file
+contents as well as keyboard commands: change executable \texttt{=tohost}
+transfers to \texttt{=rcout} in your copies. A mere \texttt{lookup tohost} still
+inspects an installed descriptor and need not be changed. Keep the supplied
+example files intact. These checks do not establish arbitrary nesting or safe
+unattended jobs.
+
+\section{Execute commands conditionally}\label{execute-commands-conditionally}
+\index{FP!conditional commands}
+\index{FP!result status}
+\index{if (FP command)}
+
+The installed startup files \passthrough{\lstinline!temtrim!}, \passthrough{\lstinline!primotrim!} and \passthrough{\lstinline!sostrim!} use \passthrough{\lstinline!if ok.no!}; their presence alone is not a reason to run those generation scripts. A small independent example verifies the following FP forms:
+
+\begin{itemize}
+\tightlist
+\item
+  \passthrough{\lstinline!if ok.yes!}: execute the next command when the preceding result is successful;
+\item
+  \passthrough{\lstinline!if ok.no!}: execute it when the preceding result is unsuccessful.
+\end{itemize}
+
+For example, a command file can contain:
+
+\begin{commandexample}{Command-file contents: condition on one successful lookup}
+lookup slang
+if ok.yes
+lookup algol
+\end{commandexample}
+
+Both descriptors appear. Changing the condition to \passthrough{\lstinline!if ok.no!} skips the \passthrough{\lstinline!lookup algol!} command because \passthrough{\lstinline!lookup slang!} succeeded. A lookup of a nonexistent entry such as \passthrough{\lstinline!absentone!} instead reports \passthrough{\lstinline!***lookup absentone unknown!}; the following \passthrough{\lstinline!if ok.no!} selects its next command. The error does not itself stop the file.
+
+Use parentheses when the condition should control several commands:
+
+\begin{commandexample}{Command-file contents: condition on a group of commands}
+lookup slang
+if ok.yes
+(
+lookup algol
+lookup fromhost
+)
+lookup tohost
+\end{commandexample}
+
+The two grouped lookups run after the successful lookup. With \passthrough{\lstinline!if ok.no!} the whole group is skipped, but \passthrough{\lstinline!lookup tohost!} outside the group still runs. Without a group, the condition controls only the next command, not every later line. The parentheses here are FP syntax, not a host subshell.
+
+For the complete tested example, copy \passthrough{\lstinline!examples/conditional\_commands.fp!} to host file \passthrough{\lstinline!exchange/condinput!}, then use an unused guest name in an ordinary FP process:
+
+\begin{commandexample}{Guest FP: run and remove the conditional example}
+condcmd=fromhost condinput
+i condcmd
+lookup slang
+clear temp condcmd
+\end{commandexample}
+
+This example uses both conditions after success and failure, with executed and
+skipped groups. Expect two \texttt{absentone} lookup errors, but no
+\texttt{nosuchprog} name error: those guarded calls are skipped. At EOF keyboard
+input resumes. These forms are checked with both supported monitor profiles.
+
+These examples establish \passthrough{\lstinline!lookup!} result tests, not that every guest program's printed diagnostics set \passthrough{\lstinline!ok!} in the same way. The supplied SLANG assembler's two checked cases are described next; other program status conventions remain unverified. Numeric \passthrough{\lstinline!mode!} bits, loops, nested conditionals and a general unattended batch policy remain unverified.
+
+\subsection{Guard a SLANG binary export with its result status}\label{guard-a-slang-binary-export-with-its-result-status}
+\index{SLANG!conditional export}
+
+The supplied SLANG assembler sets an unsuccessful FP result for the tested undeclared-identifier error and a successful result for the valid integer sample. This permits a conditional export without executing either program. The complete example is \passthrough{\lstinline!examples/assembly\_status.fp!}:
+
+\begin{commandexample}{Command-file contents: assembly\_status.fp}
+checkbad=slang checksrc
+if ok.yes
+badcheck=tohost conv.bin checkbad
+if ok.no
+lookup fromhost
+lookup checkbad
+clear temp checkbad
+checkgood=slang checkvalid
+if ok.no
+nosuchprog
+if ok.yes
+checkbin=tohost conv.bin checkgood
+lookup checkgood
+clear temp checkgood
+lookup slang
+\end{commandexample}
+
+From the emulator's working directory, prepare its inputs in a host shell:
+
+\begin{commandexample}[language=sh]{Host shell: prepare the conditional assembly inputs}
+cp examples/slang_error.sl exchange/badinput
+cp examples/slang_integer.sl exchange/slinput
+cp examples/assembly_status.fp exchange/statusin
+\end{commandexample}
+
+Select console output (\passthrough{\lstinline!o c!}), choose unused guest names from the example, and ensure host \passthrough{\lstinline!exchange/badcheck!} and \passthrough{\lstinline!exchange/checkbin!} do not exist. In an ordinary FP process with the earlier temporary resource claim, enter:
+
+\begin{commandexample}{Guest FP: run and remove the assembly-status example}
+checksrc=fromhost badinput
+checkvalid=fromhost slinput
+checkcmd=fromhost statusin
+i checkcmd
+lookup checkbad checkgood
+clear temp checksrc checkvalid checkcmd
+\end{commandexample}
+
+The failed assembly reports \passthrough{\lstinline!***slang sorry 1 1/4/1!}. Its export is skipped: no host file \passthrough{\lstinline!badcheck!} is created. The failure branch prints the \passthrough{\lstinline!fromhost!} descriptor, and the partial result is inspected and explicitly removed. The valid assembly reports \passthrough{\lstinline!slang ok 1/12/1!}; its failure branch skips \passthrough{\lstinline!nosuchprog!}, and its success branch exports the expected instruction bytes to \passthrough{\lstinline!exchange/checkbin!}. The file then explicitly removes the valid result too, so the keyboard lookup reports both result names unknown.
+
+\begin{operationnote}{Test the intended result, not a later command}
+Keep a result-status test immediately after the operation being tested. An intervening completed utility call such as \passthrough{\lstinline!lookup!} can supply a new result status; do not test its success and mistake that for assembly success. In this fixture, skipped conditional commands preserve the status needed by the following complementary condition. All cleanup is explicit, not a transaction or automatic rollback.
+\end{operationnote}
+
+Both monitor/controller variants are checked, but other SLANG error classes, other assembler versions and other compilers are not covered. Continue to inspect the assembly report and never run an unverified partial result.
+
+\subsection{A missing program does not abort a command file}\label{a-missing-program-does-not-abort-a-command-file}
+\index{Error recovery!missing program}
+
+\begin{operationnote}{A command file is not a stop-on-error job}
+In the supplied FP, an unknown program name reports an error but the remaining commands in the input file still run. Do not treat this as shell-style stop-on-error behavior, or assume later cleanup/export commands were skipped. Conditional execution must be written explicitly; see \manualref{execute-commands-conditionally}{conditional FP commands} and \manualref{guard-a-slang-binary-export-with-its-result-status}{guarding a SLANG export} for the bounded cases checked here.
+\end{operationnote}
+
+The harmless \passthrough{\lstinline!examples/command\_error.fp!} example contains:
+
+\begin{commandexample}{Command-file contents: command\_error.fp}
+lookup fromhost
+nosuchprog
+lookup tohost
+\end{commandexample}
+
+Copy it to host file \passthrough{\lstinline!exchange/errinput!}, then import and run it at FP using an unused guest name:
+
+\begin{commandexample}{Guest FP: run the missing-program example}
+errcmd=fromhost errinput
+i errcmd
+lookup slang
+\end{commandexample}
+
+The console shows the \passthrough{\lstinline!fromhost!} descriptor, \passthrough{\lstinline!***fp name nosuchprog!}, then the \passthrough{\lstinline!tohost!} descriptor. After EOF, the keyboard \passthrough{\lstinline!lookup slang!} works in the same process without attention or reset. The error is deliberately part of this example; no program named \passthrough{\lstinline!nosuchprog!} should be installed.
+
+The same continuation occurs with one outer command file. The supplied \passthrough{\lstinline!examples/command\_error\_outer.fp!} contains:
+
+\begin{commandexample}{Outer command-file contents: command\_error\_outer.fp}
+lookup slang
+i errcmd
+lookup algol
+\end{commandexample}
+
+Copy that file to host file \passthrough{\lstinline!exchange/errtopin!}, keep the imported \passthrough{\lstinline!errcmd!}, and enter:
+
+\begin{commandexample}{Guest FP: run and remove the nested error example}
+errtop=fromhost errtopin
+i errtop
+lookup slang
+clear temp errcmd errtop
+\end{commandexample}
+
+Both the inner \passthrough{\lstinline!lookup tohost!} after the error and the outer \passthrough{\lstinline!lookup algol!} after inner EOF execute. The final keyboard lookup and cleanup still work. This specific missing-program case is verified with both supported monitor variants. It is not a promise that compiler errors, syntax errors, I/O failures or monitor process pauses behave the same way. Check each important result before using it; arbitrary unattended command files are not made safe by this example.
+
+\section{Recover from FP and assembly errors}\label{recover-from-fp-and-assembly-errors}
+\index{Error recovery}
+\index{Error recovery!assembly error}
+
+In the following short transcript, the lines beginning with \passthrough{\lstinline!***!} are guest replies; do not type them. All other listings in this procedure are labelled as host-shell preparation, FP input or command-file contents.
+
+A rejected FP command does not necessarily end the process or require a machine reset. In an ordinary FP process, a nonexistent program name in the supplied image produces:
+
+\begin{commandexample}{Guest FP transcript: missing-program commands and replies}
+nosuchprog
+***fp name nosuchprog
+lookup nosuchprog
+***lookup nosuchprog unknown
+\end{commandexample}
+
+FP then accepts the next keyboard command. For example, \passthrough{\lstinline!lookup slang!} still shows the installed assembler. Check spelling, catalog scope and command context before retrying. Do not reset or reload the monitor just to recover from this name error: that would discard the running guest session.
+
+Assembly errors require a separate check. The supplied assembler can leave a partial result entry even after reporting failure. A catalog entry marked \passthrough{\lstinline!2.4!} is \textbf{not} proof that its contents are a successfully assembled program. Always inspect the final SLANG report before running the result. If output was redirected to a listing, inspect that listing too.
+
+The tutorial bundle provides a deliberately invalid source as \passthrough{\lstinline!examples/slang\_error.sl!}. It contains an instruction referring to \passthrough{\lstinline!a1!} without declaring that identifier. To reproduce this example, copy it and the valid integer source from another host shell, starting in the emulator's working directory:
+
+\begin{commandexample}[language=sh]{Host shell: prepare the failed and valid assembly sources}
+cp examples/slang_error.sl exchange/badinput
+cp examples/slang_integer.sl exchange/slinput
+\end{commandexample}
+
+Use unused temporary guest names and an ordinary process with a temporary disk claim. With console output selected (\passthrough{\lstinline!o c!}), enter in FP:
+
+\begin{commandexample}{Guest FP: assemble and inspect the deliberately invalid source}
+badsrc=fromhost badinput
+badprog=slang badsrc
+lookup badprog
+\end{commandexample}
+
+The tested assembler reports \passthrough{\lstinline!a1 undeclared!}, followed by \passthrough{\lstinline!***slang sorry 1 1/4/1!}. Nevertheless, \passthrough{\lstinline!lookup badprog!} finds a temporary one-segment entry with content/entry \passthrough{\lstinline!2.4!} and length 4. Do not run it. This behavior was checked with both supported monitor configurations; do not assume that a different historical version removes failed results automatically.
+
+Remove only that failed temporary result, then confirm its absence:
+
+\begin{commandexample}{Guest FP: remove the partial result and confirm its absence}
+clear temp badprog
+lookup badprog
+\end{commandexample}
+
+The lookup now reports \passthrough{\lstinline!***lookup badprog unknown!}. The original source \passthrough{\lstinline!badsrc!} is still available for inspection; removing the result does not repair the source. For this example, import the separate valid source and assemble it under a new name instead:
+
+\begin{commandexample}{Guest FP: assemble and export the separate valid source}
+fixsrc=fromhost slinput
+fixprog=slang fixsrc
+recovered=tohost conv.bin fixprog
+\end{commandexample}
+
+This produces \passthrough{\lstinline!slang ok 1/12/1!} and the same instruction bytes as the preceding successful example in host file \passthrough{\lstinline!exchange/recovered!}. Choose a host destination that does not already exist. FP has remained in the same process throughout; no Escape, Control-E, \passthrough{\lstinline!new!}, or machine reset is needed for these two errors.
+
+After keeping any wanted source or output, clean up the remaining example files:
+
+\begin{commandexample}{Guest FP: remove the recovery example entries}
+clear temp badsrc fixsrc fixprog
+\end{commandexample}
+
+The same undeclared-identifier error does not abort a command file either. For a bounded example, copy \passthrough{\lstinline!examples/assembly\_error.fp!} to host file \passthrough{\lstinline!exchange/asmerrin!}, and the invalid \passthrough{\lstinline!slang\_error.sl!} source to \passthrough{\lstinline!exchange/badinput!}. The command file contains:
+
+\begin{commandexample}{Command-file contents: assembly\_error.fp}
+batchbad=slang batchsrc
+lookup batchbad
+clear temp batchbad
+lookup slang
+\end{commandexample}
+
+With console output selected (\passthrough{\lstinline!o c!}), an ordinary FP process and unused guest names, import and run it:
+
+\begin{commandexample}{Guest FP: run and remove the assembly-error command file}
+batchsrc=fromhost badinput
+batchcmd=fromhost asmerrin
+i batchcmd
+lookup batchbad
+lookup slang
+clear temp batchsrc batchcmd
+\end{commandexample}
+
+The file reports \passthrough{\lstinline!a1 undeclared!} and \passthrough{\lstinline!***slang sorry 1 1/4/1!}, then still executes the remaining lookups and cleanup. Its first lookup shows \passthrough{\lstinline!batchbad!} with content/entry \passthrough{\lstinline!2.4!} and length 4. The file's explicit \passthrough{\lstinline!clear!} removes that partial result; this is not automatic assembler cleanup. The subsequent keyboard lookup reports \passthrough{\lstinline!***lookup batchbad unknown!}, and \passthrough{\lstinline!lookup slang!} still works in the same FP process. Do not replace the cleanup line with a call to \passthrough{\lstinline!batchbad!}: its executable marker does not make it safe to run.
+
+This command-file case is checked with both monitor/controller variants. It demonstrates continuation after this one SLANG error, not safe automatic recovery from all compilation failures or automatic conditional execution of later commands. In a real job, inspect the assembly report before running or exporting a program as a successful result.
+
+These checks cover a missing FP program name and one undeclared SLANG identifier, not recovery from every compiler, editor, process or catalog error. In particular, an unfinished interactive program may still be waiting for its own input rather than an FP command. Use the command-context and process-control instructions before deleting files or removing a process.
+
+\section{Demonstrations and diagnostic programs}\label{demonstrations-and-diagnostic-programs}
+
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+Entry
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+What is known
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Evidence
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\passthrough{\lstinline!geo!} & Interactive geography program. Enter \passthrough{\lstinline!geo!}, answer \passthrough{\lstinline!e!} at \passthrough{\lstinline!dansk/English ?!}, and it reaches the English \passthrough{\lstinline!ARE YOU READY?!} prompt. The startup path is tested, not an entire game. & Tested startup \\
+\passthrough{\lstinline!geodata!} & Associated geography data. The text contains numeric tables and country names such as Afghanistan, Albania, and Denmark. Preserve it with \passthrough{\lstinline!geo!}; it is data, not an FP command. & Documented from contents \\
+\passthrough{\lstinline!regnetest!} & FP command file entered as \passthrough{\lstinline!i regnetest!}, not simply \passthrough{\lstinline!regnetest!}. It conditionally compiles \passthrough{\lstinline!cpuregtest!} as \passthrough{\lstinline!aaa2!}, runs that program with supplied simulation input, and repeats through \passthrough{\lstinline!i regnetest!}. One complete iteration has been checked, including both numerical checks and one successful/zero failed runs. & Contents inspected; tested opt-in integration run \\
+\passthrough{\lstinline!cpuregtest!} & Algol source used by \passthrough{\lstinline!regnetest!}, not an unrelated executable diagnostic. Its header identifies MPROFILE, VER 8EU, 7-FEB-80, Kaare Lund Rasmussen; the program prints version 83.04.12. It models cooling and nickel diffusion in iron phases and includes numerical self-checks. & Source inspected; exercised through regnetest \\
+\passthrough{\lstinline!montest!} & Installed program with help for inspecting internal/external process and area descriptors, message buffers, chain tables and core/dumps. Help and limited own-process/disk descriptor fields are checked below; other fields and state-changing functions remain untested. Help also mentions segment locking and output-file operations: do not assume it is a harmless automatic monitor test. & Help and limited process/disk displays tested \\
+\passthrough{\lstinline!claimtest!} & Installed binary with parameter and error messages. Its name suggests resource-claim diagnostics, but neither that purpose nor its parameter contract has been established from source or execution. & Binary inspected; operating guide unavailable \\
+\passthrough{\lstinline!giersim!} & A GIER simulation program is installed; its binary includes GIER stop/error reports. No complete simulated GIER session has been verified. & Documented identity, untested operation \\
+\end{longtable}
+
+Do not treat diagnostics as harmless demonstrations merely because their names contain \passthrough{\lstinline!test!}. Use a disposable session or a working disk copy for unverified tools. The developer's automated \passthrough{\lstinline!regnetest!} checkpoint is opt-in; it is not rerun by every normal quick check.
+
+\subsection{Run one regnetest iteration}\label{run-one-regnetest-iteration}
+\index{regnetest}
+\index{cpuregtest}
+\index{Diagnostics!numerical workload}
+
+For the verified \passthrough{\lstinline!regnetest!} workflow, choose an unused process name \passthrough{\lstinline!test!} and start a user FP from the supervisor \passthrough{\lstinline!s!} with \passthrough{\lstinline!new test size 100000 run!}. In the resulting user FP, enter \passthrough{\lstinline!i regnetest!}. A complete iteration prints these results (spacing may vary):
+
+\begin{commandexample}{Guest output: one completed regnetest iteration}
+sum af tal= 360.700643456 test ok
+sum af tal= 1.85598980864'3 test ok
+antal okruns = 1
+antal fejlruns = 0
+\end{commandexample}
+
+This iteration has also been checked through the normal \passthrough{\lstinline!sim4000 -a!} frontend with default IX enabled.
+One iteration also passes with \texttt{RC4000.protected.cfg} and its matching
+disk: \texttt{cpuregtest} is freshly compiled under protection before producing
+the same results. This extends the checked software subset, not every installed
+numerical program or an unlimited repeated run. No special protection bypass
+is required; keep writes disposable and use the normal interruption procedure
+below.
+
+\begin{operationnote}{A completed iteration does not end the test session}
+Ctrl-E (or the configured emulator escape key) suspends execution and returns to the simulator prompt; it does not terminate the guest test process. Resuming the emulator can continue the test. Use a volatile disk overlay or a disposable working image for this diagnostic session; do not assume the four result lines mean that FP has returned to keyboard input.
+\end{operationnote}
+
+The command file begins with \passthrough{\lstinline!if 0.no!}, followed by a grouped \passthrough{\lstinline!aaa2=algol cpuregtest!} and \passthrough{\lstinline!mode 0.yes!}. Compilation therefore depends on the FP mode-0 state; do not assume it rebuilds on every iteration. It then calls \passthrough{\lstinline!aaa2!}, supplies a title and thirteen numeric inputs, and loops back through \passthrough{\lstinline!i regnetest!}. The final \passthrough{\lstinline!finis!} is present after that recursive input block; do not treat it as a guaranteed one-iteration termination.
+
+The two source checks compare accumulated simulation values with 360.7006434 and 1855.9898087, each with absolute tolerance below 0.0000001. Passing these checks is useful evidence for this workload, not exhaustive CPU or floating-point conformance. \passthrough{\lstinline!cpuregtest!} alone is not the documented FP invocation: use the command file so the compilation and input conventions match.
+
+\subsection{Tested montest calls}\label{tested-montest-calls}
+\index{montest}
+\index{montest!help}
+\index{montest!command and record input}
+
+\passthrough{\lstinline!montest!} is an inspection tool rather than simply a pass/fail diagnostic. In a disposable session, choose an unused process name \passthrough{\lstinline!mtest!} and create a user FP from the supervisor \passthrough{\lstinline!s!} with \passthrough{\lstinline!new mtest size 200000 run!}. The following help calls have been checked with the supplied monitor:
+
+\begin{commandexample}{Guest FP: request montest help}
+montest info
+montest info internal
+montest info external
+montest info buf
+montest info chain
+montest info typein
+montest info end
+\end{commandexample}
+
+Each prints a \passthrough{\lstinline!call:!} explanation and returns to FP. These commands request help, not the actual descriptor, buffer or chain display. For example, \passthrough{\lstinline!montest info internal!} describes selectors such as \passthrough{\lstinline!internal all!} and \passthrough{\lstinline!name.<name>!}. The single-process and all-slot displays below are separately checked; help output alone is not evidence that a display works. The following short dialog has also been checked. Enter the lines one at a time; after the first line, \passthrough{\lstinline!info chain!} is a montest command, not an FP call:
+
+\begin{commandexample}{Guest FP: enter the montest dialog}
+montest typein
+\end{commandexample}
+
+\begin{commandexample}{montest command input: request help and leave the tool}
+info chain
+end
+\end{commandexample}
+
+\begin{commandexample}{Guest FP: confirm the return from montest}
+lookup montest
+\end{commandexample}
+
+\passthrough{\lstinline!info chain!} displays help without reading a disk-chain descriptor. With the exact \passthrough{\lstinline!montest typein!} invocation above, \passthrough{\lstinline!end!} leaves the tool and returns to FP; the subsequent \passthrough{\lstinline!lookup montest!} confirms that FP is handling commands again. Do not confuse \passthrough{\lstinline!end!} with the record-display directive \passthrough{\lstinline!finis!} described in the typein help. The following limited record dialog has also been checked:
+
+\begin{procedureblock}
+\begin{commandexample}{Guest FP: enter the montest record example}
+montest typein
+\end{commandexample}
+
+\begin{commandexample}{montest command input: select the process record}
+internal name.mtest
+\end{commandexample}
+
+\begin{commandexample}{montest record prompt: repeat the record and leave record display}
+repeat
+finis
+\end{commandexample}
+
+\begin{commandexample}{montest command input: request help and return to FP}
+info chain
+end
+\end{commandexample}
+\end{procedureblock}
+
+After \passthrough{\lstinline!internal name.mtest!} prints the descriptor, the record prompt is \passthrough{\lstinline!>!}. At that prompt, \passthrough{\lstinline!repeat!} displays the same process again; its descriptor address and allocation bounds remain the same. \passthrough{\lstinline!finis!} leaves record display and returns to montest's command input, not to FP. The following \passthrough{\lstinline!info chain!} confirms that montest is still active. Only \passthrough{\lstinline!end!} returns to FP for this invocation. Other navigation controls and \passthrough{\lstinline!out <file>!} have not been tested. Ctrl-E still suspends the emulator to its operator prompt; it does not perform the guest tool's \passthrough{\lstinline!end!} command.
+
+\index{montest!internal process descriptors}
+\index{montest!external device descriptors}
+\index{montest!disk-chain header}
+For read-only inspection, the following calls return to FP:
+
+\begin{commandexample}{Guest FP: inspect process, disk and catalog header}
+montest internal name.mtest
+montest internal all
+montest external name.disc
+montest external devno.15
+montest chain docname.disc
+\end{commandexample}
+
+The first call shows your process's name and allocation; addresses vary by
+session. The all-slot display is long and includes unused descriptor slots:
+use \texttt{list} in \texttt{s} for an ordinary job list, and \texttt{claim}
+in FP for resource reporting. Both external selectors identify guest device
+15, \texttt{disc}; the number is not a Telnet port or host filename.
+The chain call shows the auxiliary device-catalog header, not the separate
+main catalog.
+
+Only selected identity, allocation and basic header fields have been checked
+with the supported monitor profiles. In particular, the external display's
+\texttt{main : 960 (!)} is a misleading label for the disk's encoded device
+number, not an address to follow or proof of corruption. Do not reuse printed
+core addresses or assume every displayed field is valid.
+
+\begin{operationnote}{Descriptor displays are not a general monitor certification}
+The shipped monitor is modified, so descriptor layouts and assumptions in this program may not match the running system. Do not use its core/dump, locking or file-related functions on important work until a disposable-session test has established their behavior. Binary strings alone do not establish compatibility.
+\end{operationnote}
+
+\section{Startup, system files, and optional subsystems}\label{startup-system-files-and-optional-subsystems}
+
+These entries generally belong to system setup, not everyday FP program execution. The names below are guest catalog names; host \passthrough{\lstinline!MONITOR!}, \passthrough{\lstinline!UNIT0!}, and \passthrough{\lstinline!RC4000.cfg!} are separate host files.
+
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+Entry
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Role and operator guidance
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Evidence
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\passthrough{\lstinline!startarea!} & Startup command/input file. Its initial text creates \passthrough{\lstinline!startproc!}, then feeds \passthrough{\lstinline!startdate c!} and \passthrough{\lstinline!finis!} to it. Changing it changes boot behavior; leave it intact for normal use. & Contents inspected; normal boot tested \\
+\passthrough{\lstinline!startdate!} & Guest date-initialization program called by \passthrough{\lstinline!startarea!}. This is the source of the startup date prompt, not a text script or the later \passthrough{\lstinline!s!} command \passthrough{\lstinline!date!}. & Tested during boot \\
+\passthrough{\lstinline!catalog!} & Binary monitor main catalog, distinct from device catalog \passthrough{\lstinline!catdisc!}. Inspect its 72 stored segments with \passthrough{\lstinline!--list-main-catalog!}; do not edit or treat it as text. & Tested stored-record listing and slot accounting \\
+\passthrough{\lstinline!stdmonitor!} & Disk-resident standard monitor used by the optional DFC403/RC4819 setup. Export/generation and boot are tested; do not replace the default host monitor casually. & Tested optional workflow \\
+\passthrough{\lstinline!autoloader!}, \passthrough{\lstinline!manuloader!} & Installed loader programs. Their individual calling conventions are not covered here. & Inventory only \\
+\passthrough{\lstinline!startsos!}, \passthrough{\lstinline!starttem!}, \passthrough{\lstinline!startprimo!} & Text command files that create and start the corresponding subsystem processes. The MIPS/TS profile moves SOS's disk claim to disc1. & Startup checked in the MIPS/TS profile \\
+\passthrough{\lstinline!startmips!} & Text command file that reads the three component scripts. Autostart reads the components directly to avoid excessive input nesting. & Contents inspected; see the MIPS/TS chapter \\
+\passthrough{\lstinline!bsos!}, \passthrough{\lstinline!btem!}, \passthrough{\lstinline!bprimo!} & Installed subsystem binaries for the historical MIPS/TS environment. These are not ordinary stand-alone FP utilities. & Historical distribution documentation \\
+\passthrough{\lstinline!sostrim!}, \passthrough{\lstinline!temtrim!}, \passthrough{\lstinline!primotrim!} & Subsystem configuration/generation material. For example, \passthrough{\lstinline!primotrim!} contains editor-driven generation options. Presence does not imply the corresponding source files are installed. & Contents inspected; generation untested \\
+\passthrough{\lstinline!upsoscat!} & Historical SOS user-catalog creation tool, used to prepare the demonstration account in UNIT0.mipsts. & Fixed catalog and login checked \\
+\passthrough{\lstinline!startsysadm!} & Command file requesting an administrative process with permanent disk resources and explicit base/login ranges. Not a recommended beginner startup path. & Contents inspected; untested \\
+\end{longtable}
+
+The default disk has no SOS user catalog (\texttt{soscat}) and its subsystem
+scripts are not a ready-to-run MIPS/TS setup. The separate \texttt{UNIT0.mipsts}
+and \texttt{UNIT1.mipsts} images provide an account catalog, adjusted disk
+claim and tested automatic startup. See \manualref{mips-ts}{MIPS/TS} for the
+complete procedure. Do not run the default disk's scripts merely to inspect them.
+
+A safe way to inspect a known text script in an ordinary FP process is to export it without executing it, for example \passthrough{\lstinline!sosstart=tohost startsos!}, then read host \passthrough{\lstinline!exchange/sosstart!}. This export has been checked byte for byte; it does not execute the script or test subsystem startup. Never edit or reimport such a file over the installed entry without a recoverable working disk copy.
+
+\section{Libraries and catalog entry points}\label{libraries-and-catalog-entry-points}
+
+\passthrough{\lstinline!algollib!} and \passthrough{\lstinline!oldalgollib!} support Algol programs. Other installed library areas include \passthrough{\lstinline!textproclib!}, \passthrough{\lstinline!bjbandelib!}, \passthrough{\lstinline!getreci!}, \passthrough{\lstinline!readaline!}, \passthrough{\lstinline!opensq!}, \passthrough{\lstinline!resultcf!}, \passthrough{\lstinline!headfilei!}, and \passthrough{\lstinline!headm!}. Some have specialized interfaces which are not described by this operator manual. Preserve them: deleting an apparently unused library can break a program loaded later.
+
+Many additional names, such as \passthrough{\lstinline!sin!}, \passthrough{\lstinline!atan!}, \passthrough{\lstinline!write!}, and \passthrough{\lstinline!readchar!}, refer to procedures in these shared areas. They are not all callable FP commands. Likewise, entries describing input/output devices are not text files. The catalog's \passthrough{\lstinline!area!}/\passthrough{\lstinline!non-area!} distinction is an allocation distinction, not a reliable executable/text/library classification. In particular, \passthrough{\lstinline!edit!} is \passthrough{\lstinline!non-area!} but callable, while \passthrough{\lstinline!geodata!} is \passthrough{\lstinline!area!} but contains data.
+
+The historical distribution describes an important Algol compatibility choice: the installed system defaults to older versions of certain monitor interface procedures. Newer variants have \passthrough{\lstinline!n!}-prefixed names such as \passthrough{\lstinline!nmonitor!} and \passthrough{\lstinline!nsystem!}. Do not rename these interfaces just to modernize their spelling; parameter conventions differ and existing binaries may depend on the old defaults.
+
+\section{Other installed tools: not yet an operating guide}\label{other-installed-tools-not-yet-an-operating-guide}
+
+The following names are useful leads when exploring the image, but their full calling conventions have not been verified. These groupings are orientation, partly inferred from names, not tested capability claims:
+
+\begin{itemize}
+\tightlist
+\item
+  Catalog/storage-related candidates: \passthrough{\lstinline!slicelist!}, \passthrough{\lstinline!discsave!}, \passthrough{\lstinline!disccopy!}, \passthrough{\lstinline!delete!}, \passthrough{\lstinline!rebase!}, \passthrough{\lstinline!basemove!}, \passthrough{\lstinline!fastmove!}, \passthrough{\lstinline!moveto!}, and \passthrough{\lstinline!maintenance!}.
+\item
+  Inspection or command-related candidates: \passthrough{\lstinline!shownews!}, \passthrough{\lstinline!bdisplay!}, \passthrough{\lstinline!com!}, \passthrough{\lstinline!trace!}, \passthrough{\lstinline!snus!}, and \passthrough{\lstinline!termspec!}. In particular, do not assume that \passthrough{\lstinline!com!} is a host serial-port service or that \passthrough{\lstinline!trace!} controls the simulator's host-side trace interface.
+\item
+  Additional shared utility entries: \passthrough{\lstinline!entry!}, \passthrough{\lstinline!set!}, \passthrough{\lstinline!permanent!}, \passthrough{\lstinline!print!}, \passthrough{\lstinline!binin!}, \passthrough{\lstinline!binout!}, \passthrough{\lstinline!mode!}, \passthrough{\lstinline!repeat!}, and \passthrough{\lstinline!end!}. The \passthrough{\lstinline!i!}/\passthrough{\lstinline!o!} workflow and simple \passthrough{\lstinline!if ok!} conditions are tested above; advanced batch-control interactions remain unverified.
+\end{itemize}
+
+Some of these tools can alter catalog scope, disk allocation, or system state. For normal work use the tested file commands above and the simulator's host-side disk-copy/persistence facilities. A future documented example must establish the actual interface before presenting an unverified tool as a safe operator procedure.
+
+To enumerate the current image without booting or changing it, run \passthrough{\lstinline!./sim4000 --list-catalog UNIT0!} (device catalog) or \passthrough{\lstinline!./sim4000 --list-main-catalog UNIT0!} (stored main catalog) from the emulator's working directory. In a running FP process, \passthrough{\lstinline!lookup name!} inspects a specific entry in the current guest view. Neither listing alone proves that a program is usable, and unallocated historical text remaining in disk sectors is not an installed file.

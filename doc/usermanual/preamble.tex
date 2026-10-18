@@ -1,0 +1,53 @@
+\usepackage{fontspec}
+\setmainfont{LibertinusSerif-Regular.otf}[
+  BoldFont=LibertinusSerif-Bold.otf,
+  ItalicFont=LibertinusSerif-Italic.otf,
+  BoldItalicFont=LibertinusSerif-BoldItalic.otf]
+\setsansfont{LibertinusSans-Regular.otf}[
+  BoldFont=LibertinusSans-Bold.otf,
+  ItalicFont=LibertinusSans-Italic.otf]
+\setmonofont{DejaVu Sans Mono}[Scale=MatchLowercase]
+\usepackage{unicode-math}
+\setmathfont{LibertinusMath-Regular.otf}
+\usepackage[margin=25mm,headheight=16pt]{geometry}
+\usepackage{microtype}
+\usepackage{array,booktabs,longtable,calc}
+\usepackage{footnotehyper}
+\usepackage{xcolor,listings}
+\lstset{basicstyle=\small\ttfamily,columns=fullflexible,
+  keepspaces=true,showstringspaces=false,breaklines=true,
+  breakatwhitespace=false,aboveskip=0.7\baselineskip,
+  belowskip=0.7\baselineskip}
+% Context titles are typeset separately, never copied as terminal input.
+\lstnewenvironment{commandexample}[2][]
+  {\lstset{#1,title={\sffamily\bfseries #2}}}{}
+% Short operational cautions stay together, without extra package dependencies.
+\newenvironment{operationnote}[1]
+  {\par\medskip\setlength{\parfillskip}{0pt plus 1fil}%
+   \noindent\begin{minipage}{\linewidth}
+   \hrule\smallskip{\sffamily\bfseries #1}\par\smallskip\ignorespaces}
+  {\par\smallskip\hrule\end{minipage}\par\medskip}
+% Keep short procedures and their cautions on one page.
+\newenvironment{procedureblock}
+  {\par\setlength{\parfillskip}{0pt plus 1fil}%
+   \noindent\begin{minipage}{\linewidth}}
+  {\end{minipage}\par}
+\providecommand{\passthrough}[1]{#1}
+\providecommand{\tightlist}{\setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+\usepackage{xurl}
+\usepackage[unicode,colorlinks=true,linkcolor=blue!45!black,
+  urlcolor=blue!45!black,pdftitle={SIM4000 User Manual},
+  pdfauthor={SIM4000 project}]{hyperref}
+\usepackage{bookmark}
+\usepackage{makeidx}
+\makeindex
+% Unlike a web link, this reference is useful in print as well as in the PDF.
+\newcommand{\manualref}[2]{\hyperref[#1]{#2 (p.~\pageref*{#1})}}
+\usepackage[automark]{scrlayer-scrpage}
+\clearpairofpagestyles
+\ihead{SIM4000 User Manual}
+\ohead{\ifnum\value{chapter}>0 Chapter~\thechapter\fi}
+\ofoot*{\pagemark}
+\setcounter{tocdepth}{1}
+\setcounter{secnumdepth}{1}
+\setlength{\emergencystretch}{3em}

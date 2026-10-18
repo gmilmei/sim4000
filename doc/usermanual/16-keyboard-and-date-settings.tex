@@ -1,0 +1,73 @@
+\chapter{Keyboard and date settings}\label{keyboard-and-date-settings}
+\index{Keyboard}
+\index{Date!shortcut}
+
+\section{Set local shortcuts and initialize the date}\label{set-local-shortcuts-and-initialize-the-date}
+\index{Keyboard!local shortcuts}
+\index{Date!year offset}
+
+The following settings apply to the local interactive guest console while the emulator is running. Change them in your configuration before startup; they do not redefine GNU Readline's operator-prompt bindings. The shipped active directives are:
+
+\begin{commandexample}{RC4000.cfg contents: local input and date settings}
+OPERATOR ESCAPE=CTRL-E
+OPERATOR DATE=ALT-D
+INPUT DEL=CTRL-H
+DATE YEAROFFSET=-40
+\end{commandexample}
+
+The escape setting accepts a control-letter key or \passthrough{\lstinline!NONE!}. With escape disabled, that key is delivered as guest input rather than opening the operator prompt. Leave an accessible escape key configured for normal interactive work. The date shortcut is an Alt-letter key or \passthrough{\lstinline!NONE!}; neither setting requires the historical TUI.
+
+At the monitor's \passthrough{\lstinline!initialize date:!} prompt, the configured Alt-D shortcut inserts the current local host date in the historical \passthrough{\lstinline!YY MM DD HH MM SS!} format. \passthrough{\lstinline!OPERATOR DATE=ALT-D!} can select another Alt-letter or \passthrough{\lstinline!NONE!}. \passthrough{\lstinline!DATE YEAROFFSET=-40!} translates 2026 to 1986; only translated years 1982 through 1999 are accepted. The same insertion is available portably by using the configured emulator escape key (Control-E by default), \passthrough{\lstinline!send-date!}, and \passthrough{\lstinline!continue!}. The date may also be typed manually. Choose the year offset for the historical year you intend to use; \passthrough{\lstinline!-40!} is a fixed translation, not a setting that keeps the guest year constant as the host year changes. This shortcut inserts console input; it does not set the monitor date independently of the guest's initialization dialog.
+
+\section{Map Backspace and decode terminal input}\label{map-backspace-and-decode-terminal-input}
+\index{Keyboard!Backspace mapping}
+\index{Keyboard!terminal sequences}
+
+Modern terminals normally send DEL (\passthrough{\lstinline!0x7f!}) for the Backspace key, while the RC software expects Control-H (\passthrough{\lstinline!0x08!}). \passthrough{\lstinline!INPUT DEL=CTRL-H!} performs that mapping; \passthrough{\lstinline!INPUT DEL=NONE!} passes DEL through unchanged.
+
+You can paste a complete guest command line, including lines longer than the emulator's small console queue. Input waits for queue space without disabling the execution throttle. In FP, enter or paste one command at a time and wait for it to finish; FP has no prompt. This is not a general multi-command script interface: a program may change command context or ask for additional input. The configured operator escape (Control-E by default) is recognized even when the guest input queue is full. It suspends execution without discarding guest input already read by the emulator; \passthrough{\lstinline!continue!} delivers the buffered characters in their original order. The escape itself is not sent to the guest. With \passthrough{\lstinline!OPERATOR ESCAPE=NONE!}, that control byte remains guest input. Avoid pasting input into a program that does not request it: suspension does not cancel it. Control-C remains a host signal that exits the emulator rather than suspending it; volatile disk writes are lost on exit as usual.
+
+The local interactive console accepts ASCII, not UTF-8. Non-ASCII bytes are rejected rather than silently changed into unrelated guest characters; the emulator reports the rejected byte count when execution is suspended. Common ANSI cursor/function sequences, terminal control strings, and bracketed-paste start/end markers are consumed without invoking guest attention. ANSI Delete (\passthrough{\lstinline!ESC [ 3 \~!}) follows \passthrough{\lstinline!INPUT DEL!}. Paste contents still follow ordinary input rules, including the configured operator escape and date shortcut. This does not add cursor editing to the guest monitor or enable bracketed-paste mode in the terminal; it safely handles framing if the terminal supplies it. Bare Escape still requests historical guest attention: the frontend waits up to 30 ms for its next byte to distinguish an Escape-prefixed sequence or Alt shortcut. Unusually delayed prefixes can therefore be interpreted as bare Escape; use the operator \passthrough{\lstinline!attention!} command for an unambiguous request. Sequence bodies may span input-service calls. \passthrough{\lstinline!send!} bypasses terminal decoding. Data-only bounded \passthrough{\lstinline!--run!} input retains its existing byte-oriented behavior.
+
+\section{Inspect or discard pasted input}\label{inspect-or-discard-pasted-input}
+\index{Input queues}
+
+After suspending execution, \passthrough{\lstinline!show input!} reports buffered input for the local primary console: \passthrough{\lstinline!host-buffer!} is the host-side FIFO, \passthrough{\lstinline!pending-byte!} is an unprocessed lookahead byte, and \passthrough{\lstinline!guest-queue!} is the RC console device queue. \passthrough{\lstinline!completed-read=yes!} means a character has already completed a device read but has not yet been sensed by the guest. \passthrough{\lstinline!eof!} describes the host input stream. The output is limited to 80 columns like other simulator diagnostics. \passthrough{\lstinline!terminal-sequence!} indicates an unfinished host sequence, and \passthrough{\lstinline!rejected-non-ascii!} is the cumulative rejected byte count for this session.
+
+To discard an accidental paste, press the configured escape key first (Control-E in the example), then enter the simulator commands below one at a time. The angle-bracket line denotes a keypress, not literal command text:
+
+\begin{commandexample}{Local escape key, then simulator prompt: inspect and discard input}
+<Control-E>
+show input
+discard-input
+show input
+continue
+\end{commandexample}
+
+\begin{operationnote}{Discarding queued input does not undo guest input}
+\passthrough{\lstinline!discard-input!} (alias \passthrough{\lstinline!di!}) reports the discarded byte counts and clears only the local host FIFO, lookahead byte, unfinished terminal sequence, and local RC device queue. It does not send attention, reset the machine, touch other terminals, or change disk files. This discard is irreversible. Repeating it with empty queues discards zero bytes. Characters not yet read from the host terminal and Readline's edited command line are not affected.
+
+A completed device read, its interrupt, and characters already received by the guest are preserved. Thus this command does not undo a partial FP command or cancel a running guest program. Use the guest's erase/attention mechanisms as appropriate to its current context before entering a replacement command.
+\end{operationnote}
+
+Interactive execution advances the 39 Hz device clock from monotonic host time. This keeps console input timeouts usable at human typing speeds. The bounded \passthrough{\lstinline!--run!} mode retains instruction-count-based deterministic timing for regression tests.
+
+\section{Keep operator input separate from bounded-run data}\label{keep-operator-input-separate-from-bounded-run-data}
+
+For automated CPU and device regression tests, \passthrough{\lstinline!--trace FILE!} records every bounded-run interpreter call and every core-store write in a stable, tab-separated format. The output file must not already exist:
+
+\begin{commandexample}[language=sh]{Host shell: bounded run with a new trace file}
+./sim4000 --run --steps 1000 --trace startup.trace
+\end{commandexample}
+
+The trace is an ASCII, tab-separated diagnostic file with LF line endings.
+Its first line identifies the format and version. Records beginning with
+\texttt{S} contain CPU state after an interpreter call; \texttt{W} records
+describe core-store writes. Traces can grow quickly. For a meaningful
+comparison, keep the monitor, disk images, configuration, input and step
+limit identical, and avoid asynchronous terminal or Telnet input. A trace
+is not a disk backup or a resumable saved machine state.
+
+Interactive mode intentionally requires a terminal on standard input. Piped input remains console data for the bounded runner and is never interpreted as operator commands.
+
+The local date shortcut and \passthrough{\lstinline!send-date!} workflow target the local primary console. Do not assume these are remote Telnet shortcuts; see \manualref{telnet-consoles}{Telnet attention and command contexts} for remote operation.

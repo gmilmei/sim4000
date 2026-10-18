@@ -1,0 +1,2447 @@
+
+
+
+m.                monitor text 8
+;h0 =g3, h1 =g3, h2 =g3, h3 =g3, h4 =g3, h5 =g3, h6 =g3, h7 =g3, h8 =g3, h9 =g3, 
+h30=g3, h31=g3, h32=g3, h33=g3, h34=g3, h35=g3, h36=g3, h37=g3, h38=g3, h39=g3, 
+h40=g3
+
+
+b.i0                    ; begin
+w.i0: al. w2  i0.       ; make room:
+      jl      x3+0      ;   autoloader(end external processes);
+      jl.     i0.       ; after loading:
+  g70= k-b127 + 2
+  k = i0                ;   goto make room;
+e.                      ; end
+i.
+e.    ; end of external process segment
+
+
+; segment 4: process descriptions
+
+c.-a128   s. k=k, h25, g100, e50, j20  z.
+c.a128-1  s. k=k, h25                  z.
+w. b127=k, h25, k=k-2
+
+; name table:
+; the table has one entry for each process description.
+; an entry contains the address of the corresponding
+; process description.
+
+w.
+f0:                     ; name table start:
+     h22                ; remoter process
+    h24                ; error log process
+     h23                ; host process
+ c.-a128 t.m.                monitor external process list in name table included
+ z.                     ;
+f1:                     ; first device
+ c.a128-1, 0,r.q7       ; option gen: device part
+f20:                    ; first subdevice:
+ c.a9-1,   0,r.a9  z.z. ;  subdevice proc desc area;
+c.-a128 t.m.                 monitor device list in name table included
+ z.                     ; std mon gen: device part
+f2:                     ; first area
+     h7, r.a1           ; area part
+f3:                     ; first internal
+     h8, r.a3           ; internal part
+f4:  0                  ; name table end
+
+f13:                    ; first drum chain
+     c.(:a113-1:),h9,r.a113,z.
+f14:                    ; first disc chain
+     c.(:a115-1:),h10,r.a115,z.
+f15: 0                  ; chain end
+
+
+; dummy internal process:
+     f5=k-a24
+     f6=f5+a16
+     1<19
+     a89,h1
+     0,r.5,h0,0,r.4
+h0:  je.  h0.
+
+; dummy external process:
+h4:  0,0,<:unknown:>,0,r.5,c33
+h1:  0, r.7
+     jd. 0
+
+; remoter process:
+     a107,a108
+h22: 56,<:remoter:>,0
+     0,0,-1,k,k-2,c33
+
+; error log process:
+     a107,a108
+b112:
+h24: 54,<:errorlogpro:>
+     0,0,-1,k,k-2,c33
+
+
+; host process:
+     a107,a108
+h23: 90,<:host:>,0,0
+     0,0,0,k,k-2,c33
+
+; external processes:
+c.-a128 t.m.                monitor external process descriptions included
+
+; console keys:
+h5:  al  w1  x1-a56-4
+     jl      c30
+
+; peripheral processes:
+        t.m.                monitor peripheral process descriptions included
+z.
+
+c.a128-1 m.                option2 - start
+
+; this block generates the process descriptions according to the options
+; in the option list. furthermore it generates the different tables
+; initiated in part 1 of the option generator, as: interrupt list,
+; s console table, s dev list and bs-table.
+
+b.b10,d36,m125,p100,s50 w.
+
+m60:
+
+; if privat proc desc is wanted then:
+c.q3-1  w.t.m.                privat proc desc included
+z.
+; console key.
+; the console key response addr is placed here to avoid limitations
+; of the size of the privat process description area.
+h5:  al  w1  x1-a56-4
+     jl      c30
+
+
+; standard process descriptions table. the process descriptions
+; are placed in order of increasing type-numbers.
+
+; dummy device:
+p0:
+
+; subdevice:
+p1:
+c.a9-1
+a107,a108-1,74,<:sub001:>, 0, 0,0,0,1<22,0,0,0
+0,1,0,0,0,r.4
+z.
+
+; interval clock:
+p2:
+a107,a108  , 2,<:clock:> , 0, 0,0,0,   0,0,0,c35
+
+; epu 401:
+p3:
+c.(:q0>3 a.1:)-1
+a107,a108  ,78,<:epu:>, 0, 0, 0,0,0,1<22,0,0,c33
+0
+z.
+
+; not used:
+p4:
+a107,a108-1,85,<:sub000:>, 0, 0,0,0,1<22,0,0,0
+0,r.6
+0,r.18
+
+; not used:
+p5:
+
+; drum rc4320:
+p6:
+c.(:q0>6a.1:)-1
+a107,a108  , 6,<:drum:>  , 0, 0,0,0,1<22,0,0,c34
+0,r.13
+z.
+
+; disc rc433:
+p7:
+c.(:q0>7a.1:)-1
+a107,a108  ,62,<:disc:>  , 0, 0,0,0,1<22,0,0,c34
+0,r.13
+z.
+
+; disc rc4818:
+p8:
+c.(:q0>8a.1:)-1
+a107,a108  ,62,<:disc:>  , 0, 0,0,0,1<22,0,0,c33
+0,r.4,180,9,0,r.7,0,0,-1,r.13
+z.
+
+; main proc for disc rc4818:
+p9:
+c.(:q0>8a.1:)-1
+   0,   0  , 0,<:mainproc:> , 0,0,0,   0,0,c50,c33
+z.
+
+; mag. tape rc747:
+p10:
+c.(:q0>10a.1:)-1
+a107,a108  ,18,<:magtape1:> , 0,0,0,1<22,0,0,c37
+2,-1,-1,0,-1,h22,0,r.11
+z.
+
+; mag. tape rc749:
+p11:
+c.(:q0>11a.1:)-1
+a107,a108  ,34,<:magtape1:> , 0,0,0,1<22,0,0,c37
+2,-1,-1,0,-1,h22,0,r.11
+z.
+
+; mag.tape rc4739:
+p12:
+c.(:q0>12a.1:)-1
+a107,a108  ,60,<:magtape1:> , 0,0,0,1<22,0,0,c41
+2,-1,-1,0,-1,h22,0,r.11
+z.
+
+; not used:
+p13:
+
+; not used:
+p14:
+
+; paper tape reader rc2000:
+p15:
+c.(:q0>15a.1:)-1
+a107,a108  ,10,<:reader:>, 0, 0,0,0,1<22,0,0,c33
+0,r.9
+z.
+
+; paper tape punch rc150:
+p16:
+c.(:q0>16a.1:)-1
+a107,a108  ,12,<:punch:> , 0, 0,0,0,1<22,0,0,c33
+0,r.7,4,3
+z.
+
+; calcomp plotter:
+p17:
+c.(:q0>17a.1:)-1
+a107,a108  ,12,<:plotter:>  , 0,0,0,1<22,0,0,c33
+0,r.7,0,-1
+z.
+
+; line printer rc610:
+p18:
+c.(:q0>18a.1:)-1
+a107,a108  ,14,<:printer:>  , 0,0,0,1<22,0,0,c33
+0,r.7
+z.
+
+; punched card reader rc405:
+p19:
+c.(:q0>19a.1:)-1
+a107,a108  ,16,<:cardreader:>  ,0,0,1<22,0,0,c33
+0,r.8,0
+z.
+
+; punched and mark sense cardreader rc1500:
+p20:
+c.(:q0>20a.1:)-1
+a107,a108  ,16,<:cardreader:>  ,0,0,1<22,0,0,c33
+0,r.8,1
+z.
+
+; typewriter rc315:
+p21:
+c.(:q0>21a.1:)-1
+a107,a108-1, 8,<:console1:> , 0,0,0,1<22,0,0,c33
+c.-(:a128>2a.1:)
+0,1,2047,0,r.9,4,37,25,38,3,127,127<16+127<8+127,r.2,0
+z.
+c.(:a128>2a.1:)-1
+0,1,0,0,0,0,0,0,0,r.4
+z.
+z.
+
+; olivetti terminal, teletype:
+p22:
+c.(:q0>22a.1:)-1
+a107,a108-1,46,<:terminal1:>, 0,0,0,1<22,0,0,c33
+c.-(:a128>2a.1:)
+0,1,2047,0,r.9,4,37,25,38,3,127,127<16+127<8+127,r.2,0
+z.
+c.(:a128>2a.1:)-1
+0,1,0,0,0,0,0,0,0,r.4
+z.
+z.
+
+; telex:
+p23:
+c.(:q0>23a.1:)-1
+a107,a108-1,36,<:telex1:>, 0, 0,0,0,1<22,0,0,c33
+0,1,2047,0,r.9,4,37,25,63,3,127,127<16+127<8+127,r.2,32
+z.
+
+; alphanumeric display rc806:
+p24:
+c.(:q1>0a.1:)-1
+a107,a108  ,30,<:display:>  , 0,0,0,1<22,0,0,c33
+90
+z.
+
+; graphic display rc4195:
+p25:
+c.(:q1>1a.1:)-1
+a107,a108  ,40,<:display:>  , 0,0,0,1<22,0,0,c33
+100,0
+z.
+
+; medium speed (rc4124):
+p26:
+c.(:q1>2a.1:)-1
+a107,a108  ,70,<:medium1:>  , 0,0,0,1<22,0,0,c33
+0,r.8,128,127,150,120,1,0,r.8,45
+z.
+
+; remote batch station:
+p27:
+c.(:q1>3a.1:)-1
+a107,a108  ,72,<:rbct1:>, 0, 0,0,0,1<22,0,0,c54
+0,0,0,0,0,r.58,0,0,0,r.256
+z.
+
+; not used:
+p28:
+
+; telemultiplexer rc4124(max 16 low- and 4 medium-speed dev), the process desc. is generated in s29:
+p29:
+
+; telemultiplexor rc4123(max 24 low-speed dev), the process description is generated in s30.
+p30:
+
+; reserved for interrupt expander rc4091, ixp401-7. 
+; expander of first level. the proc desc is generated in s32.
+p31:
+
+; interrupt expander rc4091, ixp401-7.
+; the expander is of second or higher level:
+p32:
+c.(:q1>8a.1:)-1
+a107,a108  , 0,<:intexpander:> ,0,0,   0,0,0,c49
+0,0
+z.
+
+; interrupt register rc401-407:
+p33:
+c.(:q1>9a.1:)-1
+a107,a108  ,22,<:ixp1:>  , 0, 0,0,0,1<22,0,0,c40
+0
+z.
+
+; interrupt key:
+p34:
+c.(:q1>10a.1:)-1
+a107,a108  ,32,<:intkey:>, 0, 0,0,0,1<22,0,0,c40
+0
+z.
+
+; interrupt counter ixp401-407:
+p35:
+c.(:q1>11a.1:)-1
+a107,a108  ,24,<:counter:>  , 0,0,0,1<22,0,0,c38
+1,0,r.12
+z.
+
+; not used:
+p36:
+
+; not used:
+p37:
+
+; not used:
+p38:
+
+; not used:
+p39:
+
+; analog input aic401:
+p40:
+c.(:q1>16a.1:)-1
+a107,a108  ,28,<:aic1:>  , 0, 0,0,0,1<22,0,0,c33
+5<1,8,0,0,5<1,0,r.3
+z.
+
+; analog input, low speed aic 402:
+p41:
+c.(:q1>17a.1:)-1
+a107,a108  ,42,<:aic1:>  , 0, 0,0,0,1<22,0,0,c33
+5<1,8,0,0,5<1,0,r.3
+z.
+
+; analog output aoc401:
+p42:
+c.(:q1>18a.1:)-1
+a107,a108  ,66,<:aoc1:>  , 0, 0,0,0,1<22,0,0,c33
+0,r.2
+z.
+
+; static digital output dot401:
+p43:
+c.(:q1>19a.1:)-1
+a107,a108  ,26,<:dot1:>  , 0, 0,0,0,1<22,0,0,c33
+z.
+
+; pulsed digital output dot402:
+p44:
+c.(:q1>20a.1:)-1
+a107,a108  ,50,<:dot1:>  , 0, 0,0,0,1<22,0,0,c33
+z.
+
+; digital sense register dst401:
+p45:
+c.(:q1>21a.1:)-1
+a107,a108  ,20,<:dst1:>  , 0, 0,0,0,1<22,0,0
+z.
+
+; binary counter bct401:
+p46:
+c.(:q1>22a.1:)-1
+a107,a108  ,68,<:bct1:>  , 0, 0,0,0,1<22,0,0,c43
+0
+z.
+
+; set point terminal spt401:
+p47:
+c.(:q1>23a.1:)-1
+a107,a108  ,44,<:spt1:>  , 0, 0,0,0,1<22,0,0,c33
+0
+z.
+
+; watch dog timer wdt401:
+p48:
+c.(:q2>0a.1:)-1
+a107,a108  ,58,<:wdt1:>  , 0, 0,0,0,1<22,0,0,c33
+z.
+
+; not used:
+p49:
+
+; the following entries are only used when privat proc desc is inputted.
+
+c.q3-1
+; the entries from 50 - 71 are not used:
+p50:
+p51:
+p52:
+p53:
+p54:
+p55:
+p56:
+p57:
+p58:
+p59:
+p60:
+p61:
+p62:
+p63:
+p64:
+p65:
+p66:
+p67:
+p68:
+p69:
+p70:
+p71:
+z.
+
+; interrupt expander area.
+      0                        ; dummy entry
+m110: 0,0 c.q8-1 ,r.q8*2-1  z. ; intexpander table
+m112: h4  c.q8-1 ,r.q8*24   z. ; expander area
+
+; parameter-area:
+;process description addr table:
+m0:  p0. ,s0.   ; no process
+     p1. ,s0.   ; reserved (for subdevice desc)
+     p2. ,s2.   ; interval clock
+     p3. ,s1.   ; epu 401
+     p4. ,s4.   ; not used
+     p5. ,s0.   ; not used
+     p6. ,s6.   ; drum rc4320
+     p7. ,s6.   ; disc rc433
+     p8. ,s8.   ; disc rc4818
+     p9. ,s0.   ; reserved (for main proce desc)
+     p10.,s1.   ; mag.tape rc747
+     p11.,s1.   ; mag.tape rc749
+     p12.,s1.   ; mag.tape rc4739
+     p13.,s0.   ; not used
+     p14.,s0.   ; not used
+     p15.,s1.   ; paper tape reader rc2000
+     p16.,s1.   ; paper tape punch rc150
+     p17.,s1.   ; plotter
+     p18.,s18.  ; line-printer rc610
+     p19.,s1.   ; punched cardreader rc405
+     p20.,s1.   ; punched and mark-sense cardreader rc1500
+     p21.,s21.  ; typewriter rc315
+     p22.,s22.  ; olivetti,teletype
+     p23.,s22.  ; telex
+     p24.,s1.   ; alphanumeric display rc806
+     p25.,s1.   ; graphic display rc4195
+     p26.,s1.   ; tmx-medium speed controller rc4124
+     p27.,s27.  ; remote batch station
+     p28.,s0.   ; not used
+     p29.,s29.  ; tmx rc4124
+     p30.,s30.  ; tmx rc4123
+     p31.,s0.   ; reserved for interrupt expander ixp401-7,rc4091 (first level)
+     p32.,s32.  ; interrupt expander ixp401-7,rc4091 (second or further levels)
+     p33.,s1.   ; interrupt register ixp401-7
+     p34.,s1.   ; interrupt key
+     p35.,s1.   ; interrupt counter ixp401-7
+     p36.,s0.   ; not used
+     p37.,s0.   ; not used
+     p38.,s0.   ; not used
+     p39.,s0.   ; not used
+     p40.,s1.   ; analog input, high-speed aic401
+     p41.,s1.   ; analog input, low-speed aic402
+     p42.,s1.   ; analog output aoc401
+     p43.,s1.   ; static digital output dot401
+     p44.,s1.   ; pulsed digital output dot402
+     p45.,s1.   ; digital sense register dst401
+     p46.,s1.   ; binary counter bct401
+     p47.,s1.   ; set-point-terminal spt401
+     p48.,s1.   ; watch dog timer wdt401
+     p49.,s0.   ; not used
+c.(:k-m0-50<2a.2047:)-1  m. ***table lenght error
+z.
+c.q3-1
+     p50.,s0.   ; not used
+     p51.,s0.   ; not used
+     p52.,s0.   ; not used
+     p53.,s0.   ; not used
+     p54.,s0.   ; not used
+     p55.,s0.   ; not used
+     p56.,s0.   ; not used
+     p57.,s0.   ; not used
+     p58.,s0.   ; not used
+     p59.,s0.   ; not used
+     p60.,s0.   ; not used
+     p61.,s0.   ; not used
+     p62.,s0.   ; not used
+     p63.,s0.   ; not used
+     p64.,s0.   ; not used
+     p65.,s0.   ; not used
+     p66.,s0.   ; not used
+     p67.,s0.   ; not used
+     p68.,s0.   ; not used
+     p69.,s0.   ; not used
+     p70.,s0.   ; not used
+     p71.,s0.   ; not used
+; privat proc desc:
+     p72.,s3.   ;
+     p73.,s3.   ;
+     p74.,s3.   ;
+     p75.,s3.   ;
+     p76.,s3.   ;
+     p77.,s3.   ;
+     p78.,s3.   ;
+     p79.,s3.   ;
+     p80.,s3.   ;
+     p81.,s3.   ;
+     p82.,s3.   ;
+     p83.,s3.   ;
+     p84.,s3.   ;
+     p85.,s3.   ;
+     p86.,s3.   ;
+     p87.,s3.   ;
+     p88.,s3.   ;
+     p89.,s3.   ;
+     p90.,s3.   ;
+     p91.,s3.   ;
+     p92.,s3.   ;
+     p93.,s3.   ;
+     p94.,s3.   ;
+     p95.,s3.   ;
+     0   ,s0.   ; dummy end entry
+c.(:k-m0-97<2a.2047:)-1  m. ***table lenght error
+z.
+p72=k, p73=k, p74=k, p75=k, p76=k, p77=k, p78=k, p79=k
+p80=k, p81=k, p82=k, p83=k, p84=k, p85=k, p86=k, p87=k
+p88=k, p89=k, p90=k, p91=k, p92=k, p93=k, p94=k, p95=k
+p100=k
+z.
+
+; monitor interrupt table:
+m2: c0,c1,c2,c24,r.22
+
+
+; procedure: unpack options.
+; the procedure reads the options starting with t. and inserts the
+; values in m3-m7. the procedure terminates when meting t.,p.,a. or f.
+;          call:        return:
+; w0                    destroyed
+; w1                    delimiter
+; w2                    destroyed
+; w3       link         destroyed
+b.j6
+w.
+d0:   rs.  w3   m20.    ; save link;
+      al   w0   0       ; insert zeroes in
+      al   w1   0       ;   option-area;
+j0:   rs.  w0   x1+m3.  ;
+      al   w1   x1+2    ;
+      sh   w1   m61     ;
+      jl.       j0.     ;
+      al   w0   -1      ;
+      rs.  w0   m4.     ; devno:=-1;
+      rl.  w3   m10.    ; load option pointer;
+j3:   bz   w1   x3      ; delim:=delim(item);
+      sl   w1   n9      ; if delim>=16 (=>finis or error)then
+      jl.       b2.     ;   goto end of options;
+      sn   w1   n1      ; if delim='type' then
+      jl.       j4.     ;   goto insert param;
+      ba   w3   x3+1    ; option-pointer:=addr(next item);
+      jl.       j3.     ; goto next delim;
+j4:   rs.  w3   m32.    ; option-start-pointer:=option-pointer;
+      jl.       j5.     ;
+j1:   rl.  w3   m10.    ; load item-pointer;
+      bz   w1   x3      ; load delim;
+      se   w1   n1      ; if delim ='t'
+      sl   w1   n7      ;   or >'n' then
+      jl.      (m20.)   ; exit: return;
+j5:   bz   w2   x3+1    ; load item-length;
+      wa   w2   6       ; w2:=item pointer:= addr(next item);
+      rs.  w2   m10.    ; w3:= item pointer(item);
+      rl.  w1   x1+m8.  ; load first param save-addr;
+j2:   al   w3   x3+2    ; get other:= get addr + 2;
+      rl   w0   x3      ; get param;
+      rs.  w0   x1+m3.  ; store param;
+      al   w1   x1+2    ; save addr:= save addr + 2;
+      se   w3   x2-2    ; if get addr = addr(next item) + 2 then
+      jl.       j2.     ;   goto next param;
+      jl.       j1.     ; end of item unpacking: goto next item;
+e.
+
+; procedure initiate transfer.
+; the procedure finds the fetch-addresses (start- and
+; top address) of the std proc desc.
+;         call:         return:
+; w0                    unchanged
+; w1                    destroyed
+; w2                    special action addr,=0 if no action
+; w3      link          transfer action addr
+b.j0
+w.
+d1:   rs.  w3   m20.    ; save link;
+      jl.  w3   d2.     ; insert 'devno';
+      rl.  w1   m3.     ; load 'type';
+      ls   w1   2       ; type:= type * 4;
+      al.  w3   x1+m0.  ; start addr of proc.descr. (type):=
+      wa   w3   x3      ;   word(type*4) in proc-desc.table;
+      al.  w2   x1+m0.+4; top addr of proc descr(type):=
+      wa   w2   x2      ;   start addr(type+1);
+      ds.  w3   m14.    ; save fetch-addresses;
+j0:   rl.  w3   m16.    ; start address:=
+      rs.  w3   m15.    ;   top address(last proc desc.);
+      al.  w3   x1+m0.+2; load addr(transferaction);
+      wa   w3   x3      ;
+      rl.  w2   m30.    ; load special action addr;
+      jl.      (m20.)   ; exit: return;
+e.
+
+; procedure insert devno.
+; the procedure updates the current devno, and - if no
+; devno in options - inserts this in options;
+;          call:        return:
+; w0                    unchanged
+; w1                    unchanged
+; w2                    devno + 1
+; w3       link         unchanged
+b.j0 w.
+d2:   rl.  w2   m4.     ; load 'd';
+      se   w2   -1      ; if d = 0 then
+      jl.       j0.     ;
+      rl.  w2   m9.     ;   insert current devno;
+      al   w2   x2+1    ; devno:=current devno+1;
+      rs.  w2   m4.     ;
+j0:   rs.  w2   m9.     ; current devno:=devno;
+      jl        x3      ; exit: return;
+e.
+
+; procedure: transfer proc.desc.
+;          call:        return:
+; w0                    destroyed
+; w1                    destroyed
+; w2                    destroyed
+; w3       link         destroyed
+b.j1
+w.
+d3:   rs.  w3   m20.    ; save link;
+      rl.  w2   m14.    ; load start addr(proc desc);
+      rl.  w3   m16.    ; load store addr;
+j0:   sl.  w2  (m13.)   ; if get addr>=top addr(proc desc) then
+      jl.       j1.     ;   goto end of transfer;
+      rl   w0   x2      ; fetch word;
+      rs   w0   x3      ; store word;
+      al   w2   x2+2    ; count up;
+      al   w3   x3+2    ;
+      jl.       j0.     ; goto next word;
+j1:                     ; end of transfer:
+      rs.  w3   m16.    ; save 'top store addr';
+      bz.  w2  (m10.)   ; delim:=next delim;
+      sn   w2   n7      ; if delim = 'all' then
+      jl.  w3   d13.    ;   insert parameters;
+      dl.  w3   m71.    ; if word0,word1(name)=0 then
+      sn   w2   0       ;   insert name;
+      se   w3   0       ;
+      jl.  w3   d6.     ;
+      jl.      (m20.)   ; exit: return;
+e.
+
+; procedure test repeats.
+; if  repeats<>0 then devno,repeats, intno(if any), proc desc get-addr's are
+; updated, and a name are inserted in the proc desc.
+;          call:        return:
+; w0                    unchanged
+; w1                    repeats
+; w2                    start addr(next proc desc)
+; w3       link         destroyed
+b.j2
+w.
+d4:   rs.  w3   m20.    ; save link;
+      rl.  w1   m5.     ; load 'r';
+      sn   w1   0       ; if r = 0 then
+      jl.       j1.     ;   goto exit;
+      rl.  w1   m28.    ; if number = 0 then
+      se   w1   0       ;  begin
+      jl.       j0.     ;
+      jl.  w3   d8.     ;   find number;
+      dl.  w3   m16.    ;   top get-addr:= top store-addr;
+      rs.  w3   m13.    ;   start get-addr:= start store-addr;
+      rs.  w2   m14.    ;  end;
+j0:   jl.  w3   d9.     ; insert number in name;
+      jl.  w3   d6.     ; store name;
+      rl.  w1   m5.     ;
+      al   w1   x1-1    ; repeats:=repeats-1;
+      rs.  w1   m5.     ;
+      sn   w1   0       ; if repeats=0 then
+      rs.  w1   m28.    ;  number:=0;
+      sn   w1   0       ; if repeats=0 then
+      jl.       j2.     ;   goto end;
+      rl.  w2   m4.     ;
+      al   w2   x2+1    ; devno:= devno + 1;
+      rs.  w2   m4.     ;
+      rs.  w2   m9.     ; current devno:=devno;
+      rl.  w2   m23.    ;
+      rl.  w3   m6.     ;
+      sh   w2   0       ;
+      se   w3   0       ; if intno <> 0 or exp1>0 then
+      al   w3   x3+1    ;   intno:= intno + 1;
+      rs.  w3   m6.     ;
+j2:   rl.  w2   m16.    ; start addr(next proc desc):=
+      rs.  w2   m15.    ;        top addr(proc desc);
+j1:   jl.      (m20.)   ; exit: return;
+e.
+
+; procedure get name: transfer std name from
+; proc.desc. to option area;
+;          call:        return:
+; w0                    destroyed
+; w1                    destroyed
+; w2                    start addr(std proc desc)
+; w3       link         unchanged
+d5:   rl.  w2   m14.    ; load start addr(std proc desc);
+      dl   w1   x2-a48+a11+2; load word0,word1(std name);
+      ds.  w1   m71.    ; save    -    -  -    - ;
+      dl   w1   x2-a48+a11+6; load word2,word3(std name);
+      ds.  w1   m72.    ; save    -    -  -    - ;
+      jl        x3      ; exit: return;
+
+; procedure name store.
+;          call:        return:
+; w0                    destroyed
+; w1                    destroyed
+; w2                    store addr(proc desc)
+; w3       link         unchanged
+d6:   rl.  w2   m15.    ; load store addr(proc desc);
+      dl.  w1   m71.    ; load first 2 words of name;
+      ds   w1   x2-a48+a11+2; store word0,word1(name);
+      dl.  w1   m72.    ; load last 2 words of name;
+      ds   w1   x2-a48+a11+6; store word2,word3(name);
+      jl        x3      ; exit: return;
+
+; get char(index).
+;          call:        return:
+; w0                    unchanged
+; w1                    destroyed
+; w2                    char
+; w3       link         unchanged
+b.i0
+w.
+d7:   al   w1   0       ; w1:= 0;
+      rl.  w2   m29.    ;
+      al   w2   x2-1    ; index:= index - 1;
+      rs.  w2   m29.    ;
+      wd.  w2   m43.    ; shift:= (index mod 3) * 8;
+      ls   w1   3       ;
+      ls   w2   1       ; addr:= (index//3)*2;
+      rl.  w2   x2+m7.  ; word:= word(addr + name addr);
+      ls   w2   x1-16   ; shift char(index) to rightmost position;
+      la.  w2   i0.     ; mask off char(index);
+      sn   w2   0       ; if char = 0 then
+      jl.       d7.     ;   get char(index - 1);
+      jl        x3      ; else exit: return;
+i0:   2.11111111        ;
+e.
+
+; procedure find number in name.
+;          call:        return:
+; w0                    number
+; w1                    destroyed
+; w2                    destroyed
+; w3       link         destroyed
+b.j3 w.
+d8:   rs.  w3   m21.    ; save link;
+      dl.  w3   m71.    ; load name(word0,word1);
+      sn   w2   0       ;
+      se   w3   0       ; if name=0 then
+      jl.       j2.     ;   get name;
+      jl.  w3   d5.     ; 
+j2:   al   w0   0       ; number:= 0;
+      al   w2   12      ; index:= 12;
+      rs.  w2   m29.    ; save index;
+      jl.  w3   d7.     ; get char;
+      rl.  w1   m29.    ;
+      al   w1   x1-1    ;
+      rs.  w1   m26.    ; insert-index:=index-1;
+      sl   w2   58      ; if char='letter' then
+      jl.       j1.     ;    goto end;
+      al   w0   x2-48   ; number:=char-48;
+      jl.  w3   d7.     ; get char;
+      sl   w2   58      ; if char='letter' then
+      jl.       j1.     ;    goto end;
+      al   w2   x2-48   ;
+      wm.  w2   m42.    ; number:=
+      wa   w0   4       ;   number+(char-48)*10;
+      jl.  w3   d7.     ; get char;
+      sl   w2   58      ; if char='letter' then
+      jl.       j1.     ;   goto end;
+      al   w2   x2-48   ;
+      wm.  w2   m44.    ; number:=
+      wa   w0   4       ;   number+(char-48)*100;
+      rl.  w2   m29.    ;
+      al   w2   x2-1    ; index:=index-1;
+      rs.  w2   m29.    ;
+j1:   rs.  w0   m28.    ; store number;
+      jl.      (m21.)   ; exit: return;
+e.
+
+; procedure insert number in name.
+;          call:        return:
+; w0                    destroyed
+; w1                    number
+; w2                    destroyed
+; w3       link         destroyed
+b.j1 w.
+d9:   rs.  w3   m21.    ; save link;
+      rl.  w3   m28.    ; load number;
+      rl.  w2   m26.    ; load insert-index;
+      sl   w3   100     ; if number>=100 then
+      al   w2   x2-1    ;   insert-index:=insert-index-1;
+      sl   w3   10      ; if char>=10 then
+      al   w2   x2-1    ;   insert-index:=insert-index-1;
+      sh.  w2  (m29.)   ; if insert-index<index then
+      rl.  w2   m29.    ;   insert-index:=index;
+      al   w0   x2      ;
+      sl   w3   100     ;
+      al   w2   x2+1    ;
+      sl   w3   10      ;
+      al   w2   x2+1    ;
+      sh   w2   9       ;  if index(last char)>11 then
+      jl.       j1.     ;   begin
+      jl.  w3   d24.    ;    write error mess:<name too long>;
+      jl.      (m21.)   ; errorexit: return; end;
+j1:   al   w1   0       ;
+j0:   ls   w1   -8      ; shift word left;
+      al   w2   0       ; w2:= last ciffer;
+      wd.  w3   m42.    ; w3:= kvotient;
+      al   w2   x2+48   ; char:= ciffer + 48;
+      ls   w2   16      ; shift char to leftmost position;
+      lo   w1   4       ; insert char in word;
+      se   w3   0       ; if kvotient <> 0 then
+      jl.       j0.     ;   goto next ciffer;
+      al   w2   0       ;
+      rl   w3   0       ; get insert-index;
+      wd.  w3   m43.    ;
+      ls   w2   3       ; shift:= (index mod 3) * 8;
+      ls   w3   1       ; addr:= (index//3)*2;
+      rl.  w0   x3+m7.  ; load word(index);
+      ls   w0   x2-16   ; shift last char(name) to rightmost position;
+      ac   w2   x2-16   ;
+      ld   w1   x2      ; insert number;
+      rs.  w0   x3+m7.  ;
+      se   w1   0       ;
+      rs.  w1   x3+m71. ;
+      rl.  w1   m28.    ;
+      al   w1   x1+1    ; number:=number+1;
+      rs.  w1   m28.    ;
+      jl.      (m21.)   ; exit: return;
+e.
+
+; procedure insert interrupt.
+;          call:        return:
+; w0                    destroyed
+; w1                    insert addr
+; w2                    expdevno
+; w3       link         destroyed
+b. j2,i0 w.
+i0:      jl w1 c30      ;
+         jl w1 c31      ;
+d11:  am        2       ;
+d10:  rl.  w0   i0.     ;  load interrespons instruction;
+      rs.  w3   m20.    ;  save link;
+      al   w1   1       ;
+      jl.  w3   d21.    ;  search int entry(test);
+      rl.  w3   m16.    ;  load store addr;
+      sn   w1   0       ;  if insert addr=0 then
+      jl.       j2.     ;    goto exit;
+      sn   w2   0       ;  if expdevno=0 then
+      jl.       j0.     ;    goto stdint;
+      al   w3   x3-a48  ; expint: addr:=addr(proc desc);
+      jl.       j1.     ;  goto final;
+j0:   rs   w0   x3      ; stdint: insert int resp instruction;
+      al   w0   x3+2    ;
+      rs.  w0   m15.    ;  store addr:=store addr+2;
+      rs.  w0   m16.    ; start addr(proc desc):=store addr;
+j1:   ws.  w3   m25.    ; final:
+      rs   w3   x1      ;  word(insert addr):=final addr;
+j2:   jl.      (m20.)   ; exit: return;
+e.
+
+; insert addr(proc desc) in name table.
+;          call:        return:
+; w0                    unchanged
+; w1                    final proc desc addr
+; w2                    destroyed
+; w3       link         unchanged
+d12:  rs.  w3   m22.    ; save link;
+      rl.  w2   m4.     ; load devno;
+      ls   w2   1       ; index:= dev.no.*2;
+      wa.  w2   m46.    ; insert addr:=start(nametable)+index;
+      rl.  w1   m15.    ; load start-addr;
+      al   w1   x1-a48  ;
+      ws.  w1   m25.    ; addr:=final addr(proc desc);
+      rx   w1   x2      ; insert addr in nametable;
+      se   w1   0       ; if old entry was used then
+      jl.  w3   d31.    ;   write error mess;
+      rl   w1   x2      ; load final proc desc addr;
+      jl.      (m22.)   ; exit: return;
+
+; procedure insert all parameters.
+;          call:        return:
+; w0                    destroyed
+; w1                    top store-addr
+; w2                    addr(next item)
+; w3       link         unchanged
+b.j1 w.
+d13:  rl.  w1   m15.    ; load start store-addr;
+      al   w1   x1-a48+a70-2; store addr:=store addr(param0)-2;
+      rl.  w2   m10.    ; load item-pointer;
+      ba   w2   x2+1    ; item-pointer:=addr(next item);
+      rx.  w2   m10.    ; get addr:=addr(param0)-2;
+j0:   al   w2   x2+2    ; next param:
+      al   w1   x1+2    ; get addr:=get addr+2;
+      sl.  w2  (m10.)   ; if get addr<item-pointer then
+      jl.       j1.     ;
+      rl   w0   x2      ;   begin
+      rs   w0   x1      ;    word(store addr):=word(get addr);
+      jl.       j0.     ;   goto next param;
+                        ;  end;
+j1:   rs.  w1   m16.    ; save top store-addr;
+      jl        x3      ; exit: return;
+e.
+
+; procedure insert addr(last message) and addr(next message) in proc desc.
+;          call:        return:
+; w0                    unchanged
+; w1                    destroyed
+; w2                    destroyed
+; w3       link         unchanged
+b. w.
+d14: rl.  w1   m15.     ; addr:=start addr(proc desc);
+     al   w1   x1-a48+a54; addr:=addr(next mess);
+     al   w2   x1       ; store addr:=final addr;
+     ws.  w2   m25.     ;
+     rs   w2   x1       ; store addr(next mess) in addr;
+     rs   w2   x1+2     ; store addr(last mess) in addr+2;
+     jl        x3       ; exit: return;
+e.
+
+; procedure insert devno in proc desc.
+;          call:        return:
+; w0                    unchanged
+; w1                    first addr(proc desc)
+; w2                    devno
+; w3       link         unchanged
+d15:  rl.  w2   m4.     ; load dev.no.;
+      rl.  w1   m15.    ; load first addr in proc desc;
+      ls   w2   6       ; word:= devno < 6;
+      rs   w2   x1-a48+a50; insert word in proc desc;
+      jl        x3      ; exit: return;
+
+; procedure exchange options.
+; the procedure exchanges the option-area and the option-save-area
+;          call:        return:
+; w0                    unchanged
+; w1                    destroyed
+; w2                    destroyed
+; w3       link         unchanged
+b.j0 w.
+d16:  al   w1   0       ; index:= 0;
+j0:   rl.  w2   x1+m24. ; exchange option-word(index)
+      rx.  w2   x1+m102.;   with
+      rs.  w2   x1+m24. ;   option-save-word(index);
+      al   w1   x1+2    ; index:= index + 2;
+      sh   w1   m62     ; if index =< maxindex then
+      jl.       j0.     ;    goto next;
+      jl        x3      ; exit: return;
+e.
+
+; procedure copy options.
+; the procedure copies the option-area into the option-save-area.
+;          call:        return:
+; w0                    unchanged
+; w1                    destroyed
+; w2                    destroyed
+; w3       link         unchanged
+b.j0 w.
+d17:  al   w1   0       ;
+j0:   rl.  w2   x1+m24. ;
+      rs.  w2   x1+m102.;
+      al   w1   x1+2    ; index:= index + 2;
+      sh   w1   m62     ; if index=<maxindex then
+      jl.       j0.     ;   next loop;
+      jl        x3      ; exit: return;
+e.
+
+; procedure insert k-values in tail.
+;          call:        return:
+; w0                    unchanged
+; w1                    destroyed
+; w2                    destroyed
+; w3       link         unchanged
+d18:
+c.a9-1
+      rl.  w2   m15.    ;  addr:=addr(proc desc);
+      al   w2   x2-a48+a72;  addr:=addr(insert param);
+      al   w1   x2      ;
+      ws.  w1   m25.    ;  word:=final addr(insert param);
+      rs   w1   x2      ;  save word;
+      rs   w1   x2+2    ;  save word;
+      jl        x3      ; exit: return;
+z.
+
+; procedure insert entry in s console table.
+; the procedure inserts devno and mask in the console table. if next
+; delim=p then the first param is used as mask, else the std 
+; mask=8.7760 is used except for the firrst entry which
+; has the std mask=8.7770.
+;          call:        return:
+; w0                    unchanged
+; w1                    pointer(next entry in cons table)
+; w2                    devno
+; w3       link         destroyed
+b. i0,j1 w.
+d19: rs. w3  m20.       ;  save link;
+     rl. w1  m17.       ; pointer:=pointer(first free entry in cons table);
+     bz. w2 (m10.)      ;  get next delim;
+     se  w2  n8         ;  if delim='p' then 
+     jl.     j0.        ;    mask:=param;
+     rl. w2  m10.       ;
+     rl  w3  x2+2       ;
+     jl.     j1.        ;
+j0:  rl. w3  i0.        ;  mask:=std mask;
+     sh. w1 (m52.)      ;  if first entry in cons table then
+     al  w3  x3+8.10    ;    mask:=main console mask;
+j1:  rl. w2  m4.        ;  get devno;
+     ds  w3  x1+2       ;  insert entry in cons table;
+     al  w1  x1+4       ;
+     rs. w1  m17.       ;  pointer:=pointer(next item);
+     jl.    (m20.)      ; exit: return;
+i0:  8.7760             ;  std mask;
+e.
+
+; procedure insert devno in s dev list.
+;        call:          return:
+; w0                    unchanged
+; w1                    unchanged
+; w2                    destroyed
+; w3     link           destroyed
+w.
+d20: rs. w3  m20.       ;  save link;
+     rl. w2  m18.       ;  get pointer(s dev list);
+     rl. w3  m4.        ;  get devno;
+     hs  w3  x2         ;  insert devno in s dev list;
+     al  w2  x2+1       ;
+     rs. w2  m18.       ;  pointer:=pointer(next entry);
+     jl.    (m20.)      ; exit: return;
+
+; procedure search int entry;
+; if w1=0 then test test.no else test.yes.
+;          call:        return:
+; w0                    unchanged(destroyed if error)
+; w1       test.yes or no  insert addr(=0 if no int)
+; w2                    expdevno(=0 if no expander)
+; w3       link         destroyed
+b. i2,j4 w.
+i0:             h4      ;
+i1:             c24     ;
+i2:             0       ;
+d21:  rs.  w3   m21.    ;  save link;
+      rs.  w1   i2.     ;  save test.yes or no;
+      rl.  w1   m23.    ;  expdevno:=exp1;
+      sh   w1   0       ;  if expdevno=<0 then
+      jl.       j4.     ;    goto stdint;
+ c.q8-1
+      al.  w2   m110.   ;  addr:=addr(first entry in exp table);
+j0:   rl   w3   x2      ; lookup: entry:=entry(addr);
+      sn   w3   x1      ;  if entry=expdevno then
+      jl.       j2.     ;    goto found;
+      al   w2   x2+4    ;  addr:=addr(next entry);
+      sh.  w2   m112.   ;  if addr=<addr(last entry) then
+      jl.       j0.     ;    goto lookup;
+ z.
+      jl.  w3   d25.    ;  write error mess:<expandererror>;
+      al.  w1   m63.    ;  insert addr:=dummy addr;
+      jl.       j3.     ;  goto exit;
+j4:   rl.  w1   m6.     ; stdint:
+      sn   w1   0       ;  if int1=0 then
+      jl.       j3.     ;    goto exit;
+      ls   w1   1       ;  index:=int1*2;
+      al.  w1   x1+m2.  ;  insert addr:=addr(int table)+index;
+      jl.       j1.     ;  goto test;
+j2:   rl.  w1   m6.     ; found:
+      ls   w1   1       ;  index:=int1*2;
+      wa   w1   x2+2    ;  insert addr:=word(addr+2)+index;
+j1:   al   w3   0       ; test:
+      sn.  w3  (i2.)    ;  if no test then
+      jl.       j3.     ;    goto exit;
+      rl   w2   x1      ;  entry:=word(insert addr);
+      se.  w3  (m23.)   ;  if exp=0 then
+      am        i0-i1   ;    unused:=c24 else unused:=h4;
+      se.  w2  (i1.)    ;  if entry<>unused then
+      jl.  w3   d32.    ;    write error:<entry used>;
+j3:   rl.  w2   m23.    ; exit: load exp1;
+      jl.      (m21.)   ;  return;
+e.
+
+; procedure insert entry in bs-table.
+;          call:        return:
+; w0                    destroyed
+; w1                    unchanged
+; w2                    destroyed
+; w3       link         destroyed
+b. i2,j3 w.
+d22:  rs.  w3   m20.    ;  save link;
+      rl.  w2   m3.     ;  if type=<drum> then
+      se   w2   6       ;    rel:=0;
+      am        m33     ;  else
+      al   w2   0       ;    rel:=addr of disc area relative to drum area;
+      ds.  w2   i1.     ;  save w1, save rel;
+      bz.  w2  (m10.)   ;  get next delim;
+      se   w2   n10     ;  if next delim<>s then
+      jl.       j0.     ;    goto insert entry;
+; read parameters.
+      rl.  w1   m10.    ;  pointer:=pointer(options);
+      ba   w1   x1+1    ;  top:=addr(next item);
+      al   w0   x1      ;
+      rx.  w1   m10.    ;  save top, get pointer;
+      rl.  w2   i1.     ;  load rel;
+      rl   w3   x1+2    ;  catsize:=
+      rs.  w3   x2+m36. ;    param(pointer+2);
+      sn   w0   x1+4    ;  if addr(next param)=top then
+      jl.       j0.     ;    goto insert entry;
+      rl   w3   x1+4    ;  slicesize:=
+      rs.  w3   x2+m37. ;    param(pointer+4);
+      sn   w0   x1+6    ;  if addr(next param)=top then
+      jl.       j0.     ;    goto insert entry;
+      rl   w3   x1+6    ;  no of segments:=
+      rs.  w3   x2+m38. ;    param(pointer+6);
+; insert entry.
+j0:   rl.  w2   m19.    ;  pointer:=pointer(bs-table);
+      rl.  w0   m4.     ;  insert devno in
+      rs   w0   x2+0    ;    bs table;
+      al   w1   x2+2    ;
+      rs.  w1   m19.    ;  newpointer:=addr(next entry in bs table);
+      rl.  w3   i1.     ;  load rel;
+      dl.  w1   x3+m37. ;  insert catsize and
+      sh   w0   4095/(:512/a88:);
+      sh   w0   0       ;  if catsize=<0 or >=max no of entries then
+      jl.       j2.     ;    goto error;
+      sh   w1   0       ;  if slicesize=<0 then
+      jl.       j2.     ;    goto error;
+      rl.  w1   x3+m38. ;  get no of segments;
+      sh   w1   0       ;  if no of segments=<0 then
+      jl.       j2.     ;    goto error;
+      al   w0   0       ;
+      wd.  w1   x3+m37. ;  no of slices:=no of segments/slicesize;
+      al   w0   x1-1    ;  addr(last slice):=no of slices-1;
+      sl.  w0  (i2.)    ;  if addr(last slice)>=2048 then
+      jl.       j2.     ;    goto error;
+      sl.  w1  (x3+m35.);  if no of slices>maxsize then
+      rs.  w1   x3+m35. ;    maxsize:=no of slices;
+j3:   rl.  w1   i0.     ;  restore w1;
+      jl.      (m20.)   ; exit: return;
+; error.
+j2:   jl.  w3   d26.    ; error: write errormess:<catalog table>;
+      jl.       j3.     ;  goto exit;
+i0:             0       ;  save w1
+i1:             0       ;  rel
+i2:             2048    ;
+e.
+
+; procedure insert testbuf pointers.
+; inserts testbuf pointers for the rbct, and sets up the testbuf.
+; if next delim is `p` then the size of the testbuf is set according
+; to the value of the param, else to a standard value.
+;      call:             return:
+; w0                     destroyed
+; w1                     destroyed
+; w2                     destroyed
+; w3   link              destroyed
+d23:                     ; insert testbuf size:
+c.(:q1>3a.1:)-1          ;
+b.j3 w.                  ;
+      rs.  w3   j3.      ;  save link;
+      bz.  w2  (m10.)    ;
+      se   w2   n8       ;  if next delim<>'p' then
+      jl.       j1.      ;     bufsize:=500 bytes;
+      am.      (m10.)    ;  else
+      rl   w2   +2       ;     bufsize:=next param;
+      sh   w2   512      ;     if not(4<bufsize=<512) then
+      sh   w2   4        ;       write error <testbuf error>;
+      jl.       j0.      ;     bufsize:=500;
+      jl.       j2.      ;
+j0:   jl.  w3   d33.     ;
+j1:   al   w2   500      ;
+j2:   rl.  w3   m15.     ;
+      al   w3   x3-a48+a78+108; addr:=
+      al   w1   x3+4     ;       insert addr(param1);
+      ws.  w1   m25.     ;
+      rs   w1   x3       ;  param1:=k+4;;
+      am        x2       ;
+      al   w1   x1-4     ;  param2:=k+bufsize;
+      rs   w1   x3+2     ;
+      wa.  w1   m25.     ;  start of next proc:=
+  al  w1  x1+12  ; 12+    b r fjernes senere
+      rs.  w1   m16.     ;    buffer top address;
+      jl.      (j3.)     ; exit: return;
+j3:             0        ;
+e.z.                     ;
+
+
+
+; procedure write errormessage.
+;          call:        return:
+; w0                    destroyed
+; w1                    unchanged
+; w2                    unchanged
+; w3       link         destroyed
+b.i13 w.
+d.p.<:fpnames:>
+l.
+i0:   <:  ***option2  <0>:>
+i1:   <:name too long<0>:>
+i2:   <:expandererror<0>:>
+i3:   <:catalog definition<0>:>
+i4:   <:process too small<0>:>
+i5:   <:relative<0>:>
+i6:   <:identerror<0>:>
+i11:  <:device number already used<0>:>
+i12:  <:interrupt number already used<0>:>
+i10:  <:type undefined<0>:>
+i13:  <:testbuffer error<0>:>
+i7:   0                 ;  save link
+i8:   0                 ;  text addr
+      0                 ;  save reg-w1
+i9:   0                 ;  save reg-w2
+
+d24:  am        i1-i2   ;
+d25:  am        i2-i3   ;
+d26:  am        i3-i4   ;
+d27:  am        i4-i5   ;
+d28:  am        i5-i6   ;
+d29:  am        i6-i10  ;
+d30:  am        i10-i11 ;
+d31:  am        i11-i12 ;
+d32:  am        i12-i13 ;
+d33:  al.  w0   i13.    ;  load text addr;
+      ds.  w0   i8.     ;  save link, text addr;
+      ds.  w2   i9.     ;  save w1, w2;
+      al   w2   10      ;  char:='nl';
+      am.      (m55.)   ;
+      jl   w3   h26-2   ;  outchar on current out;
+      rl.  w0   m24.    ;  load lineno;
+      rl.  w2   m55.    ;  load fp-base;
+      jl   w3   x2+h32-2;  outchar on current out;
+          32<12+3       ;  format;
+      al.  w0   i0.     ;  load addr(mess head);
+      jl   w3   x2+h31-2;  outtext on current out;
+      rl.  w0   i8.     ;  load error text;
+      jl   w3   x2+h31-2;  outtext on current out;
+      al   w0   1       ;
+      rs.  w0   m41.    ;  status:=error;
+      dl.  w2   i9.     ;  restore w1,w2;
+      jl.      (i7.)    ; exit: return;
+e.e.
+
+
+; parameters:
+; m0                    ; start of 'proc.descr. addr-table'
+; m1                    ; not used
+; m2                    ; interrupt table
+
+; options area:
+m24:0                   ; line no, delim=0
+m3: 0                   ; 't', delim=2
+m4: 0                   ; 'd', delim=4
+m5: 0                   ; 'r', delim=6
+m6: 0                   ; 'i', delim=8
+    0                   ; 'i2'
+m23:0                   ; 'exp1'
+    0                   ; 'exp2'
+m7: 0                   ; 'n', delim=10
+m71:0                   ; 
+    0                   ;
+m72:0                   ;
+
+; option save area:
+m102: 0                 ; line no
+m103: 0                 ; 't'
+m104: 0                 ; 'd'
+m105: 0                 ; 'r'
+m106: 0                 ; 'i'
+      0                 ; 'i2'
+m108: 0                 ; exp
+      0                 ; exp2
+m107: 0                 ; 'n'
+      0                 ;
+      0                 ;
+      0                 ;
+
+m8:   m24-m3            ; line no
+      m3-m3             ; t
+      m4-m3             ; d
+      m5-m3             ; r
+      m6-m3             ; i
+      m23-m3            ; e
+      m7-m3             ; n
+
+; various parameters:
+m9:  -1                 ; current dev.no
+m32:  0                 ; option-start pointer
+m10:  0                 ; item pointer in options
+;m11                    ; first free addr
+m12:  0                 ; last free addr, initial value inserted from slang stack+2
+m13:  0                 ; top addr get proc.descr.
+m14:  0                 ; start -   -    -    -
+m15:  0                 ; first free addr in store area (start of last proc desc)
+m16:  m11.              ; top store addr (start of next proc desc)
+m17:  0                 ; pointer(s console table)
+m18:  0                 ; pointer(s dev list)
+m19:  0                 ; pointer(bs-table9
+m20:  0                 ; save addr for link
+m21:  0                 ;   -    -   -    -
+m22:  0                 ;   -    -   -    -
+;m23                    ; intexpander
+;m24                    ; line no
+m25:  p0                ; => final addr=store addr-word(m25) 
+m26:  0                 ; insert-index
+m27:  h4                ;
+m28:  0                 ; number
+m29:  0                 ; index
+m30:  0                 ; addr of special action, used to jump out 
+                        ; after initiate procedure
+m31:  0                 ; used in special actions (TMX: maxdevno)
+; drum area:
+m34:  a114              ; drumchainsize
+m35:  a114              ; drummaxsize
+m36:  0                 ; drumcatalogsize
+m37:  0                 ; drumslicesize
+m38:  0                 ; no of segment for the drum
+; disc area:
+m39:  a116              ; discchainsize
+      a116              ; discmaxsize
+      0                 ; disccatalogsize
+      0                 ; discslicesize
+      0                 ; no of segments for the disc
+m33=m39-m34
+m40:  0                 ; pointer in disc table,discno counter
+      0,r.8             ; save words for proc.disc addrs
+m41:  0                 ; return status
+m42:  10                ; used for
+m43:  3                 ;   multiplying and dividing
+m44:  100               ;
+m46:  0                 ; start(nametable)
+m47:  0                 ; top(nametable)
+m48:  m60               ; final addr:=addr-m48(used in privat proc desc)
+m49:  q6                ; addr(mon opt table)
+m50:  0                 ; addr(opt start)
+m51:  0                 ; addr(int list)
+m52:  0                 ; addr(s console table)
+m53:  0                 ; addr(s device table)
+m54:  0                 ; top addr(s device list)
+m58:  0                 ; addr(bs-table)
+m59:  0                 ; top addr(bs-table)
+m55:  0                 ; addr(fp base)
+m56:  0                 ; addr(slang base)
+m57:  0                 ; return addr (to slang)
+;m60                    ; start of proc desc area
+m61=m72-m3
+m62=m72-m24
+m63=m110-2
+
+
+; main program.
+b1:   jl.  w3   d0.     ; unpack options;
+      jl.  w3   d1.     ; initiate transfer;
+      se   w2   0       ; if special action then
+      jl        x2      ;   goto special action(w3=link);
+      jl        x3      ; goto transfer(type);
+
+; end of options.
+b.i4,j4 w.
+b2:
+      al   w2   -1      ;
+      rs.  w2   m3.     ; type:=-1;
+      rl.  w2   m30.    ;
+      se   w2   0       ; if special action then
+      jl   w3   x2      ;   special action;
+; if number of subdevices<>o then insert subdevice descriptions.
+c.a9-1
+      al   w0   0       ; lineno:=0;
+      al   w1   1       ; type:=1;
+      ds.  w1   m3.     ;
+      al   w0   q7      ; devno:=devno(last device in nametable)+1;
+      al   w1   a9      ; repeats:=number of subdevices;
+      ds.  w1   m5.     ;
+      jl.  w3   d1.     ; initiate transfer;
+j4:   jl.  w3   d3.     ; transfer proc desc;
+      jl.  w3   d12.    ; insert proc desc addr in nametable;
+      jl.  w3   d14.    ; insert addr(next mess) and addr(last mess);
+      jl.  w3   d18.    ; insert k-values in tail;
+      jl.  w3   d19.    ; insert entry in s console table;
+      jl.  w3   d20.    ; insert entry in s device list;
+      jl.  w3   d4.     ; test repeats;
+      se   w1   0       ; if repeats<>0 then
+      jl.       j4.     ;   goto transfer;
+z.
+      al.  w1   m2.     ; get addr:=addr(int table);
+      rl.  w2   m51.    ; store addr:=adr(int list);
+j0:   rl   w0   x1      ; transfer int addresses:
+      rs   w0   x2      ;
+      al   w1   x1+2    ; get addr:=get addr+2;
+      al   w2   x2+2    ; save addr:=save addr+2;
+      se.  w2  (m52.)   ; if save addr<top(int list) then
+      jl.       j0.     ;   goto transfer;
+; update mon opt table:
+      rl.  w2   m49.    ; load addr(mon opt table);
+      rl.  w1   m18.    ; load pointer ins dev list;
+      rs   w1   x2+8    ; insert top s dev list in mon opt table;
+      al.  w0   m11.    ; start:=start addr(temporary proc desc area);
+      rl.  w1   m16.    ; top:=top addr(temporary proc desc area);
+      ds   w1   x2+30   ; insert start,top in mon opt table;
+      rl.  w2   m56.    ; w2:=addr(slang base);
+      rs   w1   x2      ;
+      sl   w1  (x2+2)   ; if addr(last free word )<top addr(proc desc) then
+      jl.       j3.     ;    goto error;
+      rl.  w0   m35.    ; test drumchainsize:
+      sh.  w0  (m34.)   ;  if drummaxsize=<drumchainsize then
+      jl.       j1.     ;    goto test discchainsize;
+      rl.  w1   i2.     ;  load ident;
+      jl   w3   x2+10   ;  insert identifier(a slang procedure);
+      jl.  w3   d29.    ; error return: write errormess:<identerror>;
+      rl.  w2   m56.    ; normal return: load slang base;
+j1:   rl.  w0   m39.+2  ; test discchainsize:
+      sh.  w0  (m39.)   ;  if disc maxsize=<discchainsize then
+      jl.       j2.     ;    goto out;
+      rl.  w1   i3.     ;  load ident;
+      jl   w3   x2+10   ;  insert identifier;
+      jl.  w3   d29.    ; error return: write errormess:<identerror>;
+      jl.       j2.     ;  goto out;
+j3:   jl.  w3   d27.    ; error: write error mess:<process too small>;
+j2:   rl.  w2   m41.    ; out: load status;
+      se   w2   0       ;  if status=ok then
+      am        i4      ;    write text0;
+      al.  w0   i0.     ;  else write text1;
+      jl.      (m57.)   ; return to slang;
+i0:   <:<10>                            end of option2 - ok<0>:>    ; text0
+i1:   <:<10>end of option2 - sorry<0>:> ; text1
+i4=i1-i0
+i2:    97<12+114        ; a114
+i3:    97<12+116        ; a116
+e.
+
+; the following procedures are monitoring the creation
+; of the process descriptions.
+
+; empty typenumber.
+s0:  jl.  w3   d30.     ;  write errormess:<illegal typenumber>;
+     jl.       b1.      ; exit: goto main program;
+
+; standard transfer action.
+s1:  jl.  w3   d10.    ; insert interrupt;
+     jl.  w3   d3.     ; transfer proc.desc.(type);
+     jl.  w3   d12.    ; insert proc.desc.addr in nametable;
+     jl.  w3   d14.    ; insert addr(next mess) and addr(lastmess);
+     jl.  w3   d15.    ; insert devno. in procdesc.;
+     jl.  w3   d20.    ; insert entry in s dev list;
+     jl.  w3   d4.     ; test repeats;
+     se   w1   0       ; if repeats<>0 then
+     jl.       s1.     ;   goto transfer;
+     jl.       b1.     ; exit: goto main program;
+
+; interval clock.
+s2:  jl.  w3   d10.    ; insert interrupt;
+     jl.  w3   d3.     ; transfer proc desc;
+     jl.  w3   d15.    ; insert devno in proc desc;
+     jl.  w3   d14.    ; insert addr(next mess) and addr(last mess);
+     jl.  w3   d12.    ; insert proc desc addr in name table;
+     jl.  w3   d4.     ; test repeats;
+     se   w1   0       ; if repeats<>0 then
+     jl.       s2.     ;   goto transfer;
+     jl.       b1.     ; exit: goto main program;
+
+; privat proc desc.
+s3:
+c.q3-1
+b.j3 w.
+     al   w1   1       ;
+     jl.  w3   d21.    ;  search int entry(test.yes);
+     rl.  w3   m14.    ;  load abs addr(proc desc start);
+     sn.  w3   p100.   ;  if abs addr=addr(no proc desc) then
+     jl.       s0.     ;    goto empty typenumber;
+     al   w0   x3+a48  ;
+     rs.  w0   m14.    ;  save start addr(proc desc);
+     ws.  w3   m48.    ;  addr:=final addr(proc desc);
+     sn   w1   0       ;  if no int then
+     jl.       j0.     ;    insertnametable;
+     sn   w2   0       ;  if int=stdint then
+     am        a48-2   ;    intaddr:=addr(base of proc desc);
+     al   w0   x3      ;  else intaddr:=addr(proc desc);
+     rs   w0   x1      ;  word(int-insert addr):=intaddr;
+j0:  al   w0   x3      ; insertnametable:
+     bz.  w2  (m10.)   ;  get next delim;
+     sn   w2   n8      ;  if next delim=p then
+     jl.       j1.     ;    goto get param;
+     al   w1   1<1+1   ;  param:=insert in name table and s dev list;
+     jl.       j2.     ;  goto insert;
+j1:  rl.  w2   m10.    ; get param:
+     rl   w3   x2+2    ;  param:=word(pointer+2);
+     ba   w2   x2+1    ;  pointer:=pointer(next item);
+     rs.  w2   m10.    ;  save pointer;
+     al   w2   0       ;
+     wd.  w3   m42.    ;
+     se   w2   0       ;
+     am        1       ;
+     al   w1   0       ;
+     al   w2   0       ;
+     wd.  w3   m42.    ;
+     se   w2   0       ;
+     al   w1   x1+1<1  ;
+     al   w2   0       ;
+     wd.  w3   m42.    ;
+     se   w2   0       ;
+     al   w1   x1+1<2  ;
+     se   w3   0       ;
+     al   w1   x1+1<3  ;
+j2:  so   w1   1       ; insert: if no insertion in nametable then
+     jl.       j3.     ;    goto s dev list;
+     rl.  w2   m4.     ;  load devno;
+     ls   w2   1       ;  index:=devno*2;
+     wa.  w2   m46.    ;  insertaddr:=name table start+index;
+     rx   w0   x2      ;  insert proc desc addr in name table;
+     se   w0   0       ;  if old entry<>0 then
+     jl.  w3   d31.    ;    write error mess.;
+j3:  sz   w1   1<1     ; s devlist: if insertion in s devlist then
+     jl.  w3   d20.    ;    insert devno in s dev list;
+     sz   w1   1<2     ; if insertion in bs catalog then
+     jl.  w3   d22.    ;   insert entry in bs-table;
+     sz   w1   1<3     ; if insertion in s console table then
+     jl.  w3   d19.    ;    insert entry in s console table;
+     jl.       b1.     ; exit: goto main program;
+e.
+z.
+
+s4:  jl. w3 d3.
+     jl. w3 d12.
+     jl. w3 d19.
+     jl. w3 d20.
+     jl. w3 d4.
+     se  w1 0
+     jl.    s4.
+     jl.    b1.
+
+; drum(6) and small disc(7);
+s6:  jl.  w3   d10.    ; insert interrupt;
+     jl.  w3   d3.     ; insert std.proc.desc.;
+     jl.  w3   d14.    ; insert addr(next mess) and addr(last mess) in proc desc;
+     jl.  w3   d15.    ; insert devno in proc desc;
+     jl.  w3   d20.    ; insert devno in s dev list;
+     jl.  w3   d12.    ; insert proc desc addr in nametable;
+     rl.  w2   m15.    ; load start addr(proc desc);
+     rs   w1   x2-a48+a70; insert proc desc.addr;
+     jl.  w3   d4.     ; test repeats;
+     jl.  w3   d22.    ; insert entry in bs-table;
+     se   w1   0       ; if repeats<>0 then
+     jl.       s6.     ;   goto transfer;
+     jl.       b1.     ; exit: goto main program;
+
+; big disc
+s8:
+c.(:q0>8a.1:)-1
+b.j10 w.
+      al   w1   0       ;
+      jl.  w3   d21.    ; search int-entry(test.no);
+      sn   w1   0       ; if int.no <> 0 then
+      jl.       j0.     ;   begin
+; initiate main proc desc.
+      jl.  w3   d17.    ; copy options into save-area;
+      al.  w0   j2.     ; insert special action addr;
+      rs.  w0   m30.    ;
+      al   w0   0       ;
+      rs.  w0   m6.     ; int no:= discno:=
+      rs.  w0   m40.    ;   pointer(disctable):= 0;
+; end of initiation;
+; insert std.proc.desc.
+j0:   jl.  w3   d3.     ; transfer std.proc.desc.;
+      jl.  w3   d14.    ; insert addr(next mess) and addr(last mess);
+      jl.  w3   d20.    ; insert devno in s dev list;
+      bz.  w2  (m10.)   ; get next delim;
+      se   w2   n8      ; if next item-delim ='p' then
+      jl.       j1.     ; begin
+      rl.  w2   m10.    ;
+      rl   w1   x2+2    ;   load param:= discno;
+      hs.  w1   m40.+1  ;   save discno;
+      ba   w2   x2+1    ;   count up item-pointer;
+      rs.  w2   m10.    ; end;
+j1:   bz.  w2   m40.+1  ; insert discno:
+      rl.  w1   m15.    ; load proc desc start addr;
+      rs   w2   x1-a48+a78+12; store discno;
+      al   w2   x2+1    ; discno:= discno + 1;
+      hs.  w2   m40.+1  ;
+      rl.  w2   m104.   ; load dev.no(mainproc);
+      ls   w2   6       ; word:= devno < 6;
+      rs   w2   x1-a48+a50; store devno;
+      jl.  w3   d12.    ; insert addr(procdesc) in nametable;
+      bz.  w3   m40.    ; get pointer;
+      al   w3   x3+2    ;
+      rs.  w1   x3+m40. ; save addr(proc.desc) in mainproctable;
+      hs.  w3   m40.    ; save pointer(next addr);
+      jl.  w3   d4.     ; test repeats;
+      jl.  w3   d22.    ; insert entry in bs-table;
+      se   w1   0       ; if repeats<>0 then
+      jl.       j0.     ;   goto transfer;
+      jl.       b1.     ; goto main program;
+; end cf proc.desc. insertion;
+; insert main.proc.desc.
+j2:   rl.  w1   m3.     ;
+      rl.  w0   m23.    ;  load exp1;
+      sn   w0   0       ;
+      se   w1   8       ;
+      jl.       j3.     ; if type=8 and no int then
+      rl.  w1   m6.     ;   exit: return;
+      sn   w1   0       ;
+      jl        x3      ;
+j3:   jl.  w3   d16.    ; insert main proc:
+      al   w1   9       ; exchange options;
+      rs.  w1   m3.     ; type:=9;
+      rl.  w0   m9.     ;
+      jl.  w3   d1.     ; initiate transfer;
+      rs.  w0   m9.     ;
+      al   w2   0       ;
+      al   w3   0       ;
+      ds.  w3   m7.+2   ; name:=0;
+      ds.  w3   m7.+6   ;
+      jl.  w3   d10.    ; insert move interrupt;
+      rl.  w3   m6.+2   ;
+      rs.  w3   m6.     ;  int1:=int2;
+      rl.  w3   m23.+2  ;
+      rs.  w3   m23.    ;  exp1:=exp2;
+      sn   w3   0       ;  if transint=stdint then
+      jl.       j5.     ;    goto insert;
+      se   w2   0       ;  if moveint=stdint then
+      jl.       j4.     ;    begin
+      rl.  w3   m16.    ;
+      al   w0   0       ;     word(store addr):=0;
+      rs   w0   x3      ;
+      al   w3   x3+2    ;     store addr:=next addr;
+      rs.  w3   m15.    ;     start addr(proc desc):=store addr;
+      rs.  w3   m16.    ;    end;
+      jl.       j5.     ;  else
+j4:   rl   w3   x1      ;    intresp addr:=intresp addr-2;
+      al   w3   x3-2    ;
+      rs   w3   x1      ;
+j5:   jl.  w3   d10.    ; insert trans interrupt;
+      jl.  w3   d3.     ; transfer proc desc;
+      jl.  w3   d15.    ; insert devno in proc desc;
+      rl.  w1   m15.    ;
+      al   w0   x1-a48  ; w3:=final addr(main proc);
+      ws.  w0   m25.    ;
+      rs   w0   x1-a48  ;
+      rs   w0   x1-a48+a53;
+      rs   w0   x1-a48+a70;
+      rs   w0   x1-a48+a71;
+      rs   w0   x1-a48+a72;
+      al   w1   x1-a48+a72; w1:=store addr(first proc desc);
+      al   w2   x1+2    ;
+      ba.  w2   m40.    ;
+      rs.  w2   m16.    ; w2:=top(main proc);
+      rs   w0   x2-2    ;
+      al   w2   x2-4    ;
+      al.  w1   m40.    ;
+      ba.  w1   m40.    ;
+j6:   rl   w3   x1      ;
+      rs   w3   x2      ; transfer addr(proc desc);
+      wa.  w3   m25.    ;
+      rs   w0   x3+a78+10; store final addr(main proc) in proc desc;
+      al   w2   x2-2    ;
+      al   w1   x1-2    ;
+      se.  w1   m40.    ;
+      jl.       j6.     ;
+      al   w0   0       ;
+      rs.  w0   m30.    ; special action addr:=0;
+      jl.  w3   d16.    ; exchange options;
+      rl.  w3   m3.     ; load type;
+      sn   w3   -1      ; if type=-1 then
+      jl.       b2.     ;   goto end of options;
+      jl.  w3   d1.     ; initiate transfer;
+      jl        x3      ;
+e.z.
+
+; line printer, type 18
+s18:
+c.(:q0>18a.1:)-1
+      jl.  w3   d10.   ;  insert interrupt;
+      jl.  w3   d3.    ;  transfer proc desc;
+      jl.  w3   d12.   ;  insert proc desc addr in nametable;
+      jl.  w3   d14.   ;  insert addr(next mess) and addr(last mess);
+      jl.  w3   d15.   ;  insert devno in proc desc;
+      jl.  w3   d20.   ;  insert entry in s dev list;
+      rl.  w2   m15.   ;  load addr(proc desc start);
+      rl.  w3   m4.    ;  load devno;
+      ls   w3   6      ;  word:=devno<6+3
+      al   w3   x3+3   ;
+      rs   w3   x2-a48+a73; store word in proc desc;
+      jl.  w3   d4.    ;  test repeats;
+      se   w1   0      ;  if repeats<>0 then
+      jl.       s18.   ;    goto insert line printer;
+      jl.       b1.    ; exit: goto main program;
+z.
+
+; handling of tpw. RC 315
+b.j2,i2 w.
+s21:  al   w1   1       ;
+      jl.  w3   d21.    ;  search entry(test);
+      se   w2   0       ;  if exp1<>0 then
+      jl.       j1.     ;    goto expint;
+      sn   w1   0       ;  if no int then
+      jl.       j0.     ;    goto insert;
+      rl.  w2   m16.    ;  stdint: addr:=store addr;
+      ws.  w2   m25.    ;  addr:=final addr;
+      ws.  w2   i1.     ;  addr:=-rel addr(h5);
+      ac   w2   x2      ;  addr:=rel addr(h5);
+      sl   w2   -2048   ;  if addr<-2048 or
+      sl   w2   2047    ;    addr>2047 then
+      jl.  w3   d28.    ;    write errormess:<relative>;
+      bz   w2   4+1     ;  insert zeroes in first byte(w2);
+      lo.  w2   i0.     ;  w2:=<jl. w1 h5.>;
+      rl.  w3   m16.    ;  load store addr;
+      rs   w2   x3      ;  store intresp. instruction;
+      al   w2   x3      ;
+      ws.  w2   m25.    ;  addr:=final addr;
+      al   w3   x3+2    ;  store addr:=next store addr;
+      jl.       j2.     ;  goto inspar;
+j1:   rl.  w3   m16.    ; expint:
+      al   w2   x3-a56  ;
+      ws.  w2   m25.    ;  addr:=final addr of store word-a56;
+j2:   rs   w2   x1      ;  word(insert addr):=addr;
+      rl.  w2   i2.     ; inspar:
+      rs   w2   x3      ;  insert 'c36';
+      rl.  w1   m6.+2   ;
+      rx.  w1   m6.     ;  exchange int1 and int2;
+      rs.  w1   m6.+2   ;
+      rl.  w1   m23.+2  ;
+      rx.  w1   m23.    ;  exchange exp1 and exp2;
+      rs.  w1   m23.+2  ;
+      se   w1   0       ;  if exp2=0 then
+      am        -2      ;    addr(proc desc):=store addr-a48+6;
+      al   w2   x3-a48+6;  else addr(proc desc):=store addr-a48+6;
+      ws.  w2   m25.    ;  addr:=final addr(proc desc);
+      rs   w2   x3+2    ;  insert addr in key-part;
+      al   w3   x3+4    ;  addr:=store addr+2;
+      rs.  w3   m15.    ;  start addr(proc desc):=addr;
+      rs.  w3   m16.    ;  store addr:=addr;
+j0:   jl.  w3   d10.    ;  insert intresp. instruction;
+      jl.  w3   d3.     ;  transfer std proc desc;
+      jl.  w3   d14.    ;  insert addr(next mess) and addr(last mess);
+      jl.  w3   d15.    ;  insert devno in proc desc;
+      jl.  w3   d12.    ;  insert addr(proc desc) in name table;
+      jl.  w3   d19.    ;  insert entry in s cons table;
+      jl.  w3   d20.    ;  insert entry in s dev list;
+      jl.  w3   d4.     ;  test repeats;
+      sn   w1   0       ;  if repeats=0 then
+      jl.       b1.     ; exit: goto main program;
+      rl.  w1   m6.     ;  exchange int1 and int2;
+      rx.  w1   m6.+2   ;
+      al   w1   x1+1    ;  int1:=int1+1;
+      rs.  w1   m6.     ;
+      rl.  w1   m23.    ;  exchange exp1 and exp2;
+      rx.  w1   m23.+2  ;
+      rs.  w1   m23.    ;
+      jl.       s21.    ;  goto start;
+i0:   jl. w1  0         ;
+i1:   h5                ;
+i2:   c36               ;
+e.
+
+; olivetti, teletype(22) and telex(23).
+c.-(:a128>2a.1:)
+s22:  jl.  w3   d3.     ; transfer proc desc;
+      jl.  w3   d12.    ; insert proc desc addr in nametable;
+      jl.  w3   d14.    ; insert addr(next mess) and addr(last mess);
+      jl.  w3   d15.    ; insert devno in proc desc;
+      jl.  w3   d19.    ; insert entry in s console table;
+      jl.  w3   d20.    ; insert entry in s dev list;
+      jl.  w3   d4.     ; test repeat;
+      se   w1   0       ; if repeats<>0 then
+      jl.       s22.    ;   goto transfer;
+      jl.       b1.     ; exit: goto main program;
+z.
+c.(:a128>2a.1:)-1
+s22=s21
+z.
+
+; remote batch station.
+s27:
+c.(:q1>3a.1:)-1
+      jl.  w3   d10.    ;  insert interrupt;
+      jl.  w3   d3.     ;  transfer proc desc;
+      jl.  w3   d12.    ;  insert proc desc addr in nametable;
+      jl.  w3   d14.    ;  insert addr(next mess) and addr(last mess);
+      jl.  w3   d15.    ;  insert devno in proc desc;
+      jl.  w3   d18.    ;  insert k-values in tail;
+      jl.  w3   d20.    ;  insert entry in s dev list;
+      jl.  w3   d23.    ;  insert testbuf pointers;
+      jl.  w3   d4.     ;  test repeats;
+      se   w1   0       ;  if repeats<>0 then
+      jl.       s27.    ;    goto transfer;
+      jl.       b1.     ; exit: goto main program;
+z.
+
+; TMX
+; the format of the TMX-process description is:
+; char-part:
+; e0:   jl   w1   c31
+; e0+2: devno < 6
+; e2:   process description addr of 1. low-speed device
+; e2+2:     -        -        -  -  2.    -       -
+; .
+; .
+; e3:   process description addr of last low-speed device
+; e4:   process description addr of 1. medium-speed device
+; e4+2: h4
+; .
+; .
+; e5:   process description addr of last medium speed device
+; e5+2: h4
+; key-part:
+; e10:  jl   w1   c31
+; e10+2:(dev.no+1) < 6
+; e12:  key-response addr of 1. low-speed device
+; e12+2:key response addr of 2. low-speed device
+; .
+; .
+; e13:  key response addr of last low-speed device
+; e14:  h4
+; .
+; .
+; e15:  h4
+; e15+2:h4
+; key-response-part:
+; e20:  c36
+; e20+2:process description addr of 1. low-speed device
+; e20+4:c36
+; e20+6:process description addr of 2. low-speed device
+; .
+; .
+; e20+.:c36
+; e20+.:process description addr of last low-speed device
+b. e20,i6,j9 w.
+e0=0, e2=4, e4=36
+e10=52, e12=56, e14=88
+e20=104
+
+i0:   h4                ;
+i1:   0                 ;
+i2:   jl   w1   c31     ;
+i3:             c36     ;
+i4:             0       ; top addresses
+i5:             0       ; save link
+
+; transfer options from m3-m7 to m103-m107.
+s29:
+s30=k+2
+c.(:q1>5a.2.11:)-1
+      am        -4      ; s29: maxno:=20;
+      al   w1   26      ; s30: maxno:=24;
+      wa.  w1   m4.     ;  top devno:=(devno(tmx)+2)+maxno;
+      rs.  w1   i4.     ;
+      jl.  w3   d17.    ; transfer options to save area;
+      al.  w1   j3.     ; save special actions addr;
+      rs.  w1   m30.    ;
+      rl.  w1   m9.     ;
+      al   w1   x1+1    ; current devno:=current devno+1;
+      rs.  w1   m9.     ;
+      jl.       b1.     ; goto unpack options;
+
+; special action:
+j3:   rl.  w1   m4.     ;
+      sl.  w1  (m104.)  ; if devno<devno(tmx) or
+      sl.  w1  (i4.)    ;   devno>=max devno then
+      jl.       j6.     ;   goto create proc desc;
+      jl        x3      ; else return;
+
+; insertion of head in char - and key-part, and initiation
+; of creation of tables.
+j6:   rs.  w3   i5.     ; save link;
+      jl.  w3   d16.    ; exchange options;
+      rl.  w3   m16.    ;
+      rs.  w3   i4.     ; save start addr of proc desc;
+      jl.  w3   d11.    ; insert interrupt in char-part;
+      rl.  w3   i4.     ;
+      rl.  w2   m4.     ; load devno;
+      ls   w2   6       ; devno:=devno<6;
+      rs   w2   x3+2    ; insert devno in char-part;
+      al   w2   x2+1<6  ; devno:=(devno+1)<6;
+      rs   w2   x3+e10+2; insert devno in key-part;
+      al   w3   x3+e10  ;
+      rs.  w3   m16.    ;
+      rl.  w3   m6.+2   ;
+      rs.  w3   m6.     ;
+      jl.  w3   d11.    ; insert key-interrupt;
+      rl.  w3   i4.     ;
+      rs.  w3   m16.    ;
+      rl.  w2   m3.     ;
+      sn   w2   30      ;  if type=30 then
+      am        e10-e4  ;   topaddr:=addr(key part);
+      al   w0   x3+e4   ;  else
+      rs.  w0   i4.     ;   topaddr:=addr(1.medium speed);
+      al   w3   x3+e2   ;
+      rl.  w2   m4.     ; load dev.no.
+      al   w2   x2+2    ; devno of 1. device(=tmx dev1):= devno + 2;
+      ls   w2   1       ; index:= tmxdev1*2;
+      wa.  w2   m46.    ; w2:=addr in nametable of addr(tmxdev1);
+      al   w1   x3+e20-e2; w1:= addr of first entrance in key-response table;
+
+; insert low-speed entrances;
+; w0 = used for proc.desc.addr
+; w1 = key-response addr
+; w2 = nametableaddr(tmxdev'n')
+; w3 = store addr in char-part
+
+j0:   sl.  w2  (m47.)   ; if nametable addr>=top(nametable) then
+      jl.       j4.     ;    goto insert 'h4';
+      rl   w0   x2      ; addr:= proc.desc. addr(tmxdev'n');
+      sh   w0   0       ; if addr=<0 then
+      jl.       j4.     ;   goto insert 'h4';
+      rs   w0   x3      ; store addr in char-part;
+      rs   w0   x1+2    ; store addr in key-response-part;
+      al   w0   x1-a56  ;
+      ws.  w0   m25.    ; addr:=addr(key-response)-a56;
+      rs   w0   x3+e10  ; store addr in key-part;
+      al   w1   x1+4    ;   addr(key-response):= addr(key-response) + 4;
+      jl.       j5.     ; goto count up;
+j4:   rl.  w0   i0.     ; load 'h4';
+      rs   w0   x3      ; insert in char-part;
+      rs   w0   x3+e10  ; insert in key-part;
+j5:   al   w2   x2+2    ; count up nametable addr
+      al   w3   x3+2    ; and addr(char-part);
+      se.  w3  (i4.)    ; if addr(char-part) <> topaddr then
+      jl.       j0.     ;   goto next device;
+
+; the low speed entrances are inserted.
+      rs.  w1   m16.    ;  save first free addr;
+      rl.  w1   m3.     ;
+      sn   w1   30      ;  if type=30 then
+      jl.       j9.     ;   goto insert keyresaddr;
+      rl.  w1   i0.     ;
+      al   w0   x3+e10-e4; save top addr of
+      rs.  w0   i4.     ;   medium speed entrances;
+
+; insert medium speed entrances in char-part;
+j1:   sl.  w2  (m47.)   ; if nametable addr>=top(nametable) then
+      jl.       j7.     ;    goto insert 'h4';
+      rl   w0   x2      ; addr:= proc desc addr(tmxdev'n');
+      sn   w0   0       ; if addr=0 then
+j7:   rl.  w0   i0.     ; insert 'h4': addr:='h4';
+      ds   w1   x3+2    ; store addr and 'h4' in char-part;
+      rs   w1   x3+e10  ; insert 'h4', 'h4' in
+      rs   w1   x3+e10+2;   key-part;
+      al   w2   x2+2    ; count up name table addr
+      al   w3   x3+4    ;   and addr(char-part);
+      se.  w3  (i4.)    ; if addr(charpart)<> top addr then
+      jl.       j1.     ;   goto next medium speed;
+j9:   rl.  w0   i3.     ; insert keyresaddr: w0:='c36';
+      al   w3   x3+e20-e10; addr:= first entrance in key.responsetable;
+
+; the key-interrupt-response-addr are inserted
+; in key response table.
+      rl.  w2   m16.    ; load first free addr;
+      jl.       j8.     ;
+j2:   rs   w0   x3      ; store 'c36';
+      al   w3   x3+4    ; addr:= addr(next entrance);
+j8:   se   w3   x2      ; if addr<>first free then
+      jl.       j2.     ;   goto next entrance;
+      rs.  w2   m15.    ;
+      al   w0   0       ;
+      rs.  w0   m30.    ; special action addr:=0;
+      jl.  w3   d16.    ; exchange options;
+      jl.      (i5.)    ; exit: return;
+
+; end of creation of the tmx-process-description
+z.
+e.
+
+; interrupt expander(32).
+s32:
+c.q8-1
+b. j2 w.
+     jl.  w3   d11.    ;  insert interrupt;
+     rl.  w3   m23.    ;  if exp1(<=> expander is of 1. level) then
+     sn   w3   0       ;   begin
+     jl.       j0.     ;    transfer proc des;
+     am        -2048   ;
+     jl.  w3   d3.+2048;    insert devno in proc desc;
+     jl.  w3   d15.    ;   end;
+     jl.       j1.     ; else
+j0:  rl.  w1   m16.    ;   begin
+     rl.  w2   m4.     ;    addr:=store addr;
+     ls   w2   6       ;    devno:= devno<6;
+     rs   w2   x1      ;    word(addr):=devno;
+     al   w1   x1+2    ;    store addr:=addr+2;
+     rs.  w1   m16.    ;   end;
+; transfer the expander table.
+j1:  rl.  w1   m4.     ;
+     rs.  w1   m23.    ;  exp1:=devno(expander);
+     al   w1   0       ;
+     rs.  w1   m6.     ;  int1:=0;
+     jl.  w3   d21.    ;  search int entry, by call: w1:=0, by return: w1:=get addr:=first addr(exp table);
+     al   w3   x1+48   ;  top:=get addr+48;
+     rl.  w2   m16.    ;  load store addr;
+j2:  rl   w0   x1      ; transfer:
+     rs   w0   x2      ;  word(store addr):=word(get addr);
+     al   w1   x1+2    ;  get addr:=get addr+2;
+     al   w2   x2+2    ;  store addr:=store addr+2;
+     se   w1   x3      ;  if get addr<>top then
+     jl.       j2.     ;    goto transfer;
+     rs.  w2   m16.    ;  store addr:=store addr;
+     jl.       b1.     ; exit: goto main program;
+e.
+z.
+m11:
+; initiate optgen.
+b0:   ds.  w3   m57.   ; save addr(slang base) and return addr to slang;
+      rs.  w1   m55.   ; save addr(fp base);
+      rl.  w1   m49.   ;
+      dl   w3   x1+12  ; transfer mon option table;
+      ds.  w3   m59.   ;
+      rs.  w2   m19.   ;  save pointer(bs-table);
+      dl   w3   x1+8   ;
+      ds.  w3   m54.   ;
+      rs.  w2   m18.   ; save pointer(s dev list)
+      dl   w3   x1+4   ;
+      ds.  w3   m52.   ;
+      rs.  w3   m17.   ; save pointer(s console table)
+      rl   w3   x1     ;
+      rs.  w3   m50.   ;
+      rs.  w3   m10.   ; item-pointer:=addr(option start);
+      al.  w1   m16.   ;
+      wa   w1   x1     ; evaluate abs. addr(proc desc area);
+      rs.  w1   m16.   ;
+      al.  w1   m11.   ;
+      ws.  w1   m25.   ;
+      rs.  w1   m25.   ;
+;initiate intexpander.
+c.q8-1
+b.j0 w.
+      rl.  w1   m49.   ;
+      rl   w1   x1+2   ;  devnoaddr:=addr(first expdevno in mon opt table);
+      am        -2048  ;
+      al.  w2   m110.+2050;  entry:=addr(first entry in table);
+      am        -2048  ;
+      al.  w3   m112.+2048;  addr:=addr(first exp area);
+j0:   rs   w3   x2     ; init: insert addr in entry;
+      rl   w0   x1     ;  expdevno:=devno(devnoaddr);
+      rs   w0   x2-2   ;
+      al   w1   x1+2   ;
+      al   w2   x2+4   ;  entry:=next entry;
+      al   w3   x3+48  ;  addr:=addr(next area);
+      am        -2048  ;
+      sh.  w2   m112.+2048;  if entry<addr(first exparea) then
+      jl.       j0.    ;    goto init;
+e.z.
+; insert addresses in mon opt table:
+b.i4 w.
+      rl.  w2   m49.   ;  load mon opt table addr;
+      al.  w0   i1.    ;
+      wa.  w0   i1.    ;
+      al.  w1   i2.    ;
+      wa.  w1   i2.    ;
+      ds   w1   x2+22  ;  insert abs addr 0f name table in mon opt table;
+      ds.  w1   m47.   ;
+      al.  w0   i3.    ;
+      wa.  w0   i3.    ;
+      al.  w1   i4.    ;
+      wa.  w1   i4.    ;
+      ds   w1   x2+26  ;  insert abs addr of start of proc desc area and
+      ws.  w0   m48.   ;        of final insert area;
+      rs.  w0   m48.   ;
+      al.  w0   m11.   ;
+      al.  w1   m11.+1600;
+      ds   w1   x2+30  ;  insert start addr (and random top) of temporary proc desc area;
+      jl.       b1.    ; exit: goto main program;
+i1:   f1.              ;
+i2:   f2.              ;
+i3:   m60.             ;
+i4:   p0.              ;
+e.
+
+      jl.       b0.    ;  goto initiate optgen;
+
+e.
+j.
+
+; this program moves the process descriptions to their final area.
+b. i4,j1 w.
+i0:  q6                  ;
+i1:  0                   ;
+i2:  0                   ; slang base
+i3:  0                   ; return addr to slang
+j0:  ds.  w3   i3.       ; saveslang base and return addr;
+     rl.  w3   i0.       ; load mon opt table addr;
+     rl   w1   x3+28     ; load start addr of temporary proc desc area;
+     rl   w2   x3+26     ; load start addr of final area;
+j1:  rl   w0   x1        ; word:= word(get addr);
+     rs   w0   x2        ; word(store addr):=word;
+     al   w1   x1+2      ; get addr:=get addr+2;
+     al   w2   x2+2      ; store addr:=store addr+2;
+     se.  w1   i0.       ; if get addr<>top of get area then
+     jl.       j1.       ;   goto next word;
+     rs.  w2  (i2.)      ; insert first free addr in slang base;
+     rl.  w3   i0.       ; load mon opt table addr;
+     rs   w2   x3+26     ;  insert top addr of final proc desc area;
+     al   w0   0         ;
+     al   w2   0         ;  status:='ok';
+     jl.      (i3.)      ; exit: return to slang;
+
+     jl.       j0.       ; goto move proc desc;
+e.
+j.
+
+
+; this program inserts the address of the dummy process in
+; all unused entries in the name-table.
+b. i5,j1 w.
+i0:            0         ; slang base
+i1:            0         ; return address to slang
+i2:            f1.       ; start addr of device-part of name table
+i3:            f2.       ; top addres of device-part of name table
+i4:            h4        ; addres of dummy process
+i5:  <:<10>                            process descriptions included<0>:>
+j0:  ds.  w3   i1.       ; start: save slang base, return addr;
+     rl.  w0   i4.       ;  load addr of dummy process;
+     al.  w2   i2.       ;
+     wa.  w2   i2.       ;  get:=name table start;
+     al.  w3   i3.       ;
+     wa.  w3   i3.       ;  top:=top of name table;
+     al   w1   0         ;
+j1:  sl   w1  (x2)       ; loop: if 0>=word(get) then
+     rs   w0   x2        ;    word(get):=addr(dummy process);
+     al   w2   x2+2      ;  get:=get+2;
+     se   w2   x3        ;  if get<>top then
+     jl.       j1.       ;    goto loop;
+     al.  w0   i5.       ;  load text-addr;
+     al.  w1   i0.       ;  first free word:=
+     rs.  w1  (i0.)      ;     start of this program;
+     al   w2   0         ;  status:=0;
+     jl.      (i1.)      ; exit: return to slang;
+
+     jl.       j0.       ; entry: goto start;
+
+e.
+j.z.
+
+
+a114=a114+a88+2, a114=a114+(:a114 a. 1:)
+a116=a116+a88+2, a116=a116+(:a116 a. 1:)
+; area processes:
+  f7=k, h7=f7+4
+; internal processes:
+  f8=f7 + a1*a2, h8=f8+4
+; drum chains:
+  f11=f8 + a3*a4, h9=f11+a88+2
+; disc chains:
+  f12=f11 + a113*a114, h10=f12+a88+2
+; message buffers:
+; f9=f12 + a115*a116, f10=f9 + a5*a6 - 2
+  f9=f12 + a115*a116+2, f10=f9 + a5*a6 - 2  ; 93-06-26 18:16 HJ **********
+
+; monitor entries used globally:
+  b29 = h8  ; first internal process
+  b30 = d4  ; print w0
+  b31 = d3  ; print w1
+  b32 = d2  ; print w2
+  b33 = d1  ; print w3
+  b34 = d0  ; save w3
+  b35 = d5  ; remove
+  b36 = d6  ; link
+  b37 = d11 ; search name
+  b38 = d13 ; release buffer
+  b39 = d15 ; deliver answer
+  b40 = d73 ; max base - (1,1)
+  b41 = d74 ; follow chain
+  b42 = d71 ; search name(name, entry, base)
+  b43 = d75 ; regretted message
+  b44 = d5  ; remove(elem)
+  b45 = d72 ; max base
+  b60 = f11 ; first addr(proc func)
+
+b.i1                    ; begin
+w.i0: rl. w2  i1.       ; make room:
+      jl      x3+0      ;   autoloader(chaintable end + 2);
+  i1: f10+2             ; after loading:
+      jl.     i0.       ;   goto make room;
+e.                      ; end
+i.
+  h25=k - b127 + 2
+e.    ; end of process description segment
+
+; k = b29-4 + a3 * a4 + a5 * a6 + a113*a114 + a115*a116
+  k = b29-4 + a3 * a4 + a5 * a6 + a113*a114 + a115*a116 + 2 ; 93-06-26 19:37 HJ ****
+; comment: k = absolute top address of monitor.
+i.
+
+; segment 5: initialize monitor
+; this segment initializes monitor table, process descriptions,
+; and buffers within the monitor as follows:
+; monitor table:
+;      initialized as defined on page 6
+; area process descriptions:
+;      description address is placed in name table
+;      description is initialized to zero
+;      kind is set to 4
+; internal process descriptions:
+;      description address is placed in name table
+;      description is initialized to zero
+;      identification bit is set to 1<n
+;      next and last event are set to next event
+; message and console buffers:
+;      buffer is initialized to zero
+;      buffer is linked to pool
+; after return to the autoloader, the segment is removed.
+
+s.k=k, g30              ; begin
+w.b127=k, g30, k=k-2
+w.g1: rs. w3  g8.       ; start:
+      al. w1  g15.      ; test no of storage bytes;
+      rs  w1  12        ;   store interrupt response addr;
+      ld  w2  -100      ;  w1:=w2:=0;
+  g14:al  w1  x1+512    ;   if addr outside core then
+      ks  w2  x1        ;   goto interrupt response;
+      jl.     g14.      ;   else goto next storage word;
+  g15:                  ;  interrupt response:
+      rs. w1  g16.      ;   store <no of storage bytes>;
+      al. w1  g10.      ; monitor table:
+      al  w2  8         ;   for i:=0 step 2
+  g2: rl  w0  x1+0      ;   until no more do
+      rs  w0  x2+0      ;   word(8+i):=
+      al  w1  x1+2      ;   word(initial monitor table+i);
+      al  w2  x2+2      ;
+      sh  w2  b115      ;
+      jl.     g2.       ;
+      rl  w2  b100      ;
+      al  w2  x2+2      ;
+  g7: al  w2  x2-2      ;  find first local subprocess;
+      rl  w3 (x2-2)     ;
+      se  w3  74        ;
+      jl.     g13.      ;
+      rl  w3  x2-2      ;
+      rl  w0  x3+a50    ;
+      ls  w0  -5        ;
+      wa  w0  b4        ;    init main proc(sub process);
+      rl  w0 (0)        ;
+      rs  w0  x3+a50    ;
+      jl.     g7.       ;
+  g13:rs  w2  b99       ;
+      al  w0  0         ; name table:
+      rl  w2 (b5)       ;
+  g3: rs  w0  x2-4      ;
+      al  w2  x2+2      ;   for addr:= name table(first area)
+      sh  w2 (b8+6)     ;   step 2 until console pool end
+      jl.     g3.       ;   do word(addr):= 0;
+      rl  w2  b5        ;   entry:= first area;
+      rl  w3  x2+0      ;   proc:= name table(entry);
+      al  w0  4         ; area process:
+  g4: rs  w3  x2+0      ;   name table(entry):= proc;
+      rs  w0  x3+0      ;   kind(proc):= 4;
+      al  w2  x2+2      ;   entry:= entry + 2;
+      al  w3  x3+a2     ;   proc:= proc + area proc size;
+      se  w2 (b6)       ;   if entry <> first internal
+      jl.     g4.       ;   then goto area process;
+      rl. w0  g9.       ;   id bit:= 1 shift 23;
+      rl  w3  x2+0      ;   proc:= name table(entry);
+                        ; internal process:
+  g5: rs  w3  x2+0      ;   name table(entry):= proc;
+      rs  w0  x3+a14    ;   identification(proc):= id bit;
+      al  w1  x3+a15    ;   next(event q(proc)):=
+      rs  w1  x3+a15    ;   last(event q(proc)):=
+      rs  w1  x3+a15+2  ;   event q(proc);
+      ls  w0  -1        ;   id bit:= id bit shift (-1);
+      al  w2  x2+2      ;   entry:= entry + 2;
+      al  w3  x3+a4     ;   proc:= proc + internal proc size;
+      se  w2 (b7)       ;   if entry <> name table end
+      jl.     g5.       ;   then goto internal process;
+      al  w1  a46       ; claims rel addr:=first claim
+      al  w0  0         ;
+c.   (:a113-1:)
+      rl  w2  b22       ;   entry:= first drum chain
+      rl  w3  x2        ; chain:= nametable(entry)
+  g11:rs  w3  x2        ; nametable(entry):=chain
+      rs  w0  x3-a88+16 ; state(chain):= free
+      rs  w1  x3-a88-2  ; claims rel addr(chain):=claims rel addr
+      al  w2  x2+2      ; entry:=entry+2
+      am      a88+2     ;
+      al  w3  x3+a114-a88-2; chain:=chain+drumchain size
+      al  w1  x1+a110*2+2 ; claims rel addr:=claims rel addr+max key+2
+      se  w2 (b23)      ; if entry<>first disc chain
+      jl.     g11.      ; then goto drum chain
+z.
+c.   (:a115-1:)
+      rl  w2  b23       ;   entry:= first disc chain
+      rl  w3  x2        ;
+  g12:rs  w3  x2        ;
+      rs  w0  x3-a88+16 ;
+      rs  w1  x3-a88-2  ;
+      al  w2  x2+2      ;
+      am      a88+2     ;
+      al  w3  x3+a116-a88-2;chain:=chain+discchain size
+      al  w1  x1+a110*2+2 ;
+      se  w2 (b24)      ; if entry<>chain end
+      jl.     g12.      ; then goto disc chain
+z.
+      al  w1  b8        ;
+      rl  w2  b8+4      ;
+  g6: jl  w3  b36       ;   for buf:= first buf(mess pool)
+      wa  w2  b8+8      ;   step buf size(mess pool)
+      sh  w2 (b8+6)     ;   until last buf(mess pool)
+      jl.     g6.       ;   do link (mess pool, buf);
+      al. w2  g1.       ;
+      jl.    (g8.)      ;   autoloader(start);
+
+g8:  0
+g9:  1<23
+
+             ; initial monitor table:
+g10: 0       ; <interrupt number>
+     c25     ; <system start address>
+     c27     ; <interrupt response>
+     c26     ; <start key response>
+             ; <interrupt 0-24>
+
+c.-a128 t.m.                monitor interrupt list included
+z.
+
+c.a128-1
+
+; this block moves the interrupt list from the option area to this segment.
+b.j1,i3 w.
+i0:   0,r.25            ;  interrupt list
+i1:   q6+2              ;  addr(addr(int list in mon opt table))
+i2:   0                 ;  save link
+i3:   <:<10>                            interrupt list included<0>:>
+
+j0:   al.  w1   i1.     ; transfer: top:=top addr(interrupt list);
+      rs   w1   x2      ;  first free addr(in slang base):=top;
+      al.  w1   i0.     ;  store:=start addr(interrupt list);
+      rl.  w2  (i1.)    ;  get:=start addr(interrupt list in opt area);
+j1:   rl   w0   x2      ; loop:
+      rs   w0   x1      ;  word(store):=word(get);
+      al   w2   x2+2    ;  get:=get+2;
+      al   w1   x1+2    ;  store:=store+2;
+      se.  w1   i1.     ;  if store<>top(interrupt list) then
+      jl.       j1.     ;    goto loop;
+      al.  w0   i3.     ;  load addr(text);
+      al   w2   0       ;  status:=ok;
+      jl        x3      ; exit: return to slang;
+
+      jl.       j0.     ; entry: goto transfer;
+e.
+j.z.
+     0       ; <current process>
+     b2      ; <next running process>
+     b2      ; <last running process>
+     f0      ; <name table start>
+     f1      ; <first device in name table>
+     f2      ; <first area in name table>
+     f3      ; <first internal in name table>
+     f4      ; <name table end>
+     b8      ; <next message buffer>
+     b8      ; <last message buffer>
+     f9      ; <message pool start>
+     f10     ; <message pool end>
+     a6      ; <message buffer size>
+     f13     ; <first drum chain>
+     f14     ; <first disc chain>
+     f15     ; <chain end>
+     0       ; <main cat chain>
+h. a110,a4-5 ; <last byte in internal process descr>
+w.   a85     ; <maximum time slice>
+     0       ; <time slice>
+     0       ; <microseconds>
+     0       ; <time>
+     0       ;
+     0       ; <clock value>
+     3<6     ; <clock device no * 64>
+ g16:0      ; <no of storage bytes>
+  h.a111,a109; <min global key>,<min aux cat key>
+w.           ; <monitor procedures>
+     e0 , e1 , e2 , e3 , e4 , e5 , e6 , e7 , e8 , e9
+     e10, e11, e12, e13, e14, e15, e16, e17, e18, e19
+     e20, e21, e22, e23, e24, e25, e26, e27, e28, e29
+     e30, e31, e32, e33, e34, e35, e36, e37, e38, e39
+     e40, e41, e42, e43, e44, e45, e46, e47, e48, e49
+     e50, e51, e52, e53, e54, e55, e56, e57, e58, e59
+     e60, e61, e62
+     0       ; <current buffer address>
+     0       ; <current receiver>
+     0       ; <interrupt return address>
+     f6      ; <process link in dummy internal process>
+      0       ; <start of local subprocs>
+     f20     ; <start of remote subprocess desc>
+      f20=f2 ; this statement has only effect when f20
+             ; is not defined in the name table inclusion
+     b112    ; <error log proc descr addr>
+     b113    ; <error log entry>
+     a141    ; <name of monitor>
+     a142    ;    -   -    -
+     a143    ;    -   -    -
+     a144    ;    -   -    -
+      0       ; <return addr from subprocs>
+      0       ; <start addr of subproc table(test)>
+      0       ; <send message entry for remote disc-areas>
+
+     jl. g1. ; after loading: goto start;
+  g30=k-b127 + 2 
+k=g1
+;comment: k = absolute first address of initialize monitor
+i.
+e.   ; end of initialize monitor segment
+
+e.   ; end of monitor block with c, d, e,and f names
+
+m.                monitor text 8 included

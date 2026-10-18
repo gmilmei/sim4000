@@ -1,0 +1,465 @@
+head cpu
+mode list.yes
+o mongenout
+head 1
+
+rt2=edit montxt2
+l./procedure print w0/,l./g0:/,r/10<12/10<12+13,0/
+l./d12:/,l./se w0/,i!
+   rl   w1    b1        ; w1 := current
+!
+f
+
+
+
+rt3=edit montxt3
+l./procedure initialize process/
+l./h50,/,r/h50/h60/
+l./90: host process/,l1,i/
+      h50 ;  92: ipc 401
+      h51 ;  94: dos
+/
+l./h34:; hostproc:/,l1,i/
+   h50:; ipc 402:
+   h51:; dos:
+/
+l./e35:/,d./the check upon/,i!
+e35:                   ; copy message:
+     jl  w3  d12       ;   check message buf;
+     rl  w3  x1+a29    ;   first:=saved w1;
+     rl  w0  x1+a31    ;   last:=saved w3;
+
+     sl  w3  (x1+a17)  ; check:
+     sl  w0  (x1+a18)  ;   if first<first addr(cur)
+     jl      c29       ;   or last>=top addr(cur)
+     ws  w0  6         ;   or first>last then
+     sh  w0  -1        ;     goto internal 3
+     jl      c29       ; 
+                       ; 
+     ac  w3  (x2+4)    ;   rec:= -(-receiver(mess))
+     so  w3  2.1       ;   if rec odd
+     sh  w3  0         ;   or rec<=0 then
+     jl      c29       ;     goto internal 3
+     rl  w0  x3+a10    ; 
+     sn  w0  64        ;   if rec is a pseudo process then
+     rl  w3  x3+a50    ;     rec:=main(rec);
+     se  w3  x1        ;   if rec<>cur then
+     jl      c29       ;     goto internal3;
+
+     bz  w3  x2+8      ;
+     so  w3  2.1       ;   if operation(mes) even then
+     jl      c29        ;     goto result3;
+
+; further checking is postponed until procfunc.
+!
+l./procedure send message/
+l./h90; 90:host process/,l1,i/
+;     h50               ;  92: ipc 402
+      g3
+      h51               ;  94: dos
+/
+f
+
+
+
+rt4=edit montxt4
+l./; rc 315 typewriter:/
+l./i25:/,r/<:/<:<10>/
+
+l./procedure typeout/,l./j1:/,l./se w3 10/,i/
+      ;sn  w3  12         ;   if char=12 then char:=10;
+      ;al  w3  10         ;
+/,l5,p-15
+
+l.-procedure typein-,
+l./jl.j12/,r/j12/j16/
+l2,r/j13/j25/,
+l1,i/
+      sn  w0  25         ;
+      jl.     j25.       ;
+/,
+l1,r/se/sn/,l2,d./jl.j15./,i!
+      se  w0  127
+      jl.     j13.
+      al  w0  8
+      am     (x1+a50)
+      io  w0  3
+      sx      2.11
+      jl.     i8.
+      jl  w3  c32
+      jl.     i5.
+      io  w0  (x1+a50)
+      sx      2.11
+      jl.     i8.
+      al  w0  127
+      rl  w2  x1+a76
+j13:  se  w0  8
+      jl.     j15.
+      al  w0  32
+      am     (x1+a50)
+      io  w0  3
+      sx      2.11
+      jl.     i8.
+      jl  w3  c32
+      jl.     i5.
+      io  w0  (x1+a50)
+      sx      2.11
+      jl.     i8.
+      al  w0  8
+      am     (x1+a50)
+      io  w0  3
+      sx      2.11
+      jl.     i8.
+      jl  w3  c32
+      jl.     i5.
+      io  w0  (x1+a50)
+      sx      2.11
+      jl.     i8.
+      al  w0  127
+      rl  w2  x1+a76
+
+j14:
+!
+l2,p-50
+l./j40:/,l./jl. j39./,
+r/j39/j5/,r/after read/end line/,i/
+      rl  w2  x1+a76     ;
+/
+f
+
+rt7=edit montxt7
+l./h30:/,l./i51:/,d,i/
+i51:  se  w0  10
+      jl.     i69.
+      al  w0  13
+      jl. w3  i19.
+      al  w0  10
+i69:  jl. w3  i19.
+/,l5,p-15
+l./monitor text 6 included/,i!
+t. m.                special drivers included
+!,f
+
+rt11=edit montxt11
+l./m150:/,l./base.proc:=base.work/
+i/
+
+     se  w1      6     ;    if disc then
+     sn  w1     62     ;
+     sz                ;
+     jl.       +10     ;    begin
+     rs  w0  x3+a73    ;      state.proc:=0;
+     al  w1     -1     ;      if next trans(proc)<>proc then
+     se  w3 (x3+a70)   ;        address buffer(proc) := -1;
+     rs  w1  x3+a78+22 ;    end;
+
+/,l5,p-20
+f
+
+
+(binmon=slang type.yes montxt1 rt2 rt3 rt4 montxt5 montxt6,
+                rt7 montxt8 montxt9 montxt10 rt11 mon8s mon8initcat
+mode list.no
+o c
+head cpu
+end)
+
+
+; PRG - monitor 3
+; RC8000 s + initcat , onn8805
+; ipc 402 , onn8808
+
+ a130= 931010   ; option date
+ a131= 174000   ; option time
+
+a1=95    ; number of areas
+a3=10    ; number of internals
+a5=85    ; number of message buffers
+
+  a81=a81 o. 1<16     ; include dos with private process description
+; a81=a81 o. 1<17     ; include ipc402 with private process description
+; a81=a81 o. 1<18     ; include epu401 with private process description
+; den foranst†ende inkludering af epu401 m† IKKE effektueres
+; da enkelte men v‘sentlige detaljer i epu'ens process-beskrivelse
+; skal ‘ndres. ONN 860307
+
+
+
+<:
+t.15 i.9                           ;  0 reader
+t.16 i.12                          ;  1 punch
+t.21 i.3.6                         ;  2 console1 renamed : when useless
+     a.0.1.38.0.0.0.0.0.0.0.0.0.4.37.25.38.3.127.0.0.1
+t.2  i.11                          ;  3 clock
+t.21 i.19.20 n.console2
+     a.0.1.38.0.0.0.0.0.0.0.0.0.4.37.25.38.3.127.0.0.1
+;t.18 i.10 d.5                          ;  5 printer
+;t.18 i.8 n.printer1                    ;  6 printer1
+;t.11 i.15 d.7                          ;  7 magtape1
+;t.11 i.16                              ;  8 magtape2
+;t.11 i.14                              ;  9 magtape3
+;t.19 i.13 d.11                     ; 11 cardreader
+;t.10 i.17 d.12                         ; 12 magtape4 (7 track)
+;t.73 i.18 d.13 p.1                     ; 13 plotter , in name table
+t.21 i.15.16 n.terminal1                ; terminal1
+     a.0.1.38.0.0.0.0.0.0.0.0.0.4.37.25.38.3.127.0.0.1
+t.21 i.13.14 n.terminal2                ; terminal2
+     a.0.1.38.0.0.0.0.0.0.0.0.0.4.37.25.38.3.127.0.0.1
+t.8  i.22.23 d.15 c.144.36.73080   ; 15 disc
+t.8 n.disc1                        ; disc1
+t.8 n.disc2                        ; disc2
+t.8 n.disc3
+t.8 n.disc4
+t.8 n.disc5
+;t.29 i.5.4 d.18                    ; 18(19) tmx
+;t.22  a.0.1.38.0.0.0.0.0.0.0.0.0.3.24.25.26.2.127.0.0.1
+       ; 20 , terminal 1 , Sperry PC .
+;t.22 r.4 n.terminal2 a.0.1.38.0.0.0.0.0.0.0.0.0.3.37.14.38.2.127.0.0.1
+       ; 21-24 , terminal 2-5 , normal terminals .
+;t.22     n.terminal6 a.0.1.38.0.0.0.0.0.0.0.0.0.8.37.14.38.7.127.-1.-1.1
+       ; 25 , terminal 6 , TTY with extra fill chars
+;t.22 r.2 n.terminal7 a.0.1.38.0.0.0.0.0.0.0.0.0.3.37.14.38.2.127.0.0.1
+       ; 26-27 , terminal 7-8 , normal terminals . 
+;t.22 d.34 r.2 n.terminal15 a.0.1.38.0.0.0.0.0.0.0.0.0.4.37.14.38.3.127.0.0.1
+       ; 34-35 , terminal 15-16 , normal terminals .
+;t.26 d.36 n.medium1 
+       ; 36 , medium1 , medium speed 
+;t.26 d.37 r.2 n.medium2
+       ; 37 , medium2 + 3 , medium speed
+;t.72  i.? d.? p.1                  ; ?? epu , in name table
+t.74 i.21 d.63 p.1                  ; dos file driver
+f.  :>
+
+n.
+
+
+; special drivers
+; ***************
+;
+;
+; Dos file interface driver       /HJ
+; ***********************************
+;
+; process description
+; *******************
+;
+; a48:           <interval low>
+; a49:           <interval high>
+; a10:           <kind = 94>
+; a11:           <name>
+; a50:           <device number * 64>
+; a52:           <reserved>
+; a53:           <users>
+; a54:           <next message>
+; a55:           <last message>
+; a56:           <interrupt address>
+; a70:           <total byte count, high part>
+; a71:           <total byte count, lo part>
+;
+;
+
+c. (:a81>16 a.1:)-1             ; if include then
+                                ; begin
+
+m.          dos file driver
+b. i50,r25
+w.
+
+a0=1<23
+; operation and mode
+     a0>0+a0>3+a0>5+13    ; operation 
+i0:  a0>0+a0>2+a0>4       ; mode
+
+i6:  r0,0,0,r3,0,r5,r20,r21,0,r23 ; jump table
+
+; entry:
+h51:  jl  w3  g15        ;   check reservation;
+      dl. w1  i0.        ;
+      jl  w3  g16        ;   check operation(0.3.5.20.21.23,0.2.4);
+      jl  w3  g17        ;   link operation;
+
+; start:
+i1:   bz  w3  x2+8       ; load op.
+      sl  w3  20
+      al  w3  x3-14      ; if w3>20 then w3:=w3-14;
+      wa  w3  6          ; w3+w3;
+      am.     i6.
+      jl     (x3)        ; goto case op of ...
+
+; sense:
+r0: 
+      la  w3  0
+      rs  w3  g20        ; status:=0;
+      jl  w3  g18        ; deliver result1
+      jl.     i3.        ; goto done1
+
+; close:
+r20:
+      am     (x1+a50)
+      io      53         ; ctrl(close)
+      sx      2.11       ;   if exception then
+      jl.     i4.        ;    goto disconnected;
+
+      jl  w3  c32        ; wait interrupt;  
+      am      0
+      io  w0 (x1+a50)    ;   sense(device,status);
+      sx      2.11       ;   if exception then
+      jl.     i4.        ;    goto disconnected;
+      rs  w0  g20        ;   save status;
+      dl  w0  x1+a71
+      ds  w0  g22        ; ans(2..3):=bytecount;
+      jl.     i2.        ; goto done0
+
+; input:
+r3:   am      13-17
+; output:
+r5:   am      17-45
+; open_in:
+r21:  am      45-49
+; open_out:
+r23:
+      al  w0  49
+
+      jl  w3  g31        ;   increase stopcount;
+      rl  w3  x2+12      ; w3:=last;
+      ws  w3  x2+10      ; w3:=w3-first; (first,last made even by check_operation)
+      al  w3  x3+2 
+      am     (x1+a50)
+      io  w3  9          ; ctrl(transfer size)
+      sx      2.11       ;   if exception then
+      jl.     i4.        ;    goto disconnected;
+
+      rl  w3  x2+10      ; w3:=first;
+      wa  w0  x1+a50
+      io  w3 (0)         ; ctrl(op)
+      sx      2.11       ;   if exception then
+      jl.     i4.        ;    goto disconnected;
+
+      jl  w3  c32        ; wait interrupt;  
+      am      0
+      io  w0 (x1+a50)    ;   sense(device,status);
+      sx      2.11       ;   if exception then
+      jl.     i4.        ;    goto disconnected;
+      rs  w0  g20        ;   save status;
+
+      am     (x1+a50)
+      io  w3  4          ;   sense4(device,status);
+      sx      2.11       ;   if exception then
+      jl.     i4.        ;    goto disconnected;
+
+      rs  w3  g22        ;   save chars;
+      al  w0  x3
+      al  w3  0
+      rx  w3  x1+a70     ; bytecount:=bytecount+count;
+      rx  w0  x1+a71
+      aa  w0  x1+a71
+      rx  w3  x1+a70
+      rx  w0  x1+a71
+        
+      al  w3  0
+      am     (0)
+      al  w0  2
+      wd. w0  i5.
+      wa  w0  0
+      rs  w0  g21        ;   bytes:=(chars+2)//3*2;
+
+      rl  w0  g20        ; w0:=status;
+      bz  w3  x2+8
+      sn  w0  0
+      sh  w3  20
+      jl.     i2.        ; if op<>open_xx or status<>0 then goto done0;
+
+      bz  w3  x2+9       ;  w3:=mode;
+      am     (x1+a50)
+      io  w3  5          ; ctrl(set mode)
+      sx      2.11       ;   if exception then
+      jl.     i4.        ;    goto disconnected;
+
+      al  w3  0
+      rs  w3  x1+a70
+      rs  w3  x1+a71     ; bytecount:=0;
+
+; done0:
+i2:   jl  w3  g32        ;   decrease stopcount; (no action if op. even)
+      jl  w3  g18        ;   deliver result(1);
+
+; done1:
+i3:   jl  w3  g25        ;   next operation;
+      jl.     i1.        ;   goto start;
+
+; disconnected:
+i4:   jl  w3  g32        ;   decrease stopcount;
+      jl  w3  g29        ;   disconnected device;
+      jl.     i3.        ;   goto done1;
+
+i5:  3   ; chars per word
+
+e.   ; end of dos file driver
+z. h51=g3 ; goto result5
+
+n.                       ; return to rc monitor text
+c. (: (:a81>18 a.1:) o. (:a81>17 a.1:) o. (:a81>16 a.1:) :)-1 ;  if include private
+                                            ;   process descriptions then
+                                            ;   begin
+
+
+
+
+; Dos file interface driver       /HJ
+; ***********************************
+;
+; process description
+; *******************
+;
+c. (:a81>16 a.1:)-1 ; if include then
+m.          dos file driver private process description
+b. w.               ; begin
+   jl  w1  c30        ;  interrupt response instruction
+   a107 , a108        ;  base interval
+p74:                  ;  type=74
+   94                 ;  kind
+   <:dos:>,0,0,0      ;  name
+   63<6               ;  devno * 64
+   0                  ;  reserved
+   1<22               ;  users, initially s
+   k                  ;  next message
+   k-2                ;  last message
+   c33                ;  interrupt address
+   0,0                ;  bytecount  
+
+c. (:k-p74-26:)*(:k-p74-26:)-1
+m. *** dos file driver, error in process description
+p74:   0   ;  provoke ok.no
+z.
+
+e. ; end of dos process description
+z.
+
+n.                              ;  return to rc monitor text
+z.  ;  end of private process descriptions
+
+
+
+
+
+; *******************************************************************
+; **                                                               **
+; **                    diverse s options                          **
+; **                                                               **
+; *******************************************************************
+m.   s size options
+
+   c81=2          ; number of standard console descriptions
+n.
+m.   s console table
+
+   k, k-2, 0, 2, 8.1770, 0, r.c1>1-5
+n.
+m.   s device exclusion table
+
+   ; empty
+n.
+m.   startup area name
+    <:startarea:>,0    ; must occupy 4 words, the first word must be
+                       ; zero if automatic startup is not wanted
+n.

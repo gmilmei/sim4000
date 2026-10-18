@@ -1,0 +1,211 @@
+\chapter{Starting and controlling the emulator}\label{command-line-options}
+\index{Command-line options}
+\index{Simulator commands}
+\index{Readline}
+\index{Completion}
+\index{Breakpoints}
+\index{run}
+\index{continue}
+
+\section{Select a startup mode}\label{select-a-startup-mode}
+\index{Command-line options!startup modes}
+
+Shell options begin with \passthrough{\lstinline!--!} for long names or \passthrough{\lstinline!-!} for single-letter alternatives. They are different from commands typed at the \passthrough{\lstinline!sim4000>!} operator prompt and from guest FP commands. Use the full long-option names shown here.
+
+\passthrough{\lstinline!--ix!} enables the optional opcode-61 index instruction; \passthrough{\lstinline!--no-ix!} disables it. They override \passthrough{\lstinline!CPU IX=YES|NO!} in the configuration for interactive and bounded runs. If both occur, the last option wins. The default is enabled for compatibility with the supplied software, not a claim about the historical hardware.
+
+The operator examples below assume that the current directory is the CMake build directory. This preserves the default \passthrough{\lstinline!RC4000.cfg!} lookup and the flat runtime paths used by that configuration.
+
+The interactive frontend is the normal operator entry point. \passthrough{\lstinline!-a!} is the convenient autostart form: it selects interactive mode, sets the monitor's disc load flag, and immediately runs the machine while using \passthrough{\lstinline!RC4000.cfg!} from the current directory. Control-E (or the configured emulator escape key) suspends that automatic run and opens the \passthrough{\lstinline!sim4000>!} prompt.
+
+\begin{commandexample}[language=sh]{Host shell: alternative interactive startup forms}
+./sim4000 -a
+./sim4000 -i -c RC4000.cfg
+./sim4000 --interactive --config RC4000.cfg --set-disc-load-flag
+\end{commandexample}
+
+The three startup lines are alternatives, not a sequence. Unlike \passthrough{\lstinline!-a!}, \passthrough{\lstinline!-i!} opens the operator prompt without immediately running. Adding \passthrough{\lstinline!--set-disc-load-flag!} requests guest disc startup when execution begins; it does not itself issue \passthrough{\lstinline!run!}. With no arguments, the program prints usage and exits. Select one execution mode; \passthrough{\lstinline!--run!} cannot be combined with \passthrough{\lstinline!-i!} or \passthrough{\lstinline!-a!}.
+
+\section{Override configuration and bound execution}\label{override-configuration-and-bound-execution}
+\index{Command-line options!path overrides}
+\index{Command-line options!bounded execution}
+
+The following startup options apply to interactive or bounded execution unless stated otherwise:
+
+\begin{longtable}{@{}p{0.36\linewidth}p{\dimexpr0.64\linewidth-2\tabcolsep\relax}@{}}
+\toprule
+Option & Meaning and limits \\
+\midrule
+\endhead
+\bottomrule
+\endlastfoot
+\passthrough{\lstinline!-c FILE!}, \passthrough{\lstinline!--config FILE!} &
+Select configuration instead of \passthrough{\lstinline!RC4000.cfg!} in the current directory. \\
+\passthrough{\lstinline!--monitor FILE!} &
+Override the monitor path selected by the configuration. \\
+\passthrough{\lstinline!--disk FILE!} &
+Override the first configured disk image, not every disk device. \\
+\passthrough{\lstinline!--disk-overlay FILE!} &
+Select a persistent overlay for the first disk; supported for RC433X, not RC4819. \\
+\passthrough{\lstinline!--disk-write-through!} &
+Write directly to an explicitly selected RC433X \passthrough{\lstinline!--disk FILE!}; incompatible with \passthrough{\lstinline!--disk-overlay!}. \\
+\passthrough{\lstinline!--set-disc-load-flag!} &
+Request the monitor's disc autostart path; distinct from the paper-tape \passthrough{\lstinline!autoload!} operator command. \\
+\passthrough{\lstinline!--ix!}, \passthrough{\lstinline!--no-ix!} &
+Override the configured optional opcode-61 capability; the last of these options wins. \\
+\passthrough{\lstinline!--run!} &
+Execute without the interactive operator prompt, bounded by an instruction-call limit. \\
+\passthrough{\lstinline!--steps COUNT!} &
+Set the bounded-run limit; default 1000000. This does not limit an interactive \passthrough{\lstinline!run!}. \\
+\passthrough{\lstinline!--trace FILE!} &
+Write a deterministic trace during \passthrough{\lstinline!--run!}; not available with interactive startup. \\
+\passthrough{\lstinline!-h!}, \passthrough{\lstinline!--help!} &
+Print startup usage and exit without starting the machine. \\
+\end{longtable}
+
+Configured paths are relative to the configuration file, while shell option path overrides are relative to the current directory. A command-line override takes precedence over its configuration setting; it does not rewrite the configuration file. See \manualref{run-from-your-own-working-directory}{the runtime-file guide} and \manualref{configuration-and-disk-persistence}{disk persistence} before moving runtime files or selecting a disk-writing mode.
+
+\begin{operationnote}{Write-through changes the selected disk image}
+Use a disposable working copy with \passthrough{\lstinline!--disk-write-through!}, never the preserved original image. Without a persistent overlay or explicit write-through, ordinary disk writes use the default volatile overlay and disappear when the emulator exits. An instruction limit is not a guarantee that guest operations have reached a safe completion point.
+\end{operationnote}
+
+For example, this shell invocation requests disc startup for a bounded run. It is not an interactive session and does not promise a complete monitor boot or completed guest job:
+
+\begin{commandexample}[language=sh]{Host shell: bounded execution with an explicit limit}
+./sim4000 --run --config RC4000.cfg --set-disc-load-flag --steps 1000000
+\end{commandexample}
+
+\section{Inspect files without booting the guest}\label{inspect-files-without-booting-the-guest}
+\index{Command-line options!offline inspection}
+\index{Configuration!syntax checking}
+
+The following are separate shell invocations, each accepting one file argument. Do not combine them with interactive/run options or type them at the simulator prompt:
+
+\begin{commandexample}[language=sh]{Host shell: independent offline inspection calls}
+./sim4000 --check-config RC4000.cfg
+./sim4000 --inspect-monitor MONITOR
+./sim4000 --inspect-image UNIT0
+./sim4000 --list-catalog UNIT0
+./sim4000 --list-main-catalog UNIT0
+\end{commandexample}
+
+\passthrough{\lstinline!--check-config!} checks configuration syntax; it does not open all runtime media or establish that every device is implemented. Monitor/image inspection reports file properties, not successful guest operation. The catalog commands read stored records without running the monitor; they do not include an unmerged live overlay or the current guest's in-memory catalog changes. Use the guest file procedures for the running session's view.
+
+\section{Edit commands at the operator prompt}\label{edit-commands-at-the-operator-prompt}
+
+At the \passthrough{\lstinline!sim4000>!} prompt, \passthrough{\lstinline!run!} or \passthrough{\lstinline!continue!} gives the terminal to the RC console. Press the configured emulator escape key (Control-E by default) to suspend execution and return to the prompt. The machine, devices, console queues, and selected disk overlay remain intact.
+
+The operator prompt uses GNU Readline. Use Left/Right and Home/End to edit, Up/Down or Control-P/Control-N to recall commands, Control-A/Control-E to move to the start/end of the line, and Control-U/Control-K to delete text. These bindings assume Readline's default Emacs editing mode; your Readline settings may change them. Control-E edits the line at this prompt, but suspends the emulator when the guest console is running. Control-D on an empty operator line exits. Nonempty consecutive duplicate commands are not added to history; the last 500 commands are kept in memory only, never written to a history file.
+
+Tab completes commands and their aliases, \passthrough{\lstinline!show!} targets, \passthrough{\lstinline!deposit!} register names, \passthrough{\lstinline!examine!} formats, interrupt settings, media modes, and file paths in file arguments. Press Tab twice to list ambiguous matches. File paths with whitespace are not supported by the command parser and are excluded from completion. Guest commands are not completed by Readline.
+
+Emulator output at the interactive CLI wraps at 80 columns, including long paths and completion listings. Guest terminal output is not reformatted; long edited input lines are displayed according to Readline and terminal settings. There is no separate historical TUI. Change device definitions by selecting another configuration with \passthrough{\lstinline!-c FILE!} and restarting; general device reconfiguration at the prompt is not provided. Existing media attachment commands remain available.
+
+\section{Simulator commands and aliases}\label{simulator-commands-and-aliases}
+\index{Simulator commands!aliases}
+
+The supported simulator commands and their explicit aliases are listed below. Parentheses, brackets, vertical bars and uppercase placeholders describe syntax; do not enter this reference block as a command file:
+
+\begin{commandexample}{Simulator prompt: command and alias reference (not a script)}
+help (h, ?)
+run (r)             continue (c)
+stop (st)           step (s) [COUNT]   trace (t) [COUNT]
+show (sh) cpu|devices|media|breakpoints|watchpoints|telnet
+show throttle       set throttle VALUE
+show input          discard-input (di)
+show keys ADDRESS [COUNT]
+examine (x) [FORMAT] ADDRESS|IC [COUNT]
+deposit (d) TARGET VALUE
+load-core (lc) FILE ADDRESS
+save-core (sc) FILE ADDRESS COUNT
+attach (at) DEVICE FILE [readonly|writable|overlay FILE|replace]
+detach (det) DEVICE
+rewind (rew) DEVICE
+break (b) ADDRESS   nobreak (nb) ADDRESS|all
+watch (w) ADDRESS   nowatch (nw) ADDRESS|all
+reset (res)         start (sta)       autoload (al)
+interrupts (int) on|off
+attention (att)     send (se) BYTE...
+send-date (sd)
+quit (q)            exit
+\end{commandexample}
+
+Addresses and counts accept C-style numbers (\passthrough{\lstinline!123!}, \passthrough{\lstinline!0x123!}). \passthrough{\lstinline!send!} accepts one or more hexadecimal 7-bit bytes, so \passthrough{\lstinline!send 05!} can deliver a literal Control-E that would otherwise be reserved by the local frontend. \passthrough{\lstinline!send!} and \passthrough{\lstinline!send-date!} append to the same local FIFO as keyboard input, behind buffered characters, and report how many bytes were queued. A full RC device queue does not reject the command; delivery proceeds during run, step, or trace. All \passthrough{\lstinline!send!} arguments are validated before any byte is queued. Explicit bytes bypass host shortcut handling and DEL/LF mappings. For example, \passthrough{\lstinline!send 05 7f!} sends literal Control-E and DEL; the RC console still interprets Escape as guest attention when appropriate. If an unprocessed lookahead byte is reported, continue or discard that input before queueing operator bytes. \passthrough{\lstinline!discard-input!} can remove these queued bytes as usual.
+
+\passthrough{\lstinline!reset!} implements the RC4000 reset key: when leaving execution it stores the current instruction counter in word 10, disables interrupts, enters monitor mode, and preserves core and attached devices. \passthrough{\lstinline!start!} has an effect only in reset state; it reads the start address from word 14 and immediately resumes execution. \passthrough{\lstinline!autoload!} likewise requires reset state, reads the initial instruction from the paper-tape reader on device 0 into W0, and executes the bootstrap from address 0. A tape must first be mounted with \passthrough{\lstinline!attach 0 FILE!} or configured with \passthrough{\lstinline!FILE=path!} on the \passthrough{\lstinline!DEFINE READER!} line. \passthrough{\lstinline!interrupts on|off!} directly changes the stopped CPU's interrupt-enable state. Terminal attributes are restored whenever execution returns to the prompt and on handled signals.
+
+\passthrough{\lstinline!run!}, \passthrough{\lstinline!step!}, and \passthrough{\lstinline!trace!} execute from the current instruction counter and leave reset state. Returning to the operator prompt suspends execution without resetting the guest; \passthrough{\lstinline!show cpu!} then reports \passthrough{\lstinline!stopped=yes!}. \passthrough{\lstinline!start!} and \passthrough{\lstinline!autoload!} still require reset state and use their documented hardware entry paths rather than the current instruction counter.
+
+Interactive and bounded runs handle Control-C, termination, and hangup signals by restoring terminal settings, printing statistics, and closing media. The process exits with the usual \passthrough{\lstinline!128 + signal!} status (\passthrough{\lstinline!130!} for \passthrough{\lstinline!SIGINT!}, \passthrough{\lstinline!143!} for \passthrough{\lstinline!SIGTERM!}, and \passthrough{\lstinline!129!} for \passthrough{\lstinline!SIGHUP!}). \passthrough{\lstinline!SIGKILL!} and host process crashes cannot be cleaned up by an application handler, so a shell may still need \passthrough{\lstinline!reset!} or \passthrough{\lstinline!stty sane!} after such an uncatchable termination.
+
+Abbreviations are explicit rather than arbitrary prefixes, so every short command has a stable meaning. \passthrough{\lstinline!show cpu!}, \passthrough{\lstinline!show registers!}, and \passthrough{\lstinline!sh reg!} are equivalent.
+
+\section{Modify stopped machine state}\label{modify-stopped-machine-state}
+\index{deposit}
+
+\begin{operationnote}{Deposits modify the live machine}
+The examples below demonstrate valid syntax, not a monitor-recovery sequence. They change registers and memory and can disrupt a running guest session even though execution is suspended. Use a disposable session and do not paste the block into normal work.
+\end{operationnote}
+
+\passthrough{\lstinline!deposit!} changes a 24-bit core word, one of the word registers, the instruction counter, the interrupt mask or request register, or exception state while execution is suspended. The supported control targets are \passthrough{\lstinline!IM!}, \passthrough{\lstinline!IR!}, \passthrough{\lstinline!EX21!}, \passthrough{\lstinline!EX22!}, and \passthrough{\lstinline!EX23!}; exception values are range-checked. Values use the same C-style number syntax as addresses. For example:
+
+\begin{commandexample}{Simulator prompt: state-changing deposit examples}
+d w0 0x123456
+d ic 0x100
+d im 0x9fffff
+d ex22 1
+d 0x200 0xabcdef
+\end{commandexample}
+
+The instruction counter must be an even byte address. As with \passthrough{\lstinline!examine!}, an odd core address identifies the word containing that byte and is displayed in aligned form after the write.
+
+\section{Create a blank disk image}\label{create-a-blank-disk-image}
+\index{Disks!creating a blank image}
+\index{mkdisc}
+
+Disk creation is built into the simulator; no separate utility or Python is
+required. From the host shell, use:
+
+\begin{commandexample}[language=sh]{Host shell: create a new disk image}
+./sim4000 --mkdisc UNIT1
+\end{commandexample}
+
+This standalone operation does not read a configuration or start the monitor.
+It cannot be combined with execution or runtime options. The equivalent
+command at the suspended simulator prompt is \texttt{mkdisc UNIT1}; filename
+completion is available there. As with other simulator commands, paths at
+that prompt cannot contain whitespace.
+
+The new file contains 180 zero-filled sectors of 768 bytes (138240 bytes),
+matching the historical starter image. It is not labelled, mounted, attached
+or registered in the configuration. Its initial file length is not the final
+logical disk capacity; writes can extend an RC433X image or overlay.
+
+Existing files, directories and symbolic links are refused, including dangling
+links. There is no overwrite switch. A write failure is reported and the newly
+created partial file is removed when possible. Normal host file permissions
+and the current umask apply.
+
+Use a new configured RC433X device and the appropriate guest disk-initialization
+tools before allocating guest files on it. Creating an image does not make
+it safe to replace an attached or mounted disk.
+
+\section{Inspect and change disk attachments}\label{inspect-and-change-disk-attachments}
+\index{Disk attachments!operator commands}
+
+\passthrough{\lstinline!show devices!} lists configured device numbers, types, attachment state, and interrupt levels. \passthrough{\lstinline!show media!} reports configured media, including reader/punch files, RC749 tapes, RC4819 drives and RC433X disks. For RC433X it shows attachment state, base image, read-only, volatile, persistent-overlay or write-through mode, overlay path where applicable, and current sparse-sector count.
+
+RC433X media can be changed while execution is suspended at the operator prompt. The three \passthrough{\lstinline!attach!} lines below are alternative modes for an already detached device, not a sequence to paste:
+
+\begin{commandexample}{Simulator prompt: alternative RC433X media selections}
+detach 15
+attach 15 UNIT0
+attach 15 UNIT0 readonly
+attach 15 UNIT0 overlay UNIT0.work.overlay
+\end{commandexample}
+
+\begin{operationnote}{Suspending execution does not make disk removal safe for the guest}
+Detaching disc 15 from a booted monitor can remove its active backing store. Use a disposable session and account for the guest's use of the disk before changing attachments. Detach discards volatile overlay writes; reattaching the same base image does not recover them.
+\end{operationnote}
+
+Disk attachment accepts only a device already declared as RC433X in \passthrough{\lstinline!RC4000.cfg!}. The default disk mode keeps writes in a volatile sparse overlay; \passthrough{\lstinline!readonly!} rejects writes, and \passthrough{\lstinline!overlay FILE!} loads or creates a persistent sparse sidecar. These modes open the base image read-only. The additional \passthrough{\lstinline!writable!} mode instead writes directly to the selected image, like startup \passthrough{\lstinline!--disk-write-through!}; use only a disposable complete working copy, never a shipped image. Runtime paths are interpreted relative to the emulator's current directory. \passthrough{\lstinline!detach!} explicitly flushes a persistent overlay before disconnecting the device and refuses to detach if that flush fails. Volatile overlay contents are intentionally discarded on detach. RC433X operations currently complete synchronously at instruction boundaries, so there is no partially active disk command while the operator prompt is available.

@@ -1,0 +1,51 @@
+\chapter{Execution throttle}\label{execution-throttle}
+\index{Throttle}
+\index{CPU budget}
+
+\section{Choose an interactive pacing mode}\label{choose-an-interactive-pacing-mode}
+\index{Throttle!runtime settings}
+
+The shipped configurations use a 50\% CPU budget for interactive execution. At \passthrough{\lstinline!sim4000>!}, inspect or change it with the following alternatives. Enter one \passthrough{\lstinline!set!} command for the mode you want; these are simulator commands, not guest FP input:
+
+\begin{commandexample}{Simulator prompt: inspect throttle and choose one pacing mode}
+show throttle
+set throttle 25%
+set throttle 250000ips
+set throttle original
+set throttle off
+\end{commandexample}
+
+\begin{itemize}
+\tightlist
+\item
+  \passthrough{\lstinline!1\%!} through \passthrough{\lstinline!100\%!} budget that fraction of one host CPU, measured using process CPU time against monotonic elapsed time. This is not a percentage of historical RC4000 speed. The limit is approximate over short intervals; scheduling and I/O can make actual usage lower. \passthrough{\lstinline!100\%!} does not insert waits.
+\item
+  \passthrough{\lstinline!1ips!} through \passthrough{\lstinline!1000000000ips!} limit actual RC instructions per second, including each \passthrough{\lstinline!am!} prefix, not interpreter calls. A slow host may not reach the requested rate.
+\item
+  \passthrough{\lstinline!original!} is a rough average-speed preset equivalent to \passthrough{\lstinline!250000ips!}, based on the typical 4 microseconds per instruction described in the historical \emph{RC 4000 Software: Multiprogramming System} (general description and section 9.4). It is not an opcode-by-opcode timing model. The June 1969 reference manual, appendix A.3, gives differing instruction and addressing times; floating-point-heavy workloads in particular may differ substantially from real hardware. Disk seek/rotation delays are not introduced by this preset.
+\item
+  \passthrough{\lstinline!off!} removes deliberate execution waits.
+\end{itemize}
+
+\section{Keep a startup setting in the configuration}\label{keep-a-startup-throttle-setting}
+\index{Throttle!configuration}
+
+To select a startup value, use exactly one active directive in the config:
+
+\begin{commandexample}{RC4000.cfg contents: one active throttle directive}
+THROTTLE VALUE=50%
+; THROTTLE VALUE=ORIGINAL
+; THROTTLE VALUE=250000IPS
+; THROTTLE VALUE=OFF
+\end{commandexample}
+
+Configuration values are case-insensitive. Old configurations with no directive remain unthrottled. Runtime changes last only for the current session and do not rewrite the configuration. Tab completion supports the setting and common values.
+
+\section{Understand what pacing does not control}\label{understand-what-pacing-does-not-control}
+\index{Throttle!timing limits}
+
+Pacing applies to \passthrough{\lstinline!run!}, \passthrough{\lstinline!continue!}, and \passthrough{\lstinline!-a!} autostart. Step and trace are unpaced debugging operations; the bounded \passthrough{\lstinline!--run!} runner deliberately ignores throttle settings to preserve fast, deterministic instruction-count tests. The real-time interactive device clock still follows host elapsed time. Throttle waits service console input, Telnet and the device clock in short intervals, so the configured emulator escape key (Control-E by default) and handled signals can interrupt even a \passthrough{\lstinline!1ips!} wait. Returning from the operator prompt starts a fresh pacing budget; no unused time from command editing is accumulated as execution credit.
+
+\begin{operationnote}{Approximate historical speed is not cycle accuracy}
+Choose a percentage budget to reduce host CPU use, or \passthrough{\lstinline!original!} for the average-rate approximation. These are different goals: a fixed instruction rate does not promise a particular host CPU percentage. Neither mode reproduces opcode-specific timing, physical disk delays or historical peripheral throughput, and \passthrough{\lstinline!--run!} does not use either limit.
+\end{operationnote}

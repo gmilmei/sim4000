@@ -1,0 +1,29 @@
+\chapter{Build and start}\label{build-and-start}
+\index{Building the emulator}
+\index{Startup}
+
+Requirements: a POSIX host, a C17 compiler, CMake 3.20 or newer, GNU Readline development headers/library, and a terminal. The linked Readline runtime library must also be available when running a copied executable. Neither Python nor TeX is required for an ordinary build or binary-distribution execution. Optional developer verification and media regeneration have separate dependencies.
+
+From the repository root:
+
+\begin{commandexample}[language=sh]{Host shell: build and start}
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build
+cd build
+cp -R ../doc/usermanual/examples .
+./sim4000 -a
+\end{commandexample}
+
+CMake supplies \passthrough{\lstinline!RC4000.cfg!}, \passthrough{\lstinline!RC4000.dfc403.cfg!}, \passthrough{\lstinline!MONITOR!}, \passthrough{\lstinline!UNIT0!}, and \passthrough{\lstinline!UNIT0.original!} in the build directory and creates \passthrough{\lstinline!exchange!}. The default configuration selects the native \passthrough{\lstinline!UNIT0!} with \passthrough{\lstinline!fromhost!} and \passthrough{\lstinline!tohost!}. The unchanged historical image retains \passthrough{\lstinline!fromdos!} and \passthrough{\lstinline!todos!}; select it with \passthrough{\lstinline!./sim4000 -a --disk UNIT0.original!}.
+
+The command \passthrough{\lstinline!-a!} starts the interactive interface, requests disk startup, and immediately runs. Normal disk writes are volatile: they are visible during this emulator session but disappear when it exits. Choose a persistence mode before starting if you want to keep your work.
+
+The copied \texttt{examples/} directory is optional for normal operation, but
+contains the input files used in the guest tutorials. It is not executed
+automatically. Keep it beside the runtime files if you move your working
+directory; the examples then need no source checkout.
+
+You are now in the running emulator, not at the host shell. Continue directly
+with \manualref{first-monitor-session}{First monitor session} to answer the
+date question. Skip \manualref{run-from-your-own-working-directory}{the optional
+working-directory setup} unless you want to run a separate copy.

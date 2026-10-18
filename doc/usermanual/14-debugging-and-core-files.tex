@@ -1,0 +1,77 @@
+\chapter{Debugging and core files}\label{debugging-and-core-files}
+\index{Core files}
+\index{Tracing}
+\index{Debugging}
+
+All commands in this chapter are simulator commands typed at the suspended \passthrough{\lstinline!sim4000>!} prompt, not guest FP commands. They operate on the current machine session. Addresses are RC byte addresses; one 24-bit core word occupies two RC bytes. Numeric arguments accept the C-style notation used in \manualref{simulator-commands-and-aliases}{the operator reference}.
+
+\section{Stop before execution or after a core write}\label{stop-before-execution-or-after-a-core-write}
+\index{Breakpoints!execution timing}
+\index{Watchpoints!core writes}
+
+\passthrough{\lstinline!break!} installs an execution breakpoint at an even byte address. Execution stops before the instruction at that address, so registers and memory still describe its input state. \passthrough{\lstinline!continue!} executes past a breakpoint once; a later visit to the same address stops again. Breakpoints can be inspected and removed with:
+
+\begin{commandexample}{Simulator prompt: inspect and remove execution breakpoints}
+show breakpoints
+nobreak 0x100
+nobreak all
+\end{commandexample}
+
+\passthrough{\lstinline!watch!} installs a core-write breakpoint at an even byte address. It observes CPU stores and device transfers through the common machine-memory boundary. Execution stops after the instruction or device operation has completed and reports the previous and resulting 24-bit word. Register writes and operator \passthrough{\lstinline!deposit!} commands do not trigger core-write breakpoints. Use \passthrough{\lstinline!show watchpoints!}, \passthrough{\lstinline!nowatch ADDRESS!}, or \passthrough{\lstinline!nowatch all!} to inspect and remove them.
+
+\section{Inspect core without modifying it}\label{inspect-core-without-modifying-it}
+\index{examine!display formats}
+
+\passthrough{\lstinline!examine!} defaults to hexadecimal words and accepts four explicit formats:
+
+\begin{commandexample}{Simulator prompt: alternative core-display formats}
+x /hex 0x200 8
+x /char 0x200 8
+x /binary 0x200 4
+x /instruction ic 10
+\end{commandexample}
+
+These four display calls are alternatives for different views of core; they neither run instructions nor change memory. Counts select words, not host file bytes.
+
+Character view shows the three high-to-low bytes of each 24-bit word and replaces non-printable bytes with periods. Instruction view uses SLANG-style mnemonics and addressing notation. \passthrough{\lstinline!IC!} follows the current instruction counter, and the word at the current instruction counter is marked with \passthrough{\lstinline!>!} in every view.
+
+\passthrough{\lstinline!show cpu!} also reports the protection profile and PR.
+\passthrough{\lstinline!show keys ADDRESS [COUNT]!} reads the word keys without
+changing them; COUNT defaults to one and is limited to 256. Odd addresses select
+the containing word. \passthrough{\lstinline!PR-protected!} describes the selected
+PR bit, not whether checks are enabled or the current monitor mode permits
+access. The supplied profile leaves protection off. For example:
+
+\begin{commandexample}{Simulator prompt: read protection state without executing}
+show cpu
+show keys 0 4
+\end{commandexample}
+
+\section{Exchange packed core data with host}\label{exchange-packed-core-data-with-host}
+\index{load-core}
+\index{save-core}
+
+\passthrough{\lstinline!load-core!} and \passthrough{\lstinline!save-core!} exchange contiguous core words with host files. The file format is headerless: each RC4000 word is stored as exactly three bytes, most-significant byte first. This is the same 24-bit packing used by the supplied \passthrough{\lstinline!MONITOR!} file. Addresses must be even byte addresses; counts are word counts. Loading rejects empty, truncated, and out-of-range files before changing core. Saving uses a temporary file in the destination directory and atomically replaces the named file only after all words have been written and flushed. File paths are relative to the emulator's current directory, not the \passthrough{\lstinline!HOSTFILES!} exchange root. For example:
+
+\begin{operationnote}{Core files are not session snapshots}
+\passthrough{\lstinline!load-core!} overwrites the target core words; it can corrupt a live monitor or guest program even while execution is suspended. \passthrough{\lstinline!save-core!} can replace an existing host destination, unlike guest \passthrough{\lstinline!tohost!} exports. Choose a disposable session and an unused destination for the example below. The file contains only the selected core words, not registers, devices, queues or disk-overlay state; loading it does not restore a complete session.
+\end{operationnote}
+
+\begin{commandexample}{Simulator prompt: save, load and inspect packed core words}
+save-core bootstrap.bin 0 16
+load-core bootstrap.bin 0x200
+x /hex 0x200 16
+\end{commandexample}
+
+The example saves 16 words (48 host bytes) and loads them at RC byte address \passthrough{\lstinline!0x200!}. It illustrates copying data, not setting a valid program entry point or preparing a runnable monitor.
+
+Core-data operations are available only at the suspended operator prompt and do not change the instruction counter or trigger write watchpoints.
+
+\section{Execute a bounded diagnostic step}\label{execute-a-bounded-diagnostic-step}
+\index{Tracing!instruction execution}
+
+\passthrough{\lstinline!trace!} is a bounded diagnostic form of \passthrough{\lstinline!step!}. It prints the executed instruction's address and raw word, decoded opcode and addressing fields, effective address, and resulting instruction counter. A count defaults to one, for example \passthrough{\lstinline!t 10!}. Address-modification prefixes consumed by one interpreter call are reported on the resulting instruction's trace line.
+
+\begin{operationnote}{Tracing executes instructions}
+Unlike \passthrough{\lstinline!examine /instruction!}, \passthrough{\lstinline!trace!} changes the machine state and can perform device I/O or guest disk writes. A step count bounds interpreter calls, not an entire guest operation. Use disk-copy or overlay precautions appropriate to the running configuration; a short trace is not a read-only inspection.
+\end{operationnote}

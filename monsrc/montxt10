@@ -1,0 +1,1676 @@
+
+
+
+
+m.                monitor text 9
+; rc date
+
+; rc 4000 systems tape, segment 6:  process functions.
+;   leif svalgaard / j|rn jensen
+;   catalog administration; creation, removal, and
+;   start and stop of processes.
+
+; the code includes certain test options selected by bits in the identifier
+;   a92 as follows:
+;   test call included:   a92 = a92 o. 1<19
+;   monitor test output:  a92 = a92 o. 1<20
+;   print w, type w:      a92 = a92 o. 1<21
+
+
+s.   c10, d50, e99, f100, i70, j21, m160, n50, p65, r7, t40, v30         ; proc func segment start:
+w.b127=k, j21, k=k-2
+
+; use of slang names:
+;   a:   monitor constants, declared and defined before proc func
+;   b:   monitor absolute entry addresses,  -       -     -   -
+;   c:   global full word constants
+;   d:   global variables, start addresses for records
+;   e:   procedures, mostly called with w3 as return register
+;   f:   constant names, relative addresses in records
+;   g:   local labels in procedures and actions
+;   i:   process functions (actions)
+;   j:   global points in central administration, error exits
+;
+; note: in the comments to the code the notation  x.b  denotes a reference to the
+;   variable  x  in the record  b.
+
+; definition of catalog parameters:
+f0  =   a88        ; size of one catalog entry:      34  bytes
+f9  =   512 - 2    ; catalog buffer size - 2  :     510  bytes
+f10 =   f9/f0      ; number of entries per segment:  15
+
+; record sender.
+;   the absolute address of the description of the calling process is stored
+;   in d2.  parameters to and from the sender are found in the register dump
+;   as follows:
+w.                               ; first address.proc func;
+f20 =  a31                       ; save w3: name address
+f21 =  a29                       ; save w1: tail address
+f22 =  a29                       ;      or: new name address
+f23 =  a29                       ;      or: catalog key
+f24 =  a29                       ;      or: general parameter pointer
+f25 =  a28                       ; save w0: result
+f26 =  a40                       ; save wait address
+
+; definition of proc func communications parameters
+
+f14 =   3            ; operation  read
+f15 =   5            ; operation write
+f16 =  48            ; minimum value of digit in identifier
+f17 =  57            ; maximum   -   -    -    -     -
+f18 =  97            ; minimum   -   -  letter -     -
+f19 = 125            ; maximum   -   -    -    -     -
+f37 =   0            ; kind:  internal process
+f38 =   4            ; kind:  area process
+
+; definition of bits and values of process states
+
+f40 =  1<2           ; repeat bit,  in proc state
+f41 =  1<3           ; no stop bit, in proc state
+f42 =  1<4           ; parent bit,  in proc state
+f43 =  1<5           ; stopped bit, in proc state
+f44 =  1<6           ; out of q bit,in proc state
+f45 =  1<7           ; waiting bit, in proc state
+; process state values
+
+f46 = a95            ; running
+f47 = a99            ; waiting start by parent
+f48 = a97            ; waiting stop by parent
+f49 = a100           ; waiting start by ancestor
+f50 = a98            ; waiting stop by ancestor
+
+; note: the above a-names are defined before proc func loading.
+;      running:                   out of q, no stop
+;      waiting start by parent    stopped, parent, no stop
+;      waiting stop by parent     stopped, parent
+;      waiting start by ancestor  stopped, no stop
+;      waiting stop by ancestor   stopped
+;      waiting events             repeat
+;      waiting for proc func      repeat, out of q 
+;
+
+; definition of function keys
+
+f71 =  1<10  ; bit 1 : aux catalog handling
+f72 =  1<9   ; bit 2 : main catalog handling
+f74 =  1<7   ; bit 4 : create peripheral process
+f75 =  1<6   ; bit 5 : remove peripheral process
+f76 =  1<5   ; bit 6 : aux entry handling
+f77 =  1<4   ; bit 7 : set clock
+
+
+; definition of chain states
+
+t0  =  1<0           ; idle
+t1  =  1<1           ; after prepare
+t2  =  1<2           ; during insert
+t3  =  1<3           ; ready
+t4  =  1<4           ; during delete
+t5  =  1<5           ; during check
+t6  =  1<6           ; during aux entry manipulation
+
+t20 =  t0            ; allowed for prepare bs
+t21 =  t1+t2         ; allowed for insert entry
+                     ;             insert bs
+                     ;             connect main catalog
+t22 =  t3            ; allowed for normal use
+t23 =  t1+t2+t3+t4+t5+t6; allowed for delete bs
+t24 =  t4            ; allowed for delete entries
+t26 =  t1+t5         ; allowed for check aux catalog
+t28 =  t1+t2+t6      ; allowed for create aux entry
+t29 =  t1+t2+t3+t4+t5+t6; allowed for set bs-claims
+t30 =  t1+t2+t3+t6   ; allowed for create area process
+
+
+; format of catalog entry
+
+f4  =  0   ; byte    ; <first slice>
+f3  =  1   ; byte    ; <namekey> * 8 + <perm key>
+f1  =  2   ; word    ; <lower base of entry>
+f2  =  4   ; word    ; <upper base of entry>
+f5  =  6   ; name    ; <entry name>
+f7  =  14  ; word    ; <size of entry>
+f11 =  16  ; name    ; <document name>
+
+f0  =  a88           ; size of catalog entry
+f6  =  14            ; start of tail
+f8  =  f0-f6         ; size of tail
+f51 = -8             ; mask for extracting all but perm-key
+
+
+; format of chainhead
+
+f60 =  -2 - f0       ; <claims rel address in internal process>
+f54 =  f4 - f0       ; <first slice of aux catalog>
+f53 =  f3 - f0       ; <chain kind> * 8 + <perm key>
+f55 =  f5 - f0       ; <name of aux catalog>
+f56 =  f6 - f0       ;   (start of tail)
+f57 =  f7 - f0       ; <size of aux catalog>
+f61 =  f11- f0       ; <document name>
+f62 =  f56+10 ; word ; <name table address of disc process>
+f64 =  f56+12 ; word ; <slice length>
+f66 =  f56+14 ; byte ; <last slice in chaintable>
+f67 =  f56+15 ; byte ; <first slice of chaintable-chain>
+f68 =  f56+16 ; byte ; <chain state>
+f69 =  f56+17 ; byte ; <cur key> (used as segment number in certain clean-ups)
+f70 =  f56+18 ; word ; <name table address of aux catalog area process>
+
+; each chaintable has a heading as the above given, which has the same
+;   basic format as a normal catalog entry.
+; it describes the aux catalog on the device.
+; after the heading follows the chain-area, consisting of one byte for
+;   each slice.
+
+
+
+; record for main catalog pseudo chainhead
+; (format as a normal chainhead)
+d9 = k - f54         ; base of pseudo chainhead:
+     0, r. f0>1      ;
+
+
+
+; description of current catalog
+
+c0:  0               ; size of current catalog
+d7:  0, r.4          ; name of current catalog
+     0               ; (name table address of current catalog area process)
+
+
+
+; description of catalog message
+
+d8:                  ; cat message:
+f30 = k - d8, f14<12 ;   operation (initially read)
+f32 = k - d8, d0     ;   first address of catalog buffer
+f34 = k - d8, d18    ;   last  address of catalog buffer
+f36 = k - d8, -1     ;   current cat segment  (initially not existing)
+
+
+
+; description of current entry
+
+     0               ;-2   cur entry segment number
+d3:  0               ;     cur entry address  (in catalog buffer)
+
+
+; common work variables:
+     0               ;-2   work
+d12: 0               ;     return
+
+
+
+; procedure set auxcat
+; call:  jl. w3  e0.
+;
+; procedure set maincat
+; call:  jl. w3  e1.
+;
+;   the use of the current catalog is terminated, and the
+;     new catalog is selected as curcat
+;
+; error return: result 2, in case of io-errors
+; return: all regs undef
+
+b. g10, h10 w.
+
+e0:                    ; set auxcat:
+     rl. w1     d4.    ;    catchain := curdoc;
+     jl.        g1.    ;      else
+e1:                    ; set maincat:
+     al. w1     d9.    ;    catchain := pseudo chain for main catalog;
+
+g1:  sn. w1    (c2.)   ;    if catchain = curcat then
+     jl      x3        ;      return;
+
+     rs. w3     h0.    ;    save(return);
+
+; notice: be very cautious not to change curcat until all transfers are
+;         terminated
+
+     rs. w1     h1.    ;    save (catchain);
+
+     jl. w3     e7.    ;    terminate update;
+; (if io-errors the curcat is not changed yet)
+
+     rl. w1     h1.    ;    w1 := new cur cat;
+     rl  w0  x1+f57    ;    move:  catsize
+     rs. w0     c0.    ;
+     al  w0    -1      ;           dummy segment number
+     rs. w0     d8.+f36;             (i.e. simulate irrell buffer contents)
+     rl  w0  x1+f70    ;           name table address of catalog area process
+     rx. w0     d7.+8  ;
+
+     al  w2  x1+f55    ;           catalog name;
+
+     rx. w1     c2.    ;    curcat := new cur cat;
+     rs  w0  x1+f70    ;    save old name table address in old curcat;
+
+     al. w1     d7.    ;
+     rl. w3     h0.    ;
+     jl.        e32.   ;    return;
+
+c2:  d9                ; curcat chainhead address (initially: pseudochainhead)
+
+h0:  0                 ; return
+h1:  0                 ; new curcat
+
+e.                     ;
+
+
+
+; procedure dump chaintable
+;   writes the chaintable of current document back on the device
+;
+; call:  jl. w3  e2.
+; error return: result 2, in case of io-errors
+; return: all regs undef
+
+b. h10 w.
+
+e2:                    ; dump chain table:
+     rs. w3     d12.   ;    save(return);
+     rl. w3     d4.    ;    w3 := curdoc;
+     al  w0  x3-f0     ;    first addr := start of head.curdoc;
+     bz  w1  x3+f66    ;
+     wa  w1     6      ;    last addr := start of chain.curdoc
+     al  w1  x1+511    ;      + last slice.curdoc + 511; (i.e. round up)
+     ds. w1     h2.    ;
+     bz  w1  x3+f67    ;    segment number :=
+     wm  w1  x3+f64    ;      first chaintable slice.curdoc
+     rs. w1     h3.    ;      * slicelength.curdoc;
+
+     al. w1     h0.    ;
+     al  w3  x3+f61    ;    send message(document, output message);
+     jd         1<11+16;
+     al. w1     d16.   ;    wait answer;
+     jd         1<11+18;
+
+     rl  w1  x1        ;
+     sn  w0     1      ;    if result <> ok
+     se  w1     0      ;    or status <> 0 then
+     jl.        j2.    ;      goto result 2;
+
+     jl.       (d12.)  ;    return;
+
+h0:  f15 < 12          ; output message:
+     0                 ;  first address
+h2:  0                 ;  last address
+h3:  0                 ;  segment number
+
+e.                     ;
+
+
+
+; procedure compute namekey
+;   sets namekey.work := namekey function(name.work)
+;
+;   the namekey is a numer ranging from 0 to the number of segments (less one)
+;     in the catalog. the namekey is computed from the name following the
+;     algorithm below, and is used to speed-up the search for the name in
+;     the catalog.
+;   when an entry is created it is placed in the first free entry in the
+;     catalog on the segment <namekey>, or the following segments.
+;   the search for an entry then starts from the segment <namekey> and
+;     towards higher segment numbers.
+;   (the successor to the last segment is segment zero)
+;
+; call:  jl. w3  e3.
+; return:  w2 = namekey.work < 3 + key.work
+;          other regs undef
+
+e3:                    ; compute namekey:
+     dl. w2     v13.   ;    double := name(0), name(2)
+     aa. w2     v14.   ;            + name(4), name(6);
+     wa  w2     2      ;    word := double(0) + double(2);
+     ba  w2     4      ;    word := word + word // 4096;
+     al  w1     0      ;
+     wd. w2     c0.    ;    namekey := word mod catsize;
+     ls  w1     3      ;
+     al  w2    -f51-1  ;
+     la. w2     v3.    ;    namekey.work := namekey;
+     wa  w2     2      ;
+     hs. w2     v3.    ;
+     jl      x3        ;    return;
+
+
+
+; the following complex of io-procedures all have a common
+;   return information:
+; return: w0 = undef
+;         w1 = segment number
+;         w2 = absolute address of start of buffer
+;         w3 = undef
+;         cur cat segment defined
+; error return: result 2, in case of io-errors
+
+; procedure get key segment
+;   ensures that the segment given by namekey.work is present
+;     in the buffer
+;
+; call:  jl. w3  e4.
+;
+;
+; procedure get cat segment
+;   ensures that the segment given as parameter is present
+;
+; call:  al  w2  <segment number>
+;        jl. w3  e5.
+;
+;
+; procedure get next segment
+;   gets the next (cyclically numberred) segment into the buffer
+;
+; call:  jl. w3  e6.
+;
+;
+; procedure terminate update
+;   the current catalog segment is written back, in case of changes
+;
+; call:  jl. w3  e7.
+
+b. g10 w.
+
+e4:                    ; get key segment:
+     bz. w2     v3.    ;
+     ls  w2    -3      ;    segment := namekey.work;
+e5:                    ; get cat segment:
+                       ; (w2 = segment)
+     se. w2    (d8.+f36);   if segment <> current segment then
+     jl.        g1.    ;      goto get segment;
+
+g0:                    ; exit:
+     al  w1  x2        ;    w1 := segment;
+     rl. w2     d8.+f32;    w2 := abs first of buffer;
+     jl      x3        ;    return;
+
+e6:                    ; get next segment:
+     am         1-0    ;    incr := 1;
+e7:                    ; terminate update:
+     al  w2     0      ;    incr := 0;
+     wa. w2     d8.+f36;    segment := current segment + incr;
+
+     sl. w2    (c0.)   ;    if segment outside catalog then
+     al  w2     0      ;      segment := 0;
+
+g1:                    ; get segment:
+                       ; (w2 = segment, w3 = return)
+     ds. w3     d12.   ;    save(segment, return);
+     bz. w0     d8.+f30;
+     se  w0     f15    ;    if catoperation <> output then
+     jl.        g4.    ;      goto test input nescessary;
+g2:                    ; after output:
+     al. w3     d7.    ;    w3 := catalog name address;
+
+     bz. w0     d8.+f30;    if catoperation = write then
+     sn  w0     f15    ;
+     jd         1<11+8 ;      reserve process(catalog); (i.e. after update)
+
+     al. w1     d8.    ;
+     jd         1<11+16;    send message(catalog, catmessage);
+     bz. w0     d8.+f30;
+     sn  w0     f15    ;    if after update then
+     jd         1<11+10;      release process(catalog);
+                       ;    (i.e. don't exclude other processes too long)
+
+     al  w1     f14    ;    catoperation := read;
+     hs. w1     d8.+f30;    (only needed after update, but anyway...)
+
+     al. w1     d16.   ;
+     jd         1<11+18;    wait answer;
+
+     al  w2    -1      ;    (prepare for io-errors)
+     sn  w0     1      ;    if result <> ok
+     sz  w2 (x1)       ;    or status <> 0 then
+     jl.        g5.    ;      goto catalog io-error;
+
+; a transfer has now been completed.
+; if after update the transfer was an output, terminating the earlier
+;   segment. in this case the new segment must be brougth into the buffer
+
+     dl. w3     d12.   ;    restore(segment, return);
+
+g4:                    ; test input nescessary:
+     rx. w2     d8.+f36;    current segment := segment;
+     se. w2    (d8.+f36);   if current segment <> segment then
+     jl.        g2.    ;      goto after write;
+
+     jl.        g0.    ;    goto exit;
+
+g5:                    ; catalog io-error:
+     rs. w2     d8.+f36;    current segment := -1;
+                       ;    (i.e. undefined contents of catalog buffer)
+     jl.        j2.    ;    goto result 2;
+
+e.                     ;
+
+
+
+; the following set of procedures are intended for updating
+; and utilizing the information given in each catalog segment:
+;   each segment contains a number, <entry count>, stating the
+;   number of entries with a namekey corresponding to the
+;   segment-number
+; notice:
+;         *********************************************************
+;         *                                                       *
+;         * in case of break-down during a multi-segment updating *
+;         *   the entry count may be one (or more) too large,     *
+;         *             but never too small                       *
+;         *                                                       *
+;         * i.e. it is actually a maximum number of entries       *
+;         *                                                       *
+;         * it will be reset at the first catalog search with     *
+;         *      that particular namekey                          *
+;         *                                                       *
+;         *********************************************************
+
+b. g30, h10 w.
+
+; procedure prepare update and change entry count
+; call:  al  w0  <change of entry count>
+;        al  w2  <start of catalog buffer>
+;        jl. w3  e8.
+; return: all regs undef
+;
+;   the corresponding entry count is updated
+;   and the segment is flagged for being written back
+
+e8:                    ; change entry count and prepare update:
+     wa  w0  x2+f9     ;    entry count.buffer :=
+     rs  w0  x2+f9     ;      entry count.buffer + change;
+
+; procedure prepare update
+; call:  jl. w3  e9.
+; return: all regs undef
+;
+;   the current catalog segment is flagged for being written back
+;   at next catalog transfer
+
+e9:                    ; prepare update:
+     al  w0     f15    ;    catoperation := write;
+     hs. w0     d8.+f30;
+     jl      x3        ;    return;
+
+
+; procedure search free entry
+;   a new entry is to be created. the entry is given in work.
+;   entry count(namekey.work) is increased, and a free entry is searched
+;     for.
+;   if no room, then entry count is decreased again, and error return
+;
+;
+; call:  jl. w3  e10.
+;        jl.     no room
+;        jl.     ok
+; error return: result 2, in case of io-error
+; return: cur entry (and segment defined)
+
+e10:                   ; search free entry:
+     rs. w3     h1.    ;    save(return);
+     jl. w3     e4.    ;    get key segment;
+     rs. w1     h0.    ;    save(segment number);
+     al  w0     1      ;
+     jl. w3     e8.    ;    increase(entry count) and prepare update;
+
+g1:                    ; next segment:
+     al  w0    -1      ;    w0 := free pattern;
+     al  w3  x2+f9     ;    w3 := top of last entry;
+g2:                    ; next entry:
+                       ; (w0 = free pattern, w2 = entry, w3 =  top)
+     sn  w0 (x2)       ;    if first word of entry <> free pattern then
+     jl.        g5.    ;      begin
+     al  w2  x2+f0     ;      entry := entry + entrysize;
+     se  w2  x3        ;      if more entries on same segment then 
+     jl.        g2.    ;        goto next entry; 
+
+     jl. w3     e6.    ;      get next segment;
+     se. w1    (h0.)   ;      if cur segment <> key segment then
+     jl.        g1.    ;        goto next segment;
+
+     jl.        g10.   ;      goto decrease entry count;
+
+g5:                    ;      end;
+     ds. w2     d3.    ;    save(cur entry segment, cur entry);
+     am.       (h1.)   ;
+     jl        +2      ;    goto ok-return;
+
+
+
+; procedure get cur entry segment
+;   ensures that the catalog buffer contains the appropriate segment
+;     and that cur entry address is relevant in this buffer
+;
+; call: jl. w3  e11.
+; error return: result 2, in case of io-error
+; return: cur entry segment is in catbuffer
+;         registers as get catalog segment
+
+e11:                   ; get cur entry segment:
+     rl. w2     d3.-2  ;    segment  := cur entry segment;
+     jl.        e5.    ;    goto get catalog segment;
+
+
+
+; procedure set cur entry
+;   moves the entry in work to the catalog segment, given by cur entry
+;
+; call: jl. w3  e12.
+; error return: result 2, in case of io-error
+; return: all regs undef
+
+e12:                   ; set cur entry:
+     rs. w3     h1.    ;    save(return);
+     jl. w3     e11.   ;    get cur entry segment;
+     jl. w3     e9.    ;    prepare update;
+
+     rl. w1     d3.    ;    w1 := cur entry;
+     al. w2     d1.    ;    w2 := work;
+     jl. w3     e33.   ;    move work to cur entry;
+
+     jl.       (h1.)   ;
+
+
+
+; procedure delete cur entry
+;   remove the entry given by cur entry, by setting the first word
+;     of the entry to -1
+;   entry count(namekey.work) is decreased
+;
+; call: jl. w3  e13.
+; error return: result 2, in case of io-error
+; return: all regs undef
+
+e13:                   ; delete cur entry:
+     rs. w3     h1.    ;    save(return);
+     jl. w3     e11.   ;    get cur entry segment;
+
+     al  w0    -1      ;
+     rs. w0    (d3.)   ;    first word(cur entry) := -1
+     jl. w3     e9.    ;    prepare update;
+                       ;    (notice: if the entry is not on the key segment
+                       ;             two segments must be updated)
+     jl. w3     e4.    ;    get key segment;
+
+g10:                   ; decrease entry count:
+     al  w0    -1      ;
+g15:                   ; update and return:
+     jl. w3     e8.    ;    change entry count and prepare update;
+     jl.       (h1.)   ;    return;
+
+
+
+; procedure for all key entries do
+;
+;   delivers all entries, one at a time, with the namekey given
+;
+; call: al  w2  <key>
+;       jl. w3  e14.
+;       jl.     no more
+;       (maybe save w2)
+;       <action for found entry>
+;       (restore w2, if destroyed)
+;       jl      x3
+;
+; error return: result 2, in case of io-errors
+;
+; return:  link+0: no more entries (all regs undef)
+;          link+2: w0w1 = undef, w2 = entry, w3 = continue search
+;                  (when continuing w2 must remain unchanged)
+
+e14:                   ; for all key entries do:
+     ds. w3     h1.    ;    save(key, return);
+     jl. w3     e5.    ;    get cat segment;
+     al  w3  x2+f9     ;    w3 := top of last entry;
+     rs. w3     h3.    ;
+
+     rl  w3  x2+f9     ;    remaining := entry count.key segment;
+     al  w2  x2-f0     ;    (decrease(entry) ... code trick)
+
+g21:                   ; test remaining:
+     sn  w3     0      ;    if remaining = 0 then
+     jl.       (h1.)   ;      return;
+     rs. w3     h2.    ;
+
+g22:                   ; next entry:
+     al  w2  x2+f0     ;    increase(entry);
+     sn. w2    (h3.)   ;    if out of buffer then
+     jl.        g24.   ;      goto next segment;
+
+g23:                   ; test entry:
+     rl  w3  x2        ;
+     se  w3    -1      ;    if entry exists then
+     bz  w3  x2+f3     ;      key := key.entry;
+     as  w3    -3      ;    (otherwise key = not possible)
+     se. w3    (h0.)   ;    if key <> saved key then
+     jl.        g22.   ;      goto next entry;
+
+     rl. w3     h1.    ;
+     jl  w3  x3+2      ;    call(found action); (w2 = entry)
+
+     rl. w3     h2.    ;
+     al  w3  x3-1      ;    decrease(remaining entries);
+     jl.        g21.   ;    goto test remaining;
+
+g24:                   ; next segment:
+     jl. w3     e6.    ;    get next segment;
+
+     al  w3  x2+f9     ;    compute top address of last entry;
+     rs. w3     h3.    ;
+
+     se. w1    (h0.)   ;    if current segment <> key segment then
+     jl.        g23.   ;      goto test entry;
+
+     ac. w0    (h2.)   ;    decrease entry count by remaining entries
+     jl.        g15.   ;      and return;
+
+h0:  0                 ; saved key
+h1:  0                 ; saved return
+h2:  0                 ; remaining entries
+h3:  0                 ; top address of last entry on segment
+
+e.                     ;
+
+
+
+; procedure compute document address
+;
+;   selects either the maincat document or the document
+;     specified in first slice.work
+;
+; call:  jl. w3  e15.
+; return:  w2 = doc address, other regs undef
+
+e15:                   ; compute document address for non-area entries:
+     rl  w2     b25    ;    (prepare for maincat-entry)
+     bz. w1     v4.    ;    if first slice.work = 0 then
+     sn  w1     0      ;      w2 := maincat document
+     jl      x3        ;      and return;
+
+     am        (b22)   ;    use the last 11 bits of first slice
+     rl  w2  x1-2048   ;      to select the document;
+     jl      x3        ;    return;
+
+; procedure first proc (proc addr,new state);
+;   finds the process given by name.work and checks that it is a child
+;   of the sender.
+;   initializes  end chain  and  children bits  and returns disabled
+;   with w3 = proc addr  and new state = wait stop by parent.
+; call:               jl. w3   e17.
+; return:             disabled with
+;                     w1 = sender
+;                     w2 = new state
+;                     w3 = proc addr
+;                     w0   changed
+; error:              not child: error 3;
+
+e17: c.(:a92>19a.1:)-1       ;   if test call included then
+     ds  w3   b34            ;   test output (e17);
+     jd. w3   e29.           ;
+z.   rs. w3   d12.           ; first proc: save return;
+     jl. w3     e47.   ;    search best process in nametable;
+       b3              ;
+       b7              ;
+     jl.        e26.   ;+6:   not found:  goto test found;
+     al  w3  x2        ;    proc := proc found;
+     rl  w0  x3+a10    ;    if kind.proc <> internal process then
+     se  w0     f37    ;
+     je.        j3.    ;      enabled goto result 3;
+
+     rl. w1   d2.            ;   if parent.proc addr <> sender
+     se  w1 (x3+a34)         ;   then enabled goto error 3;
+     je.      j3.            ;
+
+     al  w2   0              ;   end chain:= children bits:= 0;
+     rs. w2   d15.           ;   w3:= proc addr;
+     ds. w3   d14.           ;
+     al  w2   f48            ;   w2:= new state:= wait stop by parent;
+     jd.     (d12.)          ; disabled return;
+
+e26: je. w3   e24.           ; test found: test format;
+     jl.      j3.            ;   goto error 3;
+
+; procedure chain and add children;
+;   connects proc addr to the the chain through wait addresses which
+;   ends in end chain and exits via add children
+; call:        jl. w3   e18.
+; return:      all registers changed
+
+b.   g0                           ; begin
+w.                                ;
+e18: dl. w2   d15.                ; chain and add children:
+     rs  w2  x1+f26               ;   wait addr.proc addr:= end chain;
+     rs. w1   d15.                ;   end chain:= proc addr;
+
+; procedure add children;
+;   searches through all internal processes and adds to children bits
+;   the identification bit for all processes with parent = proc addr;
+; call:        jl. w3   e19.
+; return:      all registers changed
+
+e19: c.(:a92>19a.1:) -1           ;   if test call included then
+     ds  w3   b34                 ;   test output (e19);
+     jd. w3   e29.                ;
+z.   rs. w3   d12.                ; add children:  save return;
+     dl. w1   d14.                ;
+     rl  w3   b6                  ;
+
+g0:  rl  w2  x3                   ;   for w3:= first internal in name table
+     sn  w1 (x2+a34)              ;   step 2 until last proc do
+     lo  w0  x2+a14               ;   if parent.name table(w3) =
+     al  w3  x3+2                 ;   proc addr then
+     se  w3  (b7)                 ;   children bits:= children bits
+     jl.      g0.                 ;   or  ident bit.name table(w3);
+     rs. w0   d13.                ;
+     jl.     (d12.)               ;   return;
+
+e.                                ; end chain/add children;
+
+; procedure next proc (result: proc addr, new state);
+;   finds proc addr corresponding to one of the bits in children bits,
+;   removes the corresponding bit in children bits, and returns disabled
+;   with new state = wait stop by ancestor and proc addr defined.
+; call:           jl. w3   e20.
+; return:         w2 = new state
+;                 w3 = proc addr
+;                 w0,w1 changed.
+; return 2:       no more children
+
+b.   g0                          ; begin
+w.                               ; next proc:
+e20: c.(:a92>19a.1:) -1          ;   if test call included then
+     ds  w3   b34                ;   test output (e20);
+     jd. w3   e29.               ; 
+z.   rl. w1   d13.               ;
+     sn  w1    0                 ;   if children bits = 0 then
+     jd     x3+2                 ;   return 2;
+
+     rs. w3   d12.               ; more children:  save return;
+     rl  w3   b6                 ;   w3:= first internal process in name tb;
+
+g0:  rl  w2  x3                  ; loop:  w2:= name table(w3);
+     al  w3  x3+2                ;   w3:= w3+2;
+     so  w1 (x2+a14)             ;   if children bits and ident bit.2 = 0
+     jl.      g0.                ;   then goto loop;
+
+     ws  w1  x2+a14              ;   proc addr:= w2;
+     ds. w2   d14.               ;   children bits:=
+     al  w3  x2                  ;   children bits - ident bit.w2;
+     al  w2   f50                ;   new state:= wait stop by ancestor;
+     jd.     (d12.)              ;
+
+e.                               ; end next proc;
+
+; procedure set pk (proc, pk value);
+;   sets the protection key given by pk value on the whole process area
+;   of the internal process proc.
+; call:            w3 = proc addr
+;                  w0 = pk value
+; note:            jl. w2   e22.
+; return:          w1 = top core.proc addr
+
+b.   g2                        ; begin
+w.                             ; set pk:
+e22: c.(:a92>19a.1:) -1        ;   if test call included then
+     ds  w3   b34              ;   test output (e22);
+     jd. w3   e29.             ;
+z.   rl  w1  x3+a17            ;   i:= first core.proc; goto test;
+     jl       x2               ; 94-06-01 21:03 HJ , skip set pk action
+     jl.      g2.              ;
+
+g0:  ks  w0  x1-20             ; set on ten:
+     ks  w0  x1-18             ;  
+     ks  w0  x1-16             ;   for j:= -20 step 2 until -4 do
+     ks  w0  x1-14             ;   pk (i+j):= pk value;
+     ks  w0  x1-12             ;
+     ks  w0  x1-10             ;
+     ks  w0  x1 -8             ;
+     ks  w0  x1 -6             ;
+     ks  w0  x1 -4             ;
+g1:  ks  w0  x1 -2             ; set on one:  pk (i-2):= pk value;
+
+g2:  al  w1  x1+20             ; test:   i:= i+20;
+     sh  w1 (x3+a18)           ;   if i =< top core.proc then
+     jl.      g0.              ;   goto set on ten;
+     al  w1  x1-18             ;   i:= i-18;
+     sh  w1 (x3+a18)           ;   if i =< top core.proc
+     jl.      g1.              ;   then goto set on one;
+     jl      x2                ;   return;
+
+e.                             ; end set pk;
+
+
+
+; procedure create next wrk-name
+;   supplies a wrk-name in name.work
+;
+;   a wrk-name has the format:  wrk<6 octal digits>
+;
+; call:  jl. w3  e23.
+;
+; return: name.work defined
+;         all regs undef
+
+b. g10, h10 w.
+
+e23:                   ; test name:
+     dl. w1     h0.    ;    increase(last wrkname) octal;
+     aa. w1     h3.    ;
+     lo. w0     h1.    ;    (notice: a carry from one character is
+     la. w0     h2.    ;             propagated to next char and so on,
+     lo. w1     h1.    ;             by means of the special mask)
+     la. w1     h2.    ;
+     ds. w1     h0.    ;
+
+     al. w1     v5.    ;    move wrk-name
+     jl. w2     e32.   ;      to name.work;
+h0=k+4 ; wrk-digits    ;
+     <:wrk000000:>,0   ; last wrk-name
+
+h1:  <:000:>           ; mask to convert to digits
+h2:  <:777:>           ; mask to eliminate superflouos carries
+     200<16+200<8+200  ; double-mask to increase octally
+h3:  200<16+200<8+200+1;    (= all ones - <:888888:> + 1)
+
+e.                     ;
+
+
+
+; procedure test format
+;
+;   test whether the format of name.work corresponds to
+;     a legal identifier.
+;   a legal name consists of a small letter followed by at most
+;     10 small letters or digits, filled up with null-chars
+;     until 4 words.
+;   f16 <= value of digit        <= f17    (initially: digits 0-9)
+;   f18 <= value of small letter <= f19    (initially: letters a-aa)
+;
+; call:  jl. w3  e24.
+; error return: result 6, if nameformat illegal
+; return: nameformat ok
+;         all regs undef
+
+b. g10 w.
+
+e24:                   ; test format:
+     rs. w3     d12.   ;    save(return);
+     al. w2     v5.    ;    name pointer := addr of name.work;
+
+     bz  w0  x2        ; test start of name:
+     sl  w0     f18<4  ;    if first char of name < minimum letter then
+     jl.        g3.    ;      goto result 6;
+     jl.        j6.    ;    goto get word;
+
+g1:                    ; test next char:
+                       ;  w0 = partial word   ( <> 0 )
+                       ;       (i.e. contains at least one character,
+                       ;             which must be left justified)
+                       ;  w1 = current word
+                       ;  w2 = name pointer:  even == before null-char
+                       ;                      odd  == after  null-char
+                       ;  w3 = 1
+     so  w2     2.1    ;    if before null-char then
+     ld  w0     8      ;      char := next char from partial word + 1 shift 8;
+                       ;    (partial word := partial word shift 8);
+                       ;    (i.e. if after null-char then illegal name)
+     sh  w3     f17+1<8;
+     al  w3  x3+f18-f16;    if neither letter nor digit then
+     sl  w3     f18+1<8;
+     sl  w3     f19+1+1<8;
+     jl.        j6.    ;      goto result 6; i.e. illegal name
+
+g2:                    ; test rest of partial word:
+     al  w3     1      ;    (prepare for next char and for making nameptr odd)
+     se  w0     0      ;    if partial word <> 0 then
+     jl.        g1.    ;      goto test next char;
+
+     sz  w1     255    ;    if last char in current word = null then
+     sz  w2     2.1    ;      after null-char := true;
+     lo  w2     6      ;    (i.e. make name pointer odd)
+
+     al  w2  x2+2      ;    increase(name pointer);
+
+g3:                    ; get word:
+     rl  w1  x2        ;    current word := name (name pointer);
+     al  w0  x1        ;    partial word := current word;
+     sh. w2     v15.   ;    if name pointer < last addr of name.word then
+     jl.        g2.    ;      goto test rest of partial word;
+
+     sz  w2     2.1    ;    if after null-char then
+     jl.       (d12.)  ;      return;
+     jl.        j6.    ;    goto result 6; (i.e. more than 11 chars)
+
+e.                     ;
+
+
+
+; the following complex of procedures take care of moves
+;   in general the call must be like this:
+; call:  al  w0  <bytes to move>   (must be even)
+;        al. w1  <to-address>
+;        al. w2  <from-address>
+;        jl. w3  move
+; return: all regs undef
+;
+; procedure move entry
+; procedure move name
+; procedure move
+;
+
+b. g10, h10 w.
+
+e33: am         f0-8   ; move entry: bytes = size of catalog entry
+e32: al  w0     8      ; move name:  bytes = size of name
+e31:                   ; move:
+     rs. w3     h0.    ;    save(return);
+
+     ac  w3    (0)     ;    remaining := - bytes;
+     sz  w3     1<1    ;    if odd number of words to move then
+     jl.        g5.    ;      goto move single word;
+
+g1:                    ; move double words:
+     rs. w3     h1.    ;    save(remaining);
+     sl  w3     h5     ;    if remaining does no exceed size of move-table
+     jl.     x3+h4.    ;      then switch out through table;
+                       ;    (otherwise move a whole portion)
+h3:                    ; start of move-table:
+     dl  w0  x2+30     ;
+     ds  w0  x1+30     ;
+     dl  w0  x2+26     ;
+     ds  w0  x1+26     ;
+     dl  w0  x2+22     ;
+     ds  w0  x1+22     ;
+     dl  w0  x2+18     ;
+     ds  w0  x1+18     ;
+     dl  w0  x2+14     ;
+     ds  w0  x1+14     ;
+     dl  w0  x2+10     ;
+     ds  w0  x1+10     ;
+     dl  w0  x2+6      ;
+     ds  w0  x1+6      ;
+     dl  w0  x2+2      ;
+     ds  w0  x1+2      ;
+h4:                    ; top of move-table:
+h5 = h3 - h4           ; size of move-table (notice: negative)
+
+     al  w1  x1-h5     ;    increase(to-address);
+     al  w2  x2-h5     ;    increase(from-address);
+     rl. w3     h1.    ;    restore(remaining);
+     al  w3  x3-h5     ;    decrease(remaining);  (remember: negative)
+     sh  w3    -1      ;    if not all moved yet then
+     jl.        g1.    ;      goto move double words;
+
+     jl.       (h0.)   ;    return;
+
+g5:                    ; move single word:
+     rl  w0  x2+0      ;
+     rs  w0  x1+0      ;
+     al  w1  x1+2      ;    increase(to-address);
+     al  w2  x2+2      ;    increase(from-address);
+     al  w3  x3+2      ;    decrease(remaining);  (remember: negative)
+     jl.        g1.    ;    goto move double words;
+
+h0:  0                 ; saved return
+h1:  0                 ; remaining bytes (negative, multiplum of 4 bytes)
+
+e.                     ;
+
+
+; procedure compare names
+;
+;   the names at name.work and name.param are compared
+;
+; call: w2 = chain addr, w3 = link
+; exit: w0w1 = undef, w2w3 = unchanged
+;
+; return: link+0: not same name
+;         link+2: the names are equal
+
+e41:                   ; compare names:
+     dl. w1     v13.   ;
+     sn  w0 (x2+f55+0) ;    if first part of name.work <>
+     se  w1 (x2+f55+2) ;       first part of name.chain then
+     jl      x3        ;      return not same;
+
+     dl. w1     v14.   ;    if second part of name.work <>
+     sn  w0 (x2+f55+4) ;
+     se  w1 (x2+f55+6) ;       second part of name.chain then
+     jl      x3        ;      return not same;
+
+     jl      x3+2      ;    return same;
+
+
+
+; procedure for all named entries in cat do
+;
+;   the namekey.work is computed, and the current catalog is searched for
+;     entries with name = name.work.
+;   for each such entry the found-action is called
+;
+; call:  jl. w3  e42.
+;        jl.     no more
+;        <action for found entry>
+;           w0w1 = base.entry, w2 = entry
+;        (maybe save w2)
+;        ...
+;        (maybe restore w2, if changed)
+;        jl      x3
+;
+; error return: result 2, in case of io-error
+;
+; return: link+0: no more entries (all regs undef)
+;         link+2: w0w1 = base.entry, w2 = entry, w3 = continue search
+
+b. h0 w.
+
+e42:                   ; for all named entries in cat do:
+     rs. w3     h0.    ;
+     jl. w3     e3.    ;    compute namekey.work;
+     ls  w2    -3      ;    segment := key;
+
+     jl. w3     e14.   ;    for all key entries do
+     jl.       (h0.)   ;+2:   no more: goto no-more action;
+
+; for each entry the name must be tested:
+     dl. w1     v13.   ;
+     sn  w0 (x2+f5+0)  ;
+     se  w1 (x2+f5+2)  ;    if name.entry <> name.work then
+     jl      x3        ;      return;
+
+     dl. w1     v14.   ;
+     sn  w0 (x2+f5+4)  ;
+     se  w1 (x2+f5+6)  ;
+     jl      x3        ;
+
+; the name.entry was correct, now exit to check the base.entry
+     dl  w1  x2+f2     ;    w0w1 := base.entry;
+     am.       (h0.)   ;
+     jl        +2      ;    call found-action and return;
+
+h0:  0                 ; saved return;
+
+e.                     ;
+
+
+
+; procedure for all named procs in part of nametable do
+;
+;   the specified part of nametable is scanned for processes with
+;     name.proc = name.work
+;   for each process the found-action is called
+;
+; call:  jl. w3  e43.
+;          <first>    ; e.g. b5 (=first area process in nametable)
+;          <top>      ; e.g. b6 (=top   area process in nametable)
+;        jl.     no more
+;        <action for found process>
+;           w2 = nametable address
+;        (maybe save w2)
+;        ...
+;        (maybe restore w2)
+;        jl      x3
+;
+; return: link+4: no more processes (all regs undef)
+;         link+6: w0w1 = base.process, w2 = nametable address, w3 = continue
+
+b. g10, h10 w.
+
+e43:                   ; for all processes in part of nametable do:
+     rl  w2 (x3+0)     ;    get first nametable address;
+     rl  w0 (x3+2)     ;    get top   nametable address;
+     al  w3  x3+6      ;
+     ds. w0     h1.    ;    save(found-action address, top nametable address);
+
+     al  w2  x2-2      ;
+g1:                    ; next process:
+     dl. w1     v13.   ;
+g2:                    ;
+     al  w2  x2+2      ;    increase(nametable address);
+     sn. w2    (h1.)   ;    if nametable address = top name table address then
+     jl.        g10.   ;      goto no-more action;
+
+     rl  w3  x2+0      ;    proc := word(nametable address);
+
+     sn  w0 (x3+a11+0) ;
+     se  w1 (x3+a11+2) ;    if name.proc <> name.work then
+     jl.        g2.    ;      goto next process;
+
+     dl. w1     v14.   ;
+     sn  w0 (x3+a11+4) ;
+     se  w1 (x3+a11+6) ;
+     jl.        g1.    ;
+
+; the process-name was correct, now exit to check the base.process
+     dl  w1  x3+a49    ;    w0w1 := base.process;
+     al. w3     g1.    ;    return := next process;
+     jl.       (h0.)   ;    call found-action;
+
+g10: am.       (h0.)   ; no-more action:
+     jl        -2      ;    goto no-more;
+
+h0:  0                 ; return to found-action
+h1:  0                 ; top name table address
+
+e.                     ;
+
+
+
+; procedure find idle process in part of nametable
+;
+;   the specified part of nametable is scanned until an idle process is found
+;   (notice: it must exist)
+;
+; call:  jl. w3  e44.
+;        <first>     ; e.g. b5 (= first area process in name table)
+;
+; return: cur proc nametable address is defined
+;         w0 = 0, w1 = unchanged, w2 = proc, w3 = undef
+
+b. g10 w.
+
+e44:                   ; find idle process in part of nametable:
+     al  w0     0      ;
+     rl  w2 (x3)       ;    nametable address := param;
+     se  w2    (b6)    ;    (if internal processes then skip procfunc itself)
+     al  w2  x2-2      ;
+g1:                    ; next process:
+     al  w2  x2+2      ;    increase(nametable address);
+     am     (x2)       ;    if name.process(nametable address) <> 0 then
+     se  w0   (+a11)   ;
+     jl.        g1.    ;      goto next process;
+
+     rs. w2     d11.   ;    save(cur proc nametable addr);
+     rl  w2  x2        ;    w2 := proc;
+     jl      x3+2      ;    return;
+
+e.                     ;
+
+
+
+; procedure find chain
+;
+;   searches the chaintables in order to find a chainhead with
+;     docname.chain = name
+;
+; call:  jl. w3  e45.
+;        <name address>
+;
+; error return:  result 6, if name(0) = 0
+;
+; return: link+2: chain not found   (all regs undef)
+;         link+4: chain found
+;                   w2 = chain
+;                   other regs undef
+
+b. g10, h10 w.
+
+e45:                   ; find chain:
+     rl  w1  x3        ;    w1 := start of name;
+     al  w1  x1+2      ;
+     al  w2  x1+4      ;
+     ds. w2     h2.    ;    save (first double, last double);
+
+     al  w3  x3+2      ;
+     rs. w3     h0.    ;    save (error return address);
+
+     rl  w3     b22    ;    entry := first drumchain in name table;
+     al  w3  x3-2      ;
+
+g1:                    ; next chain:
+     dl. w1    (h2.)   ;    w0w1 := last double word of name;
+g2:                    ;
+     al  w3  x3+2      ;    increase (entry);
+     sn  w3    (b24)   ;    if all chains tested then
+     jl.       (h0.)   ;      error return;
+
+     rl  w2  x3        ;    chain := name table(entry);
+     sn  w0 (x2+f61+4) ;
+     se  w1 (x2+f61+6) ;    if name.chain <> name then
+     jl.        g2.    ;      goto next chain;
+
+     dl. w1    (h1.)   ;
+     sn  w0 (x2+f61+0) ;
+     se  w1 (x2+f61+2) ;
+     jl.        g1.    ;
+
+; a chain was found, with docname.chain = name
+; check that the chain is not empty
+
+     sn  w0     0      ;    if name(0) = 0 then
+     jl.        j6.    ;      result 6;  i.e. nameformat illegal;
+
+     am.       (h0.)   ;
+     jl        +2      ;    return ok;
+
+h0:  0                 ; return
+h1:  0                 ; address of first double word of name
+h2:  0                 ; address of last  double word of name
+
+e.                     ;
+
+
+
+; procedure search best entry in catalog
+;
+;   searches the current catalog for an entry with name.entry = name.work
+;     and with the narrowest interval containing base.work
+;   the entry is moved to work
+;
+; call:  jl. w3  e46.
+;        jl.     not found
+;        jl.     found
+;
+; error return: result 2, in case of io-error
+;               result 6, in case of nameformat illegal
+;
+; return: link+0: no entry with name.entry = name.work was found
+;                   with an interval containing base.work
+;                 (all regs undef)
+;         link+2: an entry was found:
+;                   w0w1 = base.entry
+;                   cur entry (and -segment) is defined
+;                   entry is moved to work
+;                 (all regs undef)
+
+b. g20, h10 w.
+
+e46:                   ; search best entry in catalog:
+     rs. w3     h0.    ;    save(return);
+
+     dl  w1     b40    ;    best base := system base;
+     ds. w1     h2.    ;
+     al  w0     0      ;    cur entry := 0;
+     rs. w0     d3.    ;
+
+     jl. w3     e42.   ;    for all named entries in catalog do
+     jl.        g5.    ;+2:   no more: goto test any found;
+
+; w0w1 = base.entry, w2 = entry, w3 = continue search
+     sh. w0    (v1.)   ;    if base.entry does not contain base.work
+     sh. w0    (h1.)   ;    or base.entry is not better than best base then
+     jl      x3        ;      continue search;
+
+     sl. w1    (v2.)   ;
+     sl. w1    (h2.)   ;
+     jl      x3        ;
+
+; a better entry was found: save new base as best base
+     bs. w0     1      ;    (code trick)
+     al  w1  x1+1      ;    (code trick)
+     ds. w1     h2.    ;    best base := base.entry;
+
+; procedure save position
+;
+; call:  w2 = entry
+;        jl. w3  e48.
+; exit:  w2,w3 = unchanged
+
+e48:                    ; save position:
+     rl. w1     d8.+f36;    cur entry segment := current segment;
+     ds. w2     d3.    ;    cur entry := entry;
+     jl      x3        ;    return;;
+
+g5:                    ; test any found:
+     rl. w2     d3.    ;    if cur entry = 0 then
+     sn  w2     0      ;      goto test format;
+     jl.        g10.   ;    (i.e. no entries was found, maybe illegal name)
+
+     jl. w3     e11.   ;    get current entry segment;
+     al. w1     d1.    ;
+     rl. w2     d3.    ;
+     jl. w3     e33.   ;    move entry to work;
+
+     dl. w1     v2.    ;    w0w1 := base.work;
+     am.       (h0.)   ;    ok return;
+     jl        +2      ;
+
+g10:                   ; test format:
+     jl. w3     e24.   ;    test format;
+     jl.       (h0.)   ;    not-found return;
+
+h0:  0                 ; saved return
+h1:  0                 ; lower best interval - 1
+h2:  0                 ; upper best interval + 1
+
+
+
+
+; procedure search best process in nametable
+;
+;   searches the nametable for a process with name.process = name.work
+;     and with the narrowest interval containing base.work
+;
+; call:  jl. w3  e47.
+;          <first>    ; e.g. b5 (=first area process in nametable)
+;          <top>      ; e.g. b6 (=top   area process in nametable)
+;        jl.     not found
+;        jl.     found
+;
+; return: link+4: no process with name.process = name.work was found
+;                 (all regs undef)
+;         link+6: a process was found:
+;                   cur process nametable address is defined
+;                   w0w1 = base.process, w2 = process
+;                 (other regs undef)
+
+
+e47:                   ; search best process in nametable:
+     rs. w3     h0.    ;    save(return);
+
+     dl  w1  x3+2      ;    get search limits;
+     ds. w1     h5.    ;
+
+     dl  w1     b40    ;    best base := system base;
+     ds. w1     h2.    ;
+     al  w0     0      ;    cur proc nametable address := 0;
+     rs. w0     d11.   ;
+
+     jl. w3     e43.   ;    for all named processes in part of nametable do
+       0 ; e.g. b3     ; (start limit)
+h5:    0 ; e.g. b7     ; (top limit)
+     jl.        g20.   ;+6:   no more: goto test any found;
+
+; w0w1 = base.process, w2 = nametable address, w3 = continue address
+     sh. w0    (v1.)   ;    if base.process does not contain base.work
+     sh. w0    (h1.)   ;    or base.process in not better than best base then
+     jl      x3        ;      continue search;
+
+     sl. w1    (v2.)   ;
+     sl. w1    (h2.)   ;
+     jl      x3        ;
+
+; a better process was found, save new base and nametable address
+     bs. w0     1      ;    (code trick)
+     al  w1  x1+1      ;    (code trick)
+     ds. w1     h2.    ;    best base := base.process;
+
+     rs. w2     d11.   ;    cur process nametable address := nametable address
+     jl      x3        ;    continue search;
+
+g20:                   ; test any found:
+     rl. w2     d11.   ;
+     rl. w3     h0.    ;
+     sn  w2     0      ;    if cur proc nametable address = 0 then
+     jl      x3+4      ;      not-found return;
+
+     rl  w2  x2        ;    proc := nametable (name table address);
+     dl  w1  x2+a49    ;    w0w1 := base.proc;
+     jl      x3+6      ;    ok-return;
+
+e.                     ;
+
+
+
+; the following set of procedures handles the conversion of
+;   logical sender-addresses (in case of rc8000)
+;
+; they all have a common call- and return-sequence:
+;
+; call:  jl. w2  e<number>
+; return: w2 = abs address
+;         w0, w1, w3 unchanged
+
+b. g10, h10 w.
+
+e60:                   ; get w1-abs:
+     rs. w2     h0.    ;
+     al  w2     a29    ;    w2 := rel of save w1;
+     jl.        g0.    ;    goto get abs;
+
+e61:                   ; get w2-abs:
+     rs. w2     h0.    ;
+     al  w2     a30    ;    w2 := rel of save w2;
+     jl.        g0.    ;    goto get abs;
+
+e62:                   ; get w3-abs:
+     rs. w2     h0.    ;
+     al  w2     a31    ;    w2 := rel of save w3;
+
+g0:                    ; get abs:
+     am.       (d2.)   ;
+     rl  w2  x2        ;    w2 := saved wreg.sender (logical address);
+
+g1:                    ; convert to abs:
+c.-8000                ;    if rc8000 then
+     am.       (d2.)   ;
+     wa  w2    +a182   ;      w2 := logical address + base.sender;
+z.                     ;
+     jl.       (h0.)   ;    return;
+
+h0:  0                 ; saved return
+
+
+; procedure get abs address
+;
+; call:  al  w2  <logical addr>
+;        jl. w3  e63.
+;
+; return: w2 = abs address
+;         w0, w1, w3 unchanged
+
+e63:                   ; get abs address
+     rs. w3     h0.    ;
+     jl.        g1.    ;    goto convert to abs;
+
+e.                     ;
+
+
+
+; the following set of procedures take care of all moves between
+;   sender-process and procfunc.
+;
+; they all have a common call- and return-sequence:
+;
+; call:  jl. w3  e<number>
+; return: all regs undef
+
+b. h10 w.
+
+;    size       procfunc addres
+
+h1:  8   ,      v5     ; name.work
+h2:  8   ,      v11    ; docname.work
+h3:  f8  ,      v6     ; tail.work
+h4:                    ; (chainhead)
+h5:  f0  ,      d1     ; entry.work
+h6:  12  ,      v6     ; registers to tail.work
+h7:  18  ,      v6     ; internal params to tail.work
+h8:  10  ,      v5     ; name + nametable addr
+h9:  4*a110+4 , d16    ; bs-claims to bs-params
+
+; moves from senders w1-area:
+e76: am         h7-h9  ; internal params to tail.work:
+e75: am         h9-h6  ; bs-claims to bs-params:
+e74: am         h6-h5  ; registers to tail.work:
+e73: am         h5-h3  ; complete entry to work:
+e72: am         h3-h2  ; tail to tail.work:
+e71: am         h2-h1  ; name to docname.work:
+e70: dl. w1     h1.+2  ; name to name.work:
+     jl. w2     e60.   ;    w2 := abs address of w1-area;
+     jl.        e31.   ;    goto move;
+
+; moves to senders w1-area:
+e82: am         h1-h5  ; name.work to name:
+e81: am         h5-h3  ; work to complete entry:
+e80: dl. w1     h3.+2  ; tail.work to tail:
+     jl. w2     e60.   ;    w2 := abs address of w1-area;
+     rx  w2     2      ;    exchange ..to.. and ..from..;
+     jl.        e31.   ;    goto move;
+
+; moves from senders w2-area:
+e85: dl. w1     h2.+2  ; name to docname.work:
+     jl. w2     e61.   ;    w2 := abs address of w2-area;
+     jl.        e31.   ;    goto move;
+
+; moves from senders w3-area:
+e92: am         h4-h2  ; chainhead to work:
+e91: am         h2-h1  ; name to docname.work:
+e90: dl. w1     h1.+2  ; name to name.work:
+     jl. w2     e62.   ;    w2 := abs address of w3-area;
+     jl.        e31.   ;    goto move;
+
+; moves to senders w3-area:
+e96: am         h8-h1  ; name and nametable addr to name etc.:
+e95: dl. w1     h1.+2  ; name.work to name:
+     jl. w2     e62.   ;    w2 := abs address of w3-area;
+     rx  w2     2      ;    exchange ..to.. and ..from..;
+     jl.        e31.   ;    goto move;
+
+e.                     ;
+
+
+
+; the following set of procedures handles the interpretation
+;   of the function-tables.
+;
+; most of the entries leave w0 and w2 unchanged
+
+b. g20, h10 w.
+
+h0 = 1                 ; size of instructions (in bytes)
+
+h1:  0                 ; current instruction pointer
+                       ;    (points at instruction being interpreted)
+h2:  0                 ; first free in stack
+h3:  0, r.3            ; stack
+
+m. *** procfunc test start
+h4:  d49               ; first of test buffer
+h5:  d50               ; top   of test buffer
+h6:  d49               ; current  test address
+m. *** procfunc test end
+
+
+n2:  am         h0     ; skip 2 instructions:
+n1:  am         h0     ; skip 1 instruction:
+n0:  al  w3     h0     ; next instruction:
+g0:  wa. w3     h1.    ;    w3 := abs addr of next instruction byte;
+g1:  rs. w3     h1.    ;    save (cur instruction ptr);
+
+; test start:
+     rs. w3    (h6.)   ;    save (cur instr ptr) in test buffer;
+     rl. w3     h6.    ;
+     al  w3  x3+2      ;    increase (test buffer ptr);
+     sl. w3    (h5.)   ;    (unless outside buffer);
+     rl. w3     h4.    ;
+     rs. w3     h6.    ;
+     rl. w3     h1.    ;    (restore (cur instr ptr) )
+; test end
+
+     bz  w3  x3        ;    w3 := instruction byte (positive integer);
+; when the function is entered, w0, w1 and w2 are unchanged from last
+;   function call.
+; w3 = return to next instruction
+     jl. w3  x3+n50.   ;    goto function (w3);
+     jl.        n0.    ;    (if it was a procedure then goto next instruction)
+
+n6:  am         h0     ; goto-action 2:  goto second param;
+n5:  al  w3     h0     ; goto-action 1:  goto first param;
+     wa. w3     h1.    ;    w3 := abs address of param byte;
+     ba  w3  x3        ;    w3 := abs addr of next instruction;
+     jl.        g1.    ;    goto save cur instruction address;
+
+; procedure next param
+;
+; call: jl. w3  n10.
+; return: w0 = next param (signed integer)
+
+n10: al  w0     h0     ; next param:
+     wa. w0     h1.    ;    w0 := abs addr of param byte;
+     rs. w0     h1.    ;    save (cur instruction ptr);
+     bl  w0    (0)     ;    w0 := param (cur instr ptr);
+     jl      x3        ;    return;
+
+
+; procedure call table program
+;
+; call: al  w3  <abs address of start of program>
+;       jl.     n20.
+
+n20: rl. w1     h1.    ; call table program:
+     rs. w1    (h2.)   ;    stack (cur instr ptr);
+     rl. w1     h2.    ;
+     al  w1  x1+2      ;    increase (stack ptr);
+g10: rs. w1     h2.    ;
+     jl.        g1.    ;    goto save abs instr ptr;
+
+n33: am         n5-n1  ; return to program and goto:
+n31: am         n1-n0  ; return to program and skip:
+n30: al. w3     n0.    ; return to program:
+     rl. w1     h2.    ;
+     al  w1  x1-2      ;    decrease (stack ptr);
+     rs. w1     h2.    ;
+     rl  w1  x1        ;    unstack (cur instr ptr);
+     rs. w1     h1.    ;
+     jl      x3        ;    goto next or skip or goto-action;
+
+
+; subroutine call following program and return later to function
+;
+; call: jl. w3  n25.
+
+n25: rl. w1     h2.    ; call from function:
+     rs  w3  x1        ;    stack (return to function);
+     rl. w3     h1.    ;
+     rs  w3  x1+2      ;    stack (cur instr ptr);
+     al  w1  x1+4      ;    increase (stack ptr);
+     al  w3  x3+h0+h0  ;    w3 := abs addr of second byte;
+     jl.        g10.   ;    goto save stackptr and cur instr ptr;
+
+n35: rl. w1     h2.    ; return from program to function:
+     al  w1  x1-4      ;
+     rs. w1     h2.    ;    decrease (stack ptr);
+     rl  w3  x1+2      ;    unstack (cur instr ptr);
+     rs. w3     h1.    ;
+     jl     (x1)       ;    return to unstack (function);
+
+
+
+n50:                   ; base of interpretation addresses:
+
+
+
+; start interpretation
+;
+;   the previous procfunc call is answerred and the next is awaited
+;   the differrent pointers are initialized
+
+j7:  am         7-6    ; result 7:
+j6:  am         6-5    ; result 6:
+j5:  am         5-4    ; result 5:
+j4:  am         4-3    ; result 4:
+j3:  am         3-2    ; result 3:
+j2:  am         2-1    ; result 2:
+j1:  am         1-0    ; result 1:
+j0:  al  w0     0      ; result 0:
+     rl. w1     d2.    ;    w1 := sender;
+     rs  w0  x1+a28    ;    w0.sender := result;
+     jl. w3     e1.    ;    set maincat;
+     jl. w3     e7.    ;    terminate update;
+
+j10: jd         1<11+2 ; waiting instruction:
+     rl  w1     b1     ;    w1 := procfunc;
+     rl  w1  x1+a15    ;    sender := next (messq (procfunc) ) - a16;
+     al  w1  x1-a16    ;
+     rs. w1     d2.    ;    save (sender);
+
+     rl  w3  x1+a33    ;    w3 := monitor call number;
+     rl  w3  x3-2      ;
+     ws. w3     h9.    ;    ( = word (ic.sender - 2) - jd 1<11+40 )
+
+; w1 = sender
+; w3 = monitor call number
+
+     al. w2     h3.    ;
+     rs. w2     h2.    ;    stack ptr := start of stack;
+     ls  w3    -1      ;
+     wa. w3     h10.   ;    cur instruction ptr := start table (monitor call);
+     ba  w3  x3        ;
+     jl.        g1.    ;    goto next instruction;
+
+h9:  jd         1<11+40; first procfunc monitor call;
+h10: n49               ; start of table
+
+e.                     ;
+m.                monitor text 9 included
